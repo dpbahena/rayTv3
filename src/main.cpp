@@ -9,17 +9,26 @@
 
 
 
-int main(int, char**) {
+int main(int arg, char** argv) {
+
+   
 
     // Window
     Window win{"Dario", 1440, 720};
     Renderer myRender{win};
     Camera cam{myRender.colorBuffer};
 
+     if (arg == 3) {
+        cam.samples_per_pixel = atoi(argv[1]);
+        cam.max_depth = atoi(argv[2]);
+     } else {
+        cam.samples_per_pixel = 100;
+        cam.max_depth = 20;
+     }
+
     cam.aspect_ratio = win.getExtent().width / static_cast<float>(win.getExtent().height);
     cam.image_width = win.getExtent().width;
-    cam.samples_per_pixel = 500;
-    cam.max_depth = 100;
+    
 
     cam.vfov = 20.0f;
     cam.lookfrom = glm::vec3(-2.0f, 2.0f,  1.0f);
@@ -28,7 +37,7 @@ int main(int, char**) {
 
     cam.defocus_angle = 10.0f;
     cam.focus_dist = 3.4f; 
-    
+    printf("Raytrace with %d samples with %d depth\n", cam.samples_per_pixel, cam.max_depth);
 
     bool rendered = false;
 
