@@ -80,6 +80,7 @@
         }
 
         displayMode();
+        printf("Image width: %d, height: %d\n", width, height);
 
         window = SDL_CreateWindow(windowName.c_str(), x_winPos, y_winPos, width, height, 0); // 0 flag for border
         
