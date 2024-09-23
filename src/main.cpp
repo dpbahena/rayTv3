@@ -24,6 +24,7 @@ int main(int arg, char** argv) {
      } else {
         cam.samples_per_pixel = 100;
         cam.max_depth = 20;
+        printf("Usage:  ./raytracer <# samples per pixel> <max depth>\n");
      }
 
     cam.aspect_ratio = win.getExtent().width / static_cast<float>(win.getExtent().height);

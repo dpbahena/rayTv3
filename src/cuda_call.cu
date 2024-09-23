@@ -1,6 +1,6 @@
 #include "cuda_call.h"
-#include <ray.h>
-#include <interval.h>
+#include "ray.h"
+#include "interval.h"
 #include <cstdio>
 #include <curand_kernel.h>
 
@@ -640,4 +640,5 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     cudaFree(d_material_right);
     cudaFree(d_material_center);
     cudaFree(d_material_bubble);
+    
 }
