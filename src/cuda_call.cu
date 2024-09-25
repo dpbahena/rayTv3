@@ -695,7 +695,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     clock_t start, stop;
     start = clock();
 
-    int threads = 16;
+    int threads = 8;
     dim3 blockSize(threads, threads);
     int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
     int blocks_y = (image_height + blockSize.y - 1) / blockSize.y;
