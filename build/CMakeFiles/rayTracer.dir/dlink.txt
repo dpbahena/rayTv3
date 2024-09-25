@@ -1,1 +1,0 @@
-/usr/local/cuda-12.6/bin/nvcc -forward-unknown-to-host-compiler -g "--generate-code=arch=compute_86,code=[compute_86,sm_86]" -Xcompiler=-fPIC -Wno-deprecated-gpu-targets -shared -dlink --options-file CMakeFiles/rayTracer.dir/deviceObjects1.rsp -o CMakeFiles/rayTracer.dir/cmake_device_link.o --options-file CMakeFiles/rayTracer.dir/deviceLinkLibs.rsp

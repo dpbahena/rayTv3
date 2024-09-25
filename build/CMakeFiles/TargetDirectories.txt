@@ -1,3 +1,0 @@
-/home/dario/learning/rayTv3/build/CMakeFiles/rayTracer.dir
-/home/dario/learning/rayTv3/build/CMakeFiles/edit_cache.dir
-/home/dario/learning/rayTv3/build/CMakeFiles/rebuild_cache.dir

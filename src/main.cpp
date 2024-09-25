@@ -22,8 +22,8 @@ int main(int arg, char** argv) {
         cam.samples_per_pixel = atoi(argv[1]);
         cam.max_depth = atoi(argv[2]);
      } else {
-        cam.samples_per_pixel = 100;
-        cam.max_depth = 20;
+        cam.samples_per_pixel = 20;
+        cam.max_depth = 10;
         printf("Usage:  ./raytracer <# samples per pixel> <max depth>\n");
      }
 

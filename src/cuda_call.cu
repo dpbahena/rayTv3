@@ -3,6 +3,7 @@
 #include "interval.h"
 #include <cstdio>
 #include <curand_kernel.h>
+#include <unistd.h>
 
 
 
@@ -621,7 +622,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     int num_threads = threads * threads * blocks_x * blocks_y;
     
     checkCuda(cudaMalloc(&d_states, num_threads * sizeof(curandState_t)));
-    init_random<<<gridSize, blockSize>>>(time(0), d_states);
+    init_random<<<gridSize, blockSize>>>(time(0) ^ getpid(), d_states);
     checkCuda(cudaDeviceSynchronize() );
 
     rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world);
