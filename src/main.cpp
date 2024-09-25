@@ -32,12 +32,12 @@ int main(int arg, char** argv) {
     
 
     cam.vfov = 20.0f;
-    cam.lookfrom = glm::vec3(-2.0f, 2.0f,  1.0f);
-    cam.lookat   = glm::vec3( 0.0f, 0.0f, -1.0f);
+    cam.lookfrom = glm::vec3(13.0f, 2.0f,  3.0f);
+    cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
 
-    cam.defocus_angle = 10.0f;
-    cam.focus_dist = 3.4f; 
+    cam.defocus_angle = 0.6f;
+    cam.focus_dist = 10.0f; 
     printf("Raytrace with %d samples with %d depth\n", cam.samples_per_pixel, cam.max_depth);
 
     bool rendered = false;
@@ -45,14 +45,14 @@ int main(int arg, char** argv) {
     while(win.windowIsOpen()) {
 
         if(!rendered) {
-            clock_t start, stop;
-            start = clock();
+            // clock_t start, stop;
+            // start = clock();
             cam.render();  // calculate the raytracing
-            stop = clock();
+            // stop = clock();
             myRender.render();
             rendered = true;
-            double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
-            std::cerr << "took " << timer_seconds << " seconds with " << cam.samples_per_pixel << " samples per pixel and depth of " << cam.max_depth << "\n";
+            // double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
+            // std::cerr << "took " << timer_seconds << " seconds with " << cam.samples_per_pixel << " samples per pixel and depth of " << cam.max_depth << "\n";
         }
 
         
@@ -70,6 +70,8 @@ int main(int arg, char** argv) {
                     case SDLK_ESCAPE:
                         win.closeWindow();
                         break;
+                    case SDLK_SPACE: // redraw display
+                        rendered = false;
                     default:
                         break;
                 }
