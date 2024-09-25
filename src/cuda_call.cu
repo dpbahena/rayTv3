@@ -545,15 +545,67 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
+void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, dielectric* &bubble, metal* &right, sphere* &spheres, hittable_list* &world){
+
+    // allocate memory on the host
+    lambertian  h_material_ground(glm::vec3(0.8f, 0.8f, 0.0f) );
+    lambertian  h_material_center(glm::vec3(0.1f, 0.2f, 0.5f) );
+    dielectric  h_material_left(1.50f);  //glass
+    dielectric  h_material_bubble(1.00f / 1.50f);
+    metal       h_material_right(glm::vec3(0.8f, 0.6f, 0.2f), 1.0f ); // fuzz 
+
+    // ALLOCATE
+    checkCuda(cudaMalloc((void**)&ground, sizeof(lambertian)) );
+    checkCuda(cudaMalloc((void**)&center, sizeof(lambertian)) );
+    checkCuda(cudaMalloc((void**)&left, sizeof(dielectric)) );
+    checkCuda(cudaMalloc((void**)&bubble, sizeof(dielectric)) );
+    checkCuda(cudaMalloc((void**)&right, sizeof(metal)) );
+
+    checkCuda(cudaMemcpy(ground, &h_material_ground, sizeof(lambertian), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMemcpy(center, &h_material_center, sizeof(lambertian), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMemcpy(left, &h_material_left, sizeof(dielectric), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMemcpy(bubble, &h_material_bubble, sizeof(dielectric), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMemcpy(right, &h_material_right, sizeof(metal), cudaMemcpyHostToDevice) );
+
+    // INCLUDE MATERIAL IN HITTABLE OBJECTS
+    sphere h_spheres[] = {
+            
+            sphere(glm::vec3( 0.0f, -100.5f, -1.0f), 100.0f, &ground->base),
+            sphere(glm::vec3( 0.0f,  0.0f,   -1.2f), 0.5f,   &center->base),
+            sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.5f,   &left->base),
+            sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.4f,   &bubble->base),
+            sphere(glm::vec3( 1.0f,  0.0f,   -1.0f), 0.5f,   &right->base)
+    };
+
+    
+
+    int number_hittables = 5;
+
+    
+    checkCuda(cudaMalloc((void**)&spheres, number_hittables * sizeof(sphere)));
+    checkCuda(cudaMemcpy(spheres, h_spheres, number_hittables * sizeof(sphere), cudaMemcpyHostToDevice) );
+
+    // create a hittable list
+    hittable_list h_world;
+    h_world.list = spheres;
+    h_world.list_size = number_hittables;
+
+    // Allocate memory for hittable list on the device
+    
+    checkCuda(cudaMalloc((void**)&world, sizeof(hittable_list)));
+    checkCuda(cudaMemcpy(world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+}
+
+
 void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm::vec3 center, glm::vec3 pixel00_loc, glm::vec3 pixel_delta_u, glm::vec3 pixel_delta_v, int samples_per_pixel, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v, uint32_t* colorBuffer)
 {  
 
-   // allocate memory on the host
-   lambertian  h_material_ground(glm::vec3(0.8f, 0.8f, 0.0f) );
-   lambertian  h_material_center(glm::vec3(0.1f, 0.2f, 0.5f) );
-   dielectric  h_material_left(1.50f);  //glass
-   dielectric  h_material_bubble(1.00f / 1.50f);
-   metal       h_material_right(glm::vec3(0.8f, 0.6f, 0.2f), 1.0f ); // fuzz 
+//    // allocate memory on the host
+//    lambertian  h_material_ground(glm::vec3(0.8f, 0.8f, 0.0f) );
+//    lambertian  h_material_center(glm::vec3(0.1f, 0.2f, 0.5f) );
+//    dielectric  h_material_left(1.50f);  //glass
+//    dielectric  h_material_bubble(1.00f / 1.50f);
+//    metal       h_material_right(glm::vec3(0.8f, 0.6f, 0.2f), 1.0f ); // fuzz 
 
    // device variables
    uint32_t*   d_image;
@@ -566,51 +618,53 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
    curandState_t* d_states;
    sphere* d_spheres;
    hittable_list* d_world;
+   
 
+    // // ALLOCATE
+    // checkCuda(cudaMalloc((void**)&d_material_ground, sizeof(lambertian)) );
+    // checkCuda(cudaMalloc((void**)&d_material_center, sizeof(lambertian)) );
+    // checkCuda(cudaMalloc((void**)&d_material_left, sizeof(dielectric)) );
+    // checkCuda(cudaMalloc((void**)&d_material_bubble, sizeof(dielectric)) );
+    // checkCuda(cudaMalloc((void**)&d_material_right, sizeof(metal)) );
 
-    // ALLOCATE
-    checkCuda(cudaMalloc((void**)&d_material_ground, sizeof(lambertian)) );
-    checkCuda(cudaMalloc((void**)&d_material_center, sizeof(lambertian)) );
-    checkCuda(cudaMalloc((void**)&d_material_left, sizeof(dielectric)) );
-    checkCuda(cudaMalloc((void**)&d_material_bubble, sizeof(dielectric)) );
-    checkCuda(cudaMalloc((void**)&d_material_right, sizeof(metal)) );
+    // checkCuda(cudaMemcpy(d_material_ground, &h_material_ground, sizeof(lambertian), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMemcpy(d_material_center, &h_material_center, sizeof(lambertian), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMemcpy(d_material_left, &h_material_left, sizeof(dielectric), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMemcpy(d_material_bubble, &h_material_bubble, sizeof(dielectric), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMemcpy(d_material_right, &h_material_right, sizeof(metal), cudaMemcpyHostToDevice) );
 
-    checkCuda(cudaMemcpy(d_material_ground, &h_material_ground, sizeof(lambertian), cudaMemcpyHostToDevice) );
-    checkCuda(cudaMemcpy(d_material_center, &h_material_center, sizeof(lambertian), cudaMemcpyHostToDevice) );
-    checkCuda(cudaMemcpy(d_material_left, &h_material_left, sizeof(dielectric), cudaMemcpyHostToDevice) );
-    checkCuda(cudaMemcpy(d_material_bubble, &h_material_bubble, sizeof(dielectric), cudaMemcpyHostToDevice) );
-    checkCuda(cudaMemcpy(d_material_right, &h_material_right, sizeof(metal), cudaMemcpyHostToDevice) );
-
-    // INCLUDE MATERIAL IN HITTABLE OBJECTS
-    sphere h_spheres[] = {
+    // // INCLUDE MATERIAL IN HITTABLE OBJECTS
+    // sphere h_spheres[] = {
             
-            sphere(glm::vec3( 0.0f, -100.5f, -1.0f), 100.0f, &d_material_ground->base),
-            sphere(glm::vec3( 0.0f,  0.0f,   -1.2f), 0.5f, &d_material_center->base),
-            sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.5f, &d_material_left->base),
-            sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.4f, &d_material_bubble->base),
-            sphere(glm::vec3( 1.0f,  0.0f,   -1.0f), 0.5f, &d_material_right->base)
-    };
+    //         sphere(glm::vec3( 0.0f, -100.5f, -1.0f), 100.0f, &d_material_ground->base),
+    //         sphere(glm::vec3( 0.0f,  0.0f,   -1.2f), 0.5f, &d_material_center->base),
+    //         sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.5f, &d_material_left->base),
+    //         sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.4f, &d_material_bubble->base),
+    //         sphere(glm::vec3( 1.0f,  0.0f,   -1.0f), 0.5f, &d_material_right->base)
+    // };
 
     
 
-    int number_hittables = 5;
+    // int number_hittables = 5;
 
     
-    checkCuda(cudaMalloc((void**)&d_spheres, number_hittables * sizeof(sphere)));
-    checkCuda(cudaMemcpy(d_spheres, h_spheres, number_hittables * sizeof(sphere), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMalloc((void**)&d_spheres, number_hittables * sizeof(sphere)));
+    // checkCuda(cudaMemcpy(d_spheres, h_spheres, number_hittables * sizeof(sphere), cudaMemcpyHostToDevice) );
 
-    // create a hittable list
-    hittable_list h_world;
-    h_world.list = d_spheres;
-    h_world.list_size = number_hittables;
+    // // create a hittable list
+    // hittable_list h_world;
+    // h_world.list = d_spheres;
+    // h_world.list_size = number_hittables;
 
-    // Allocate memory for hittable list on the device
+    // // Allocate memory for hittable list on the device
     
-    checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)));
-    checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)));
+    // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
 
+    init_objects(d_material_ground, d_material_center, d_material_left, d_material_bubble, d_material_right, d_spheres, d_world);
 
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
+    
 
     int threads = 16;
     dim3 blockSize(threads, threads);
