@@ -45,14 +45,14 @@ int main(int arg, char** argv) {
     while(win.windowIsOpen()) {
 
         if(!rendered) {
-            clock_t start, stop;
-            start = clock();
+            // clock_t start, stop;
+            // start = clock();
             cam.render();  // calculate the raytracing
-            stop = clock();
+            // stop = clock();
             myRender.render();
             rendered = true;
-            double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
-            std::cerr << "took " << timer_seconds << " seconds with " << cam.samples_per_pixel << " samples per pixel and depth of " << cam.max_depth << "\n";
+            // double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
+            // std::cerr << "took " << timer_seconds << " seconds with " << cam.samples_per_pixel << " samples per pixel and depth of " << cam.max_depth << "\n";
         }
 
         

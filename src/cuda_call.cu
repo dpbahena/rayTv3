@@ -665,7 +665,8 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
     
-
+    clock_t start, stop;
+    start = clock();
     int threads = 16;
     dim3 blockSize(threads, threads);
     int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
@@ -683,7 +684,11 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     // checkCuda(cudaPeekAtLastError() );
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
-
+    stop = clock();
+    double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
+    // std::cerr << "took " << timer_seconds << " seconds with " << cam.samples_per_pixel << " samples per pixel and depth of " << cam.max_depth << "\n";
+    printf("It took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, samples_per_pixel, max_depth );
+    
     checkCuda(cudaMemcpy(colorBuffer, d_image, image_width * image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
     cudaFree(d_image);
