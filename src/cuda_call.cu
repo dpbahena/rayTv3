@@ -1,11 +1,12 @@
 #include "cuda_call.h"
 #include "ray.h"
 #include "interval.h"
-#include "sphere.h"
 
+#include "sphere.h"
+#include "material.h"
 
 #include <cstdio>
-#include <curand_kernel.h>
+// #include <curand_kernel.h>
 #include <vector>
 #include <random>
 #include <chrono>
@@ -25,21 +26,24 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 }
 
 
-enum MaterialType {LAMBERTIAN, METAL, DIELECTRIC};
-struct material;
-struct hittable_list;
+// enum MaterialType {LAMBERTIAN, METAL, DIELECTRIC};
+// struct material;
+struct hittable_list {
+    sphere* list;
+    int list_size;
+};
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
 __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
 __device__ inline glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max);
 __device__ inline glm::vec3 random_vector(curandState_t* states,  int i, int j);
 __device__ inline float random_float_in_range(curandState_t* state, float a, float b);
-__device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
-__device__ inline bool near_zero(const glm::vec3 v);
+// __device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
+// __device__ inline bool near_zero(const glm::vec3 v);
 __device__ inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n);
 __device__ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_over_etat);
-__device__ inline float reflectance(float cosine, float refraction_index);
-__device__ inline float random_float(curandState_t* state);
+// __device__ inline float reflectance(float cosine, float refraction_index);
+// __device__ inline float random_float(curandState_t* state);
 __device__ glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
 __device__ glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
 __device__ ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v);
@@ -189,107 +193,104 @@ inline double random_double(float min, float max) {
 //             material* mat;
 //     };
 
-struct alignas(16) material {
-    public:
-        bool (*scatter)(const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j);
-        MaterialType type;
+// struct alignas(16) material {
+//     public:
+//         bool (*scatter)(const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j);
+//         MaterialType type;
     
     
-};
+// };
 
 
 
-struct hittable_list {
-    sphere* list;
-    int list_size;
-};
 
 
 
-struct lambertian {
-    public:
-        material base;
-        glm::vec3 albedo;
 
-        __device__ 
-        static bool scatter(const lambertian* self, const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j){
-            auto scatter_direction = rec.normal + random_unit_vector(states,  i, j);
+// struct lambertian {
+//     public:
+//         material base;
+//         glm::vec3 albedo;
+
+//         __device__ 
+//         static bool scatter(const lambertian* self, const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j){
+//             auto scatter_direction = rec.normal + random_unit_vector(states,  i, j);
             
-            // Catch degenerate scatter direction
-            if (near_zero(scatter_direction)) scatter_direction = rec.normal;
-            scattered = ray(rec.p, scatter_direction, r_in.time());
-            attenuation = self->albedo;  // Access the albedo using itself
+//             // Catch degenerate scatter direction
+//             if (near_zero(scatter_direction)) scatter_direction = rec.normal;
+//             scattered = ray(rec.p, scatter_direction, r_in.time());
+//             attenuation = self->albedo;  // Access the albedo using itself
            
 
-            return true;
-        }
+//             return true;
+//         }
 
-        __device__ __host__
-        lambertian(const glm::vec3& a) : albedo(a) {
-            base.scatter = (bool (*)(const ray&, const hitRecord&, glm::vec3&, ray&, curandState_t*, int, int))scatter;
-            base.type = LAMBERTIAN;
+//         __device__ __host__
+//         lambertian(const glm::vec3& a) : albedo(a) {
+//             base.scatter = (bool (*)(const ray&, const hitRecord&, glm::vec3&, ray&, curandState_t*, int, int))scatter;
+//             base.type = LAMBERTIAN;
             
-        }
+//         }
         
-};  
+// };  
 
-struct metal {
-   public:
-      material base;
-      glm::vec3 albedo;
-      float fuzz;
+// struct metal {
+//    public:
+//       material base;
+//       glm::vec3 albedo;
+//       float fuzz;
 
-      __device__ 
-      static bool scatter(const metal* self, const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j) {
-            glm::vec3 reflected = reflect(r_in.direction, rec.normal);
-            reflected = glm::normalize(reflected) + (static_cast<float>(self->fuzz) * random_unit_vector(states, i, j));
-            scattered = ray(rec.p, reflected, r_in.time());
-            attenuation = self->albedo;
+//       __device__ 
+//       static bool scatter(const metal* self, const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j) {
+//             glm::vec3 reflected = reflect(r_in.direction, rec.normal);
+//             reflected = glm::normalize(reflected) + (static_cast<float>(self->fuzz) * random_unit_vector(states, i, j));
+//             scattered = ray(rec.p, reflected, r_in.time());
+//             attenuation = self->albedo;
             
-            return (glm::dot(scattered.direction, rec.normal) > 0.0f);
-      }
+//             return (glm::dot(scattered.direction, rec.normal) > 0.0f);
+//       }
 
-      __device__ __host__
-      metal(const glm::vec3& a, float fuzz) : albedo(a), fuzz(fuzz < 1.0f ? fuzz : 1.0f) {
-            base.scatter = (bool (*)(const ray&, const hitRecord&, glm::vec3&, ray&, curandState_t*, int, int))scatter;
-            base.type = METAL;
-      }
-};
+//       __device__ __host__
+//       metal(const glm::vec3& a, float fuzz) : albedo(a), fuzz(fuzz < 1.0f ? fuzz : 1.0f) {
+//             base.scatter = (bool (*)(const ray&, const hitRecord&, glm::vec3&, ray&, curandState_t*, int, int))scatter;
+//             base.type = METAL;
+//       }
+// };
 
-struct dielectric {
-   public:
-      material base;
-      float refraction_index;
-      /* Refractive index in vacumm or air, or the ratio of the material's refractive index over the refractive index of the enclosing media */
+// struct dielectric {
+//    public:
+//       material base;
+//       float refraction_index;
+//       /* Refractive index in vacumm or air, or the ratio of the material's refractive index over the refractive index of the enclosing media */
 
-      __device__ 
-      static bool scatter(const dielectric* self, const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j) {
-            attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-            float ri = rec.front_face ? (1.0f / self->refraction_index) : self->refraction_index;
-            glm::vec3 unit_direction = glm::normalize(r_in.direction);
-            float cos_theta = fmin(glm::dot(-unit_direction, rec.normal), 1.0f);
-            float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+//       __device__ 
+//       static bool scatter(const dielectric* self, const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j) {
+//             attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
+//             float ri = rec.front_face ? (1.0f / self->refraction_index) : self->refraction_index;
+//             glm::vec3 unit_direction = glm::normalize(r_in.direction);
+//             float cos_theta = fmin(glm::dot(-unit_direction, rec.normal), 1.0f);
+//             float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
 
-            bool cannot_refract = ri * sin_theta > 1.0f;
-            glm::vec3 direction;
-            curandState_t x = states[i];  // for random data
+//             bool cannot_refract = ri * sin_theta > 1.0f;
+//             glm::vec3 direction;
+//             curandState_t x = states[i];  // for random data
 
-            if (cannot_refract || reflectance(cos_theta, ri) > random_float(&x) )
-               direction = reflect(unit_direction, rec.normal);
-            else   
-               direction = refract(unit_direction, rec.normal, ri);
+//             if (cannot_refract || reflectance(cos_theta, ri) > random_float(&x) )
+//                direction = reflect(unit_direction, rec.normal);
+//             else   
+//                direction = refract(unit_direction, rec.normal, ri);
             
-            states[i] = x; // save back value
-            scattered  = ray(rec.p, direction, r_in.time());
-            return true;
-      }
+//             states[i] = x; // save back value
+//             scattered  = ray(rec.p, direction, r_in.time());
+//             return true;
+//       }
 
-      __device__ __host__
-      dielectric(float r_i) : refraction_index(r_i) {
-            base.scatter = (bool (*)(const ray&, const hitRecord&, glm::vec3&, ray&, curandState_t*, int, int))scatter;
-            base.type = DIELECTRIC;
-      }
-};
+//       __device__ __host__
+//       dielectric(float r_i) : refraction_index(r_i) {
+//             base.scatter = (bool (*)(const ray&, const hitRecord&, glm::vec3&, ray&, curandState_t*, int, int))scatter;
+//             base.type = DIELECTRIC;
+//       }
+// };
 
 
 __device__
