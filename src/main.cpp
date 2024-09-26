@@ -51,6 +51,7 @@ int main(int arg, char** argv) {
             // stop = clock();
             myRender.render();
             rendered = true;
+            // break;
             // double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
             // std::cerr << "took " << timer_seconds << " seconds with " << cam.samples_per_pixel << " samples per pixel and depth of " << cam.max_depth << "\n";
         }

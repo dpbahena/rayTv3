@@ -3,9 +3,10 @@
 #include "interval.h"
 #include <cstdio>
 #include <curand_kernel.h>
-#include <unistd.h>
+// #include <unistd.h>
 #include <vector>
 #include <random>
+#include <chrono>
 
 
 
@@ -521,27 +522,16 @@ ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::
     return ray(ray_origin, ray_direction);
 }
 
+// Use high-resolution clock to generate a seed
+unsigned int seed = static_cast<unsigned int>(
+    std::chrono::high_resolution_clock::now().time_since_epoch().count()
+);
 
 __global__ void init_random(unsigned int seed, curandState_t* states){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     curand_init(seed, idx, 0, &states[idx]);
 }
 
-// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, float defocusAngle, vec3 defocusDisk_u, vec3 defocusDisk_v, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, uint32_t* image, hittable_list* world) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= width || j >= height) return;
-    
-//     glm::vec3 color = {0.0, 0.0, 0.0};
-//     for (int sample = 0; sample < samples_per_pixel; sample++){
-//         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
-//         color  += ray_color(states, i, j, depth, r, *world);
-//     }
-//     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
-//     color *= pixel_sample_scale;
-//     image[width * j + i] = colorToUint32_t(color);  
-// }
 
 __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -695,7 +685,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     clock_t start, stop;
     start = clock();
 
-    int threads = 8;
+    int threads = 16;
     dim3 blockSize(threads, threads);
     int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
     int blocks_y = (image_height + blockSize.y - 1) / blockSize.y;
@@ -705,8 +695,8 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     int num_threads = threads * threads * blocks_x * blocks_y;
     
     checkCuda(cudaMalloc(&d_states, num_threads * sizeof(curandState_t)));
-    init_random<<<gridSize, blockSize>>>(time(0) ^ getpid(), d_states);
-    checkCuda(cudaDeviceSynchronize() );
+    init_random<<<gridSize, blockSize>>>(seed, d_states);
+    // checkCuda(cudaDeviceSynchronize() );
 
     rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world);
     // checkCuda(cudaPeekAtLastError() );
