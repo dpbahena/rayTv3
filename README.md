@@ -15,3 +15,10 @@ I started with Chapter 13 defocus Blur
 ### Sample - 500 samples and 100 depth : 48.65368 secs  1440 X 720
 ### Sample - 500 samples and 100 depth : 95.69674 secs  1920 x 1080
 ![Screenshot of the project](output_samples/chap14_finalRender.png)
+
+
+# BOOK 2: Chapter 2.   - MOTION BLUR
+<!-- ### Sample - 500 samples and 100 depth : 48.65368 secs  1440 X 720 -->
+### Sample - 500 samples and 100 depth : 103.826068 secs  1920 x 1080
+![Screenshot of the project](output_samples/book2-ch2-motionBlur.png)
+

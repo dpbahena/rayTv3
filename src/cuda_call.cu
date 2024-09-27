@@ -522,7 +522,11 @@ ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::
 
     auto ray_origin =  (defocusAngle <= 0) ? cameraCenter : defocus_disk_sample(states, i, j, cameraCenter, defocusDisk_u, defocusDisk_v);
     auto ray_direction = pixel_sample - ray_origin;
-    return ray(ray_origin, ray_direction);
+    auto x = states[i];
+    auto ray_time = random_float(&x);
+    states[i] = x; // put value back after using it
+
+    return ray(ray_origin, ray_direction, ray_time);
 }
 
 // Use high-resolution clock to generate a seed
@@ -555,8 +559,8 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
 void init_objects(std::vector<material*> device_materials, sphere* &spheres, hittable_list* &world){
 
     
-    std::vector<sphere>     h_spheres;
-    lambertian* ground;
+    std::vector<sphere> h_spheres;
+    lambertian*         ground;
     
 
     // Create the ground (a huge sphere)
@@ -584,7 +588,8 @@ void init_objects(std::vector<material*> device_materials, sphere* &spheres, hit
                     checkCuda(cudaMalloc((void**)&d_mat, sizeof(lambertian)) );
                     checkCuda(cudaMemcpy(d_mat, &material, sizeof(lambertian), cudaMemcpyHostToDevice) );
                     device_materials.push_back(&d_mat->base);
-                    h_spheres.push_back(sphere(center, 0.2f, &d_mat->base));
+                    auto center2 = center + glm::vec3(0, random_double(0, .5), 0);
+                    h_spheres.push_back(sphere(center, center2, 0.2f, &d_mat->base));
 
                 }
                 if(choose_material < 0.95f) {
