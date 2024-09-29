@@ -18,108 +18,23 @@ struct hitRecord {
     }
 };
 
-
-// class sphere {
-//         public:
-//             __host__ __device__
-//             sphere() {}
-//             __host__ __device__
-//             sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){}
-//             __host__ __device__
-//             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-//                 glm::vec3 oc = r.origin - center;
-//                 auto a = glm::dot(r.direction, r.direction);
-//                 auto h = glm::dot(oc, r.direction);
-//                 auto c = glm::dot(oc, oc) - radius * radius;
-
-//                 auto discriminant = h * h - a * c;
-//                 if (discriminant < 0)
-//                     return false;
-
-//                 auto sqrtd = std::sqrt(discriminant);
-
-//                 // find the nearest root that lies in the acceptable range
-//                 auto root = (-h - sqrtd) / a;
-//                 if (!ray_t.surrounds(root)) {
-//                     root = (-h + sqrtd) / a;
-//                     if (!ray_t.surrounds(root))
-//                         return false;
-//                 }
-
-//                 rec.t = root;
-//                 rec.p = r.at(rec.t);
-//                 glm::vec3 outward_normal = (rec.p - center) / radius;
-//                 rec.set_face_normal(r, outward_normal);
-//                 rec.mat_ptr = mat;
-                
-//                 return true;
-//             }
-
-//         private:
-//             glm::vec3 center;
-//             float radius;
-//             material* mat;
-//     };
-
-// class sphere {
-//         public:
-//             __host__ __device__
-//             sphere() {}
-//             // Stationary sphere
-//             __host__ __device__
-//             sphere(const glm::vec3& static_center, float radius, material* mat) : center(static_center, glm::vec3(0.0, 0.0, 0.0)), radius(radius), mat(mat){}
-//             // Moving sphere
-//             sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center(center1, center2 - center1), radius(radius), mat(mat){}
-//             __host__ __device__
-//             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-//                 glm::vec3 current_center = center.at(r.time());
-//                 glm::vec3 oc = current_center -  r.origin;
-//                 auto a = glm::dot(r.direction, r.direction);
-//                 auto h = glm::dot(r.direction, oc);
-//                 auto c = glm::dot(oc, oc) - radius * radius;
-
-//                 auto discriminant = h * h - a * c;
-//                 if (discriminant < 0)
-//                     return false;
-
-//                 auto sqrtd = std::sqrt(discriminant);
-
-//                 // find the nearest root that lies in the acceptable range
-//                 auto root = (-h - sqrtd) / a;
-//                 if (!ray_t.surrounds(root)) {
-//                     root = (-h + sqrtd) / a;
-//                     if (!ray_t.surrounds(root))
-//                         return false;
-//                 }
-
-//                 rec.t = root;
-//                 rec.p = r.at(rec.t);
-//                 glm::vec3 outward_normal = (rec.p - current_center) / radius;
-//                 rec.set_face_normal(r, outward_normal);
-//                 rec.mat_ptr = mat;
-                
-//                 return true;
-//             }
-
-//         private:
-//             ray center;
-//             float radius;
-//             material* mat;
-//     };
-
 class sphere {
         public:
             __host__ __device__
             sphere() {}
             // stationary sphere
             __host__ __device__
-            sphere(const glm::vec3& center, float radius, material* mat) : center1(center), radius(radius), mat(mat), is_moving(false) {}
+            sphere(const glm::vec3& static_center, float radius, material* mat) : center1(static_center), radius(radius), mat(mat), is_moving(false) {
+                center_vec = glm::vec3(radius, radius, radius);
+                bBox = AaBb(static_center - center_vec, static_center + center_vec );
+            }
             
             // moving sphere
             __host__ __device__
             sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center1(center1), radius(radius), mat(mat), is_moving(true) {
 
                 center_vec = center2 - center1;
+                
             }
 
 
@@ -154,12 +69,16 @@ class sphere {
                 return true;
             }
 
+            __device__ __host__
+            AaBb bounding_box() const { return bBox; }
+
         private:
             glm::vec3 center1;
             float radius;
             material* mat;
             bool is_moving;
             glm::vec3 center_vec;
+            AaBb bBox;
 
             __device__ __host__
             glm::vec3 sphere_center(float t) const {

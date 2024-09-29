@@ -4,6 +4,7 @@
 
 #include "sphere.h"
 #include "material.h"
+#include "aabb.h"
 
 #include <cstdio>
 // #include <curand_kernel.h>
@@ -234,6 +235,8 @@ __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hi
 
     return hit_anything;
 }
+
+
 
 
 __device__

@@ -19,7 +19,7 @@ class interval {
             bool contains(double x) const {
                 return min <= x && x <= max;
             }
-            
+
             __device__ __host__ 
             bool surrounds(double x) const {
                 return min < x && x < max;
@@ -30,6 +30,11 @@ class interval {
                 if (x < min) return min;
                 if (x > max) return max;
                 return x;
+            }
+
+            interval expand (float delta) const {
+                auto padding = delta / 2.0f;
+                return interval (min - padding, max + padding);
             }
 
             static const interval empty, universe;
