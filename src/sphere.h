@@ -1,5 +1,4 @@
-
-// #include <glm/glm.hpp>
+#include "aabb.h"
 
 struct material;
 
@@ -34,6 +33,9 @@ class sphere {
             sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center1(center1), radius(radius), mat(mat), is_moving(true) {
 
                 center_vec = center2 - center1;
+                AaBb box1(sphere_center(0) - center_vec, sphere_center(0) + center_vec);
+                AaBb box2(sphere_center(1) - center_vec, sphere_center(1) + center_vec);
+                bBox = AaBb(box1, box2);
                 
             }
 

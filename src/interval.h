@@ -9,6 +9,11 @@ class interval {
             double min, max;
             __device__ __host__ interval() : min(+FLT_MAX), max(-FLT_MAX){} //default interval is empty
             __device__ __host__ interval(double min, double max) : min(min), max(max) {}
+            __device__ __host__ interval(const interval& a, const interval& b) {
+                /* Create the interval tightly enclosing the two input intervals */
+                min = a.min <= b.min ? a.min : b.min;
+                max = a.max >= b.max ? a.max : b.max;
+            }
 
             __device__ __host__ 
             double size() const {

@@ -27,8 +27,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 }
 
 
-// enum MaterialType {LAMBERTIAN, METAL, DIELECTRIC};
-// struct material;
+
 struct hittable_list {
     sphere* list;
     int list_size;
