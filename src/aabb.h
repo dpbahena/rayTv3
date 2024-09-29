@@ -2,7 +2,19 @@
 
 // #include "interval.h"
 
+struct hitRecord {
+    glm::vec3 p;
+    glm::vec3 normal;
+    material* mat_ptr;
+    float t;
+    bool front_face;
 
+    __host__ __device__
+    void set_face_normal(const ray& r, const glm::vec3& outward_normal) {
+        front_face = glm::dot(r.direction, outward_normal) < 0;
+        normal = front_face ? outward_normal : -outward_normal;
+    }
+};
 
 class AaBb {
     public:
@@ -52,4 +64,58 @@ class AaBb {
 
             return true;
         }
+};
+
+class BVH_Node {
+    public:
+        BVH_Node(hittable_boxes* boxes, curandState_t* states, int i): BVH_Node(boxes.list, 0, boxes.list_size, states, i) {} 
+        BVH_Node(BVH_Node** objects, size_t start, size_t end, curandState_t* states, int i) {
+            auto x = states[i];
+            int axis = int(3 * random_float(&x));  // randomly choose an axis
+            auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
+
+            size_t object_span = end - start;
+
+            if (object_span == 1) {
+                left = right = objects[start].
+                
+            }
+
+        }
+
+        __host__ __device__
+        bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
+            if(!bBox.hit(r, ray_t))
+                return false;
+            bool hit_left   = left->hit(r, ray_t, rec);
+            bool hit_right  = right->hit(r, interval(ray_t.min, hit_left ? rec.t : ray_t.max), rec);
+
+            return hit_left || hit_right;
+        }
+
+        AaBb bounding_box() const {return bBox; }
+    private:
+        AaBb bBox;
+        BVH_Node* left;
+        BVH_Node* right;
+
+        static bool box_compare(const BVH_Node* a, const BVH_Node* b, int axis_index){
+            auto a_axis_interval = a->bounding_box().axis_interval(axis_index);
+            auto b_axis_interval = b->bounding_box().axis_interval(axis_index);
+
+            return a_axis_interval.min < b_axis_interval.min;
+        }
+
+        static bool box_x_compare (const BVH_Node* a, const BVH_Node* b){
+            return box_compare(a, b, 0);
+        }
+        static bool box_y_compare (const BVH_Node* a, const BVH_Node* b){
+            return box_compare(a, b, 1);
+        }
+        static bool box_z_compare (const BVH_Node* a, const BVH_Node* b){
+            return box_compare(a, b, 2);
+        }
+
+         
+
 };

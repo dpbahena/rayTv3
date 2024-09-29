@@ -31,6 +31,13 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 struct hittable_list {
     sphere* list;
     int list_size;
+    AaBb* bBox_list;
+    int bBox_list_size;
+};
+
+struct hittable_boxes {
+    BVH_Node* list;
+    int list_size;
 };
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
@@ -38,12 +45,8 @@ __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i,
 __device__ inline glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max);
 __device__ inline glm::vec3 random_vector(curandState_t* states,  int i, int j);
 __device__ inline float random_float_in_range(curandState_t* state, float a, float b);
-// __device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
-// __device__ inline bool near_zero(const glm::vec3 v);
 __device__ inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n);
 __device__ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_over_etat);
-// __device__ inline float reflectance(float cosine, float refraction_index);
-// __device__ inline float random_float(curandState_t* state);
 __device__ glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
 __device__ glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
 __device__ ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v);

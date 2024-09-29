@@ -3,19 +3,19 @@
 struct material;
 
 
-struct hitRecord {
-    glm::vec3 p;
-    glm::vec3 normal;
-    material* mat_ptr;
-    float t;
-    bool front_face;
+// struct hitRecord {
+//     glm::vec3 p;
+//     glm::vec3 normal;
+//     material* mat_ptr;
+//     float t;
+//     bool front_face;
 
-    __host__ __device__
-    void set_face_normal(const ray& r, const glm::vec3& outward_normal) {
-        front_face = glm::dot(r.direction, outward_normal) < 0;
-        normal = front_face ? outward_normal : -outward_normal;
-    }
-};
+//     __host__ __device__
+//     void set_face_normal(const ray& r, const glm::vec3& outward_normal) {
+//         front_face = glm::dot(r.direction, outward_normal) < 0;
+//         normal = front_face ? outward_normal : -outward_normal;
+//     }
+// };
 
 class sphere {
         public:
