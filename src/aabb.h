@@ -1,6 +1,16 @@
 #pragma once
 
-// #include "interval.h"
+
+#include <thrust/sort.h>
+#include <curand_kernel.h>
+
+__device__
+inline float random_float(curandState_t* state);
+ 
+
+// inline double random_double();
+
+struct material;
 
 struct hitRecord {
     glm::vec3 p;
@@ -19,26 +29,30 @@ struct hitRecord {
 class AaBb {
     public:
         interval x, y, z;
+        __device__ __host__
         AaBb() {} // The default AABB is empty, since intervals are empty by default
+        __device__ __host__
         AaBb(const interval& x, const interval& y, const interval& z): x(x), y(y), z(z) {}
+        __device__ __host__
         AaBb(const glm::vec3& a, const glm::vec3& b) {
             /* Treat the 2 points a & b as extrema for the bounding box, so we don't require a particular min/max coordinate order */
             x = (a[0] <= b[0]) ? interval(a[0], b[0]) : interval(b[0], a[0]); // same as a[0] same as a.x
             y = (a[1] <= b[1]) ? interval(a[1], b[1]) : interval(b[1], a[1]);
             z = (a[2] <= b[2]) ? interval(a[2], b[2]) : interval(b[2], a[2]);
         }
+        __device__ __host__
         AaBb(const AaBb& box0, const AaBb& box1) {
             x = interval(box0.x, box1.x);
             y = interval(box0.y, box1.y);
             z = interval(box0.z, box1.z);
         }
-
+        __device__ __host__
         const interval& axis_interval(int n) const {
             if (n == 1) return y;
             if (n == 2) return z;
             return x;
         }
-
+        __device__ __host__
         bool hit(const ray& r, interval ray_t) const {
             const glm::vec3& ray_orig = r.origin;
             const glm::vec3& ray_dir  = r.direction;
@@ -68,18 +82,35 @@ class AaBb {
 
 class BVH_Node {
     public:
-        BVH_Node(hittable_boxes* boxes, curandState_t* states, int i): BVH_Node(boxes.list, 0, boxes.list_size, states, i) {} 
-        BVH_Node(BVH_Node** objects, size_t start, size_t end, curandState_t* states, int i) {
+
+        // __device__ __host__
+        // BVH_Node(hittable_boxes boxes, curandState_t* states, int i): BVH_Node(boxes.list, 0, boxes.list_size, states, i) {} 
+        // BVH_Node(std::vector<BVH_Node*>list, curandState_t* states, int i): BVH_Node(list.data(), 0, list.size(), states, i) {} 
+
+        __device__ 
+        BVH_Node(BVH_Node** nodeObjects, size_t start, size_t end, curandState_t* states, int i) {
             auto x = states[i];
             int axis = int(3 * random_float(&x));  // randomly choose an axis
+            // int axis = int(3 * random_double());  // randomly choose an axis
+            states[i] = x;  // save the value back after use
             auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
-
+            
+            
             size_t object_span = end - start;
 
             if (object_span == 1) {
-                left = right = objects[start].
-                
+                left = right = nodeObjects[start];
+            } else if (object_span == 2) {
+                left = nodeObjects[start];
+                right = nodeObjects[start + 1];
+            } else { 
+                thrust::sort(thrust::device, nodeObjects + start, nodeObjects + end, comparator );
+                auto mid = start + object_span / 2;
+                left = new BVH_Node(nodeObjects, start, mid, states, i);
+                right = new BVH_Node(nodeObjects, mid, end, states, i);
             }
+            
+            bBox = AaBb(left->bounding_box(), right->bounding_box());
 
         }
 
@@ -93,6 +124,7 @@ class BVH_Node {
             return hit_left || hit_right;
         }
 
+        __device__ __host__
         AaBb bounding_box() const {return bBox; }
     private:
         AaBb bBox;
@@ -102,6 +134,7 @@ class BVH_Node {
         static bool box_compare(const BVH_Node* a, const BVH_Node* b, int axis_index){
             auto a_axis_interval = a->bounding_box().axis_interval(axis_index);
             auto b_axis_interval = b->bounding_box().axis_interval(axis_index);
+            
 
             return a_axis_interval.min < b_axis_interval.min;
         }
