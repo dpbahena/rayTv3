@@ -21,7 +21,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 
 enum MaterialType {LAMBERTIAN, METAL, DIELECTRIC};
+enum HittableType {SPHERE, LIST, BBOX};
 struct material;
+struct hittable;
 struct hittable_list;
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
@@ -49,6 +51,7 @@ __device__ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, c
 struct hitRecord {
     glm::vec3 p;
     glm::vec3 normal;
+    sphere* sphere_ptr;
     material* mat_ptr;
     float t;
     bool front_face;
@@ -60,117 +63,134 @@ struct hitRecord {
     }
 };
 
+struct hittable {
+    // bool (*hit_funct)(const void*, const ray&, interval, hitRecord&);
+    // void* obj;   // generic pointer to the derived class instance
+    // // const sphere* self;
 
-// class sphere {
-//     public:
-//         __device__ __host__
-//         sphere() {}
+    // __device__
+    // bool hit(const ray& r, interval ray_t, hitRecord& rec) const {
+    //     printf("Ari\n");
+    //     return hit_funct(obj, r, ray_t, rec);  //self  is just a name..you can change is for obj or ana..or whatever
+    // }
 
-//         // stationary Sphere
-//         __device__ __host__
-//         sphere(const glm::vec3& center, float radius, material* mat) 
-//             : center1(center), radius(radius), mat(mat), is_moving(false){}
+     bool (*hit)(const ray&, interval, hitRecord&);
+     HittableType type;
 
-//         // Moving Sphere
-//         __device__ __host__
-//         sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) 
-//             : center1(center1), radius(radius), mat(mat), is_moving(true) 
-//             {
-//                 center_vec = center2 - center1;
-//             }
+   
+};
 
 
-//         __device__ __host__
-//         bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-//             glm::vec3 center = is_moving ? sphere_center(r.time()) : center1;
-//             glm::vec3 oc = r.origin - center;
-//             auto a = glm::dot(r.direction, r.direction);
-//             auto h = glm::dot(oc, r.direction);
-//             auto c = glm::dot(oc, oc) - radius * radius;
 
-//             auto discriminant = h * h - a * c;
-//             if (discriminant < 0)
-//                 return false;
 
-//             auto sqrtd = std::sqrt(discriminant);
-
-//             // find the nearest root that lies in the acceptable range
-//             auto root = (-h - sqrtd) / a;
-//             if (!ray_t.surrounds(root)) {
-//                 root = (-h + sqrtd) / a;
-//                 if (!ray_t.surrounds(root))
-//                     return false;
-//             }
-
-//             rec.t = root;
-//             rec.p = r.at(rec.t);
-//             glm::vec3 outward_normal = (rec.p - center) / radius;
-//             rec.set_face_normal(r, outward_normal);
-//             rec.mat_ptr = mat;
-            
-//             return true;
-//         }
-
-//     private:
-//         // glm::vec3 center;
-//         glm::vec3 center1;
-//         float radius;
-//         material* mat;
-//         bool is_moving;
-//         glm::vec3 center_vec;
-
-//         __device__ __host__
-//         glm::vec3 sphere_center(float t) const {
-//             /**
-//              * Linearly interpolate from center1 to center2 accofing to time,
-//              * where t = 0 yields center1 + time * center_vec;
-//              */
-//             return center1 + t * center_vec;
-//         }
-// };
 
 
 class sphere {
-        public:
-            __host__ __device__
-            sphere() {}
-            __host__ __device__
-            sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){}
-            __host__ __device__
-            bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-                glm::vec3 oc = r.origin - center;
-                auto a = glm::dot(r.direction, r.direction);
-                auto h = glm::dot(oc, r.direction);
-                auto c = glm::dot(oc, oc) - radius * radius;
+    public:
+        
+        __host__ __device__
+        sphere() {}
 
-                auto discriminant = h * h - a * c;
-                if (discriminant < 0)
+        __host__ __device__
+        sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){
+            
+            base.hit = (bool (*)(const ray& r, interval ray_t, hitRecord& rec))hit;
+            base.type = SPHERE;
+            // base.obj = this; // set this object pointer to the instance of the sphere
+            // base.hit_funct = &sphere::hit;  // assign the member function
+        }
+
+        __host__ __device__
+        static bool hit(sphere* self, const ray& r, interval ray_t, hitRecord &rec)  {
+            // auto s = static_cast<const sphere*>(self);
+            auto s = reinterpret_cast<sphere*>(self);
+            printf("Ariana\n");
+            glm::vec3 oc = r.origin - self->center;
+            auto a = glm::dot(r.direction, r.direction);
+            auto h = glm::dot(oc, r.direction);
+            auto c = glm::dot(oc, oc) - self->radius * self->radius;
+
+            auto discriminant = h * h - a * c;
+            if (discriminant < 0)
+                return false;
+
+            auto sqrtd = std::sqrt(discriminant);
+
+            // find the nearest root that lies in the acceptable range
+            auto root = (-h - sqrtd) / a;
+            if (!ray_t.surrounds(root)) {
+                root = (-h + sqrtd) / a;
+                if (!ray_t.surrounds(root))
                     return false;
-
-                auto sqrtd = std::sqrt(discriminant);
-
-                // find the nearest root that lies in the acceptable range
-                auto root = (-h - sqrtd) / a;
-                if (!ray_t.surrounds(root)) {
-                    root = (-h + sqrtd) / a;
-                    if (!ray_t.surrounds(root))
-                        return false;
-                }
-
-                rec.t = root;
-                rec.p = r.at(rec.t);
-                glm::vec3 outward_normal = (rec.p - center) / radius;
-                rec.set_face_normal(r, outward_normal);
-                rec.mat_ptr = mat;
-                
-                return true;
             }
 
-        private:
-            glm::vec3 center;
-            float radius;
-            material* mat;
-    };
+            rec.t = root;
+            rec.p = r.at(rec.t);
+            glm::vec3 outward_normal = (rec.p - self->center) / self->radius;
+            rec.set_face_normal(r, outward_normal);
+            rec.mat_ptr = self->mat;
+            rec.sphere_ptr = self;
+            
+            
+            
+            
+            return true;
+        }
+        
+    // private:
+        hittable base;  // base structure
+        
+         
+        glm::vec3 center;
+        float radius;
+        material* mat;
+};
+
+
+
+
+
+// class sphere {
+//         public:
+//             __host__ __device__
+//             sphere() {}
+//             __host__ __device__
+//             sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){}
+//             __host__ __device__
+//             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
+//                 glm::vec3 oc = r.origin - center;
+//                 auto a = glm::dot(r.direction, r.direction);
+//                 auto h = glm::dot(oc, r.direction);
+//                 auto c = glm::dot(oc, oc) - radius * radius;
+
+//                 auto discriminant = h * h - a * c;
+//                 if (discriminant < 0)
+//                     return false;
+
+//                 auto sqrtd = std::sqrt(discriminant);
+
+//                 // find the nearest root that lies in the acceptable range
+//                 auto root = (-h - sqrtd) / a;
+//                 if (!ray_t.surrounds(root)) {
+//                     root = (-h + sqrtd) / a;
+//                     if (!ray_t.surrounds(root))
+//                         return false;
+//                 }
+
+//                 rec.t = root;
+//                 rec.p = r.at(rec.t);
+//                 glm::vec3 outward_normal = (rec.p - center) / radius;
+//                 rec.set_face_normal(r, outward_normal);
+//                 rec.mat_ptr = mat;
+                
+//                 return true;
+//             }
+
+//         private:
+//             glm::vec3 center;
+//             float radius;
+//             material* mat;
+//     };
 
 struct alignas(16) material {
     public:
@@ -432,9 +452,18 @@ __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hi
     hitRecord temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
-    
+    // printf("hi, %d\n", world.list_size);
     for (int i = 0; i < world.list_size; i++) {
-        if (world.list[i].hit(r, interval(ray_t.min, closest_so_far), temp_rec)) {
+        // auto sphere_ptr = reinterpret_cast<const sphere*>( world.list[i].base.self);
+        // printf("hola\n");
+        // auto sphere_ptr = reinterpret_cast<const sphere*>(rec.sphere_ptr);
+        // printf("hola\n");
+        auto sphere_ptr = reinterpret_cast <const sphere*>(&world.list[i]);
+
+        // if (world.list[i].base.hit(r, interval(ray_t.min, closest_so_far), temp_rec)) {
+        // if (sphere::hit(sphere_ptr, interval(ray_t.min, closest_so_far), temp_rec)) {
+        if (sphere::hit(sphere_ptr, r, ray_t, rec))
+            printf("senor\n");
             hit_anything = true;
             closest_so_far = temp_rec.t;
             rec = temp_rec;
