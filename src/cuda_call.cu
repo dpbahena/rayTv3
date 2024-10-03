@@ -25,6 +25,7 @@ enum HittableType {SPHERE, LIST, BBOX};
 struct material;
 struct hittable;
 struct hittable_list;
+class sphere;
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
 __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
@@ -51,7 +52,7 @@ __device__ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, c
 struct hitRecord {
     glm::vec3 p;
     glm::vec3 normal;
-    sphere* sphere_ptr;
+    // sphere* sphere_ptr;
     material* mat_ptr;
     float t;
     bool front_face;
@@ -76,6 +77,7 @@ struct hittable {
 
      bool (*hit)(const ray&, interval, hitRecord&);
      HittableType type;
+     const sphere* ptr;
 
    
 };
@@ -96,15 +98,16 @@ class sphere {
             
             base.hit = (bool (*)(const ray& r, interval ray_t, hitRecord& rec))hit;
             base.type = SPHERE;
+            base.ptr = this;
             // base.obj = this; // set this object pointer to the instance of the sphere
             // base.hit_funct = &sphere::hit;  // assign the member function
         }
 
         __host__ __device__
-        static bool hit(sphere* self, const ray& r, interval ray_t, hitRecord &rec)  {
+        static bool hit(const sphere* self, const ray& r, interval ray_t, hitRecord &rec)  {
             // auto s = static_cast<const sphere*>(self);
-            auto s = reinterpret_cast<sphere*>(self);
-            printf("Ariana\n");
+            // auto s = reinterpret_cast<sphere*>(self);
+            // printf("Ariana\n");
             glm::vec3 oc = r.origin - self->center;
             auto a = glm::dot(r.direction, r.direction);
             auto h = glm::dot(oc, r.direction);
@@ -129,7 +132,7 @@ class sphere {
             glm::vec3 outward_normal = (rec.p - self->center) / self->radius;
             rec.set_face_normal(r, outward_normal);
             rec.mat_ptr = self->mat;
-            rec.sphere_ptr = self;
+            // rec.sphere_ptr = self;
             
             
             
@@ -458,11 +461,14 @@ __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hi
         // printf("hola\n");
         // auto sphere_ptr = reinterpret_cast<const sphere*>(rec.sphere_ptr);
         // printf("hola\n");
-        auto sphere_ptr = reinterpret_cast <const sphere*>(&world.list[i]);
+        // auto sphere_ptr = reinterpret_cast <const sphere*>(world.list[i].base.ptr);
 
+
+
+        auto sphere_ptr =  static_cast<const sphere*>( world.list[i].base.ptr);
         // if (world.list[i].base.hit(r, interval(ray_t.min, closest_so_far), temp_rec)) {
         // if (sphere::hit(sphere_ptr, interval(ray_t.min, closest_so_far), temp_rec)) {
-        if (sphere::hit(sphere_ptr, r, ray_t, rec))
+        if (sphere::hit((sphere_ptr), r, interval(ray_t.min, closest_so_far), temp_rec)) {
             printf("senor\n");
             hit_anything = true;
             closest_so_far = temp_rec.t;
