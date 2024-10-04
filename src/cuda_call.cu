@@ -31,8 +31,17 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 struct hittable_list {
     sphere* list;
     int list_size;
-    // AaBb* bBox_list;
-    // int bBox_list_size;
+    AaBb* listBox;
+    AaBb bbox;
+
+    void addBoxes() {
+        for (int i = 0; i < list_size; i++) {
+          listBox[i] = AaBb(bbox, list[i].bounding_box());
+        }
+    }
+    
+
+    
 };
 
 struct hittable_boxes {
@@ -338,6 +347,7 @@ void init_objects(std::vector<material*> device_materials, sphere* &spheres, hit
 
     
     std::vector<sphere> h_spheres;
+    std::vector<AaBb> h_boxes;
     lambertian*         ground;
     
 
@@ -436,8 +446,11 @@ void init_objects(std::vector<material*> device_materials, sphere* &spheres, hit
     hittable_list h_world;
     h_world.list = spheres;
     h_world.list_size = number_of_hittables;
-    hittable_boxes h_boxes;
+    h_world.addBoxes();
+
+    // hittable_boxes h_boxes;
     // h_boxes.list = h_world.list;
+    
 
     /* Allocate memory for hittable list on the device */
     checkCuda(cudaMalloc((void**)&world, sizeof(hittable_list)) );

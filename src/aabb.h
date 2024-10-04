@@ -3,6 +3,7 @@
 
 #include <thrust/sort.h>
 #include <curand_kernel.h>
+#include <memory>
 
 __device__
 inline float random_float(curandState_t* state);
@@ -152,3 +153,20 @@ class BVH_Node {
          
 
 };
+
+struct BVHNode {
+    AaBb bbox;
+    int left_child_index; // Index left child in the array, -1 if it's a leaf
+    int right_child_index; // index right child in the array, -1 if it's a leaf
+    int object_index;       // index of the object the leaf represent (if it's a leaf)
+    bool is_leaf;
+
+
+};
+
+class BVH {
+    public:
+        BVH(const std::vector<shared_ptr<hittable_boxes>>& objects) {
+            build_bh
+        }
+}
