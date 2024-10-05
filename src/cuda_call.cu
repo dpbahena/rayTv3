@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <curand_kernel.h>
 #include <unistd.h>
+#include <vector>
 
 
 
@@ -130,12 +131,11 @@ class sphere {
         }
         
     // private:
-        hittable base;  // base structure
-        
-         
+        hittable base;  // base structure 
         glm::vec3 center;
         float radius;
         material* mat;
+        
 };
 
 
@@ -153,9 +153,63 @@ struct alignas(16) material {
 
 
 
-struct hittable_list {
-    sphere* list;
-    int list_size;
+// struct hittable_list {
+//     // sphere* list;
+//     // int list_size;
+   
+
+
+
+// };
+
+class hittable_list {
+    public:
+        
+        
+        hittable_list(){}
+        hittable_list(hittable* objects, int number_objects){
+            list_size = number_objects;
+            add(objects);
+        };
+        
+        void add(hittable* objects) {
+            list = objects;
+            
+        }
+
+        __device__ 
+        static bool hit(const hittable_list* self, const ray& r, interval ray_t, hitRecord& rec) {
+            hitRecord temp_rec;
+            bool hit_anything = false;
+            auto closest_so_far = ray_t.max;
+            for (int i = 0; i < self->list_size; i++) {
+                
+                
+
+                if (self->list[i].type == SPHERE){
+                    auto ptr = (sphere*) self->list[i].ptr;
+                    if (sphere::hit(ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
+                        hit_anything = true;
+                        closest_so_far = temp_rec.t;
+                        rec = temp_rec;
+                    }
+
+                }
+                
+            }
+
+            return hit_anything;
+        }
+
+
+
+        // public variables
+        // std::vector<hittable*> objects;
+        hittable* list;
+        int list_size; 
+
+        hittable base;
+
 };
 
 
@@ -399,26 +453,26 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 }
 
 
-__device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hitRecord& rec) {
-    hitRecord temp_rec;
-    bool hit_anything = false;
-    auto closest_so_far = ray_t.max;
-    for (int i = 0; i < world.list_size; i++) {
+// __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hitRecord& rec) {
+//     hitRecord temp_rec;
+//     bool hit_anything = false;
+//     auto closest_so_far = ray_t.max;
+//     for (int i = 0; i < world.list_size; i++) {
         
-        if (world.list[i].base.type == SPHERE){
-            auto ptr = static_cast<sphere> (world.list[i]);
-            if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
-                hit_anything = true;
-                closest_so_far = temp_rec.t;
-                rec = temp_rec;
-            }
+//         if (world.list[i].base.type == SPHERE){
+//             auto ptr = static_cast<sphere> (world.list[i]);
+//             if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
+//                 hit_anything = true;
+//                 closest_so_far = temp_rec.t;
+//                 rec = temp_rec;
+//             }
 
-        }
+//         }
         
-    }
+//     }
 
-    return hit_anything;
-}
+//     return hit_anything;
+// }
 
 
 __device__
@@ -430,7 +484,9 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     
     for (int k = 0; k < depth; k++){
         hitRecord rec;
-        if(hit(world, cur_ray, interval(0.001f, FLT_MAX), rec)){
+        if (world.base.type == LIST)
+            auto ptr = (hittable_list*)world.base.ptr;
+        if(wo::hit(ptr, cur_ray, interval(0.001f, FLT_MAX), rec)){
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
             glm::vec3 attenuation;
