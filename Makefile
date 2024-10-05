@@ -12,7 +12,7 @@ LDFLAGS = -lSDL2
 # CUDA compiler and flags
 NVCC = nvcc
 # NVCCFLAGS = -std=c++17 -g  -I$(TINYOBJ_INCLUDE_PATH) -I$(STB_INCLUDE_PATH) -I$(NLOHMANN_JSON_PATH)
-NVCCFLAGS = -std=c++17 -g
+NVCCFLAGS = -std=c++17 -g -diag-suppress=20012
 
 # Source files
 CPP_SOURCES = $(wildcard src/*.cpp)

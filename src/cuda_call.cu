@@ -65,19 +65,10 @@ struct hitRecord {
 };
 
 struct hittable {
-    // bool (*hit_funct)(const void*, const ray&, interval, hitRecord&);
-    // void* obj;   // generic pointer to the derived class instance
-    // // const sphere* self;
-
-    // __device__
-    // bool hit(const ray& r, interval ray_t, hitRecord& rec) const {
-    //     printf("Ari\n");
-    //     return hit_funct(obj, r, ray_t, rec);  //self  is just a name..you can change is for obj or ana..or whatever
-    // }
-
-     bool (*hit)(const ray&, interval, hitRecord&);
+    
      HittableType type;
-     const sphere* ptr;
+    //  const sphere* ptr;
+     const void* ptr;
 
    
 };
@@ -96,7 +87,7 @@ class sphere {
         __host__ __device__
         sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){
             
-            base.hit = (bool (*)(const ray& r, interval ray_t, hitRecord& rec))hit;
+            // base.hit = (bool (*)(const ray& r, interval ray_t, hitRecord& rec))hit;
             base.type = SPHERE;
             base.ptr = this;
             // base.obj = this; // set this object pointer to the instance of the sphere
@@ -105,9 +96,7 @@ class sphere {
 
         __host__ __device__
         static bool hit(const sphere* self, const ray& r, interval ray_t, hitRecord &rec)  {
-            // auto s = static_cast<const sphere*>(self);
-            // auto s = reinterpret_cast<sphere*>(self);
-            // printf("Ariana\n");
+            
             glm::vec3 oc = r.origin - self->center;
             auto a = glm::dot(r.direction, r.direction);
             auto h = glm::dot(oc, r.direction);
@@ -153,47 +142,6 @@ class sphere {
 
 
 
-// class sphere {
-//         public:
-//             __host__ __device__
-//             sphere() {}
-//             __host__ __device__
-//             sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){}
-//             __host__ __device__
-//             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-//                 glm::vec3 oc = r.origin - center;
-//                 auto a = glm::dot(r.direction, r.direction);
-//                 auto h = glm::dot(oc, r.direction);
-//                 auto c = glm::dot(oc, oc) - radius * radius;
-
-//                 auto discriminant = h * h - a * c;
-//                 if (discriminant < 0)
-//                     return false;
-
-//                 auto sqrtd = std::sqrt(discriminant);
-
-//                 // find the nearest root that lies in the acceptable range
-//                 auto root = (-h - sqrtd) / a;
-//                 if (!ray_t.surrounds(root)) {
-//                     root = (-h + sqrtd) / a;
-//                     if (!ray_t.surrounds(root))
-//                         return false;
-//                 }
-
-//                 rec.t = root;
-//                 rec.p = r.at(rec.t);
-//                 glm::vec3 outward_normal = (rec.p - center) / radius;
-//                 rec.set_face_normal(r, outward_normal);
-//                 rec.mat_ptr = mat;
-                
-//                 return true;
-//             }
-
-//         private:
-//             glm::vec3 center;
-//             float radius;
-//             material* mat;
-//     };
 
 struct alignas(16) material {
     public:
@@ -455,25 +403,18 @@ __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hi
     hitRecord temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
-    // printf("hi, %d\n", world.list_size);
     for (int i = 0; i < world.list_size; i++) {
-        // auto sphere_ptr = reinterpret_cast<const sphere*>( world.list[i].base.self);
-        // printf("hola\n");
-        // auto sphere_ptr = reinterpret_cast<const sphere*>(rec.sphere_ptr);
-        // printf("hola\n");
-        // auto sphere_ptr = reinterpret_cast <const sphere*>(world.list[i].base.ptr);
+        
+        if (world.list[i].base.type == SPHERE){
+            auto ptr = static_cast<sphere> (world.list[i]);
+            if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+            }
 
-
-
-        auto sphere_ptr =  static_cast<const sphere*>( world.list[i].base.ptr);
-        // if (world.list[i].base.hit(r, interval(ray_t.min, closest_so_far), temp_rec)) {
-        // if (sphere::hit(sphere_ptr, interval(ray_t.min, closest_so_far), temp_rec)) {
-        if (sphere::hit((sphere_ptr), r, interval(ray_t.min, closest_so_far), temp_rec)) {
-            printf("senor\n");
-            hit_anything = true;
-            closest_so_far = temp_rec.t;
-            rec = temp_rec;
         }
+        
     }
 
     return hit_anything;
