@@ -89,11 +89,19 @@ class sphere {
             sphere() {}
             // stationary sphere
             __host__ __device__
-            sphere(const glm::vec3& static_center, float radius, material* mat) : center(static_center, glm::vec3(0.0,0.0,0.0)), radius(radius), mat(mat){}
+            sphere(const glm::vec3& static_center, float radius, material* mat) : center(static_center, glm::vec3(0.0,0.0,0.0)), radius(radius), mat(mat){
+                auto rvec = glm::vec3(radius, radius, radius);
+                bbox = AaBb(static_center - rvec, static_center + rvec);
+            }
             
             // moving sphere
             __host__ __device__
-            sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center(center1, center2 - center1), radius(radius), mat(mat){}
+            sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center(center1, center2 - center1), radius(radius), mat(mat){
+                auto rvec = glm::vec3(radius, radius, radius);
+                AaBb box1(center.at(0) - rvec, center.at(0) + rvec);
+                AaBb box2(center.at(1) - rvec, center.at(1) + rvec);
+                bbox = AaBb(box1, box2);
+            }
 
             __host__ __device__
             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
