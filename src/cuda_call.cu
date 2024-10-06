@@ -4,6 +4,7 @@
 
 #include "sphere.h"
 #include "material.h"
+#include "aabb.h"
 
 #include <cstdio>
 // #include <curand_kernel.h>
