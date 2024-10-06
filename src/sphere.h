@@ -23,59 +23,24 @@ struct hitRecord {
 //         public:
 //             __host__ __device__
 //             sphere() {}
+//             // stationary sphere
 //             __host__ __device__
-//             sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){}
+//             sphere(const glm::vec3& center, float radius, material* mat) : center1(center), radius(radius), mat(mat), is_moving(false) {}
+            
+//             // moving sphere
 //             __host__ __device__
-//             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-//                 glm::vec3 oc = r.origin - center;
-//                 auto a = glm::dot(r.direction, r.direction);
-//                 auto h = glm::dot(oc, r.direction);
-//                 auto c = glm::dot(oc, oc) - radius * radius;
+//             sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center1(center1), radius(radius), mat(mat), is_moving(true) {
 
-//                 auto discriminant = h * h - a * c;
-//                 if (discriminant < 0)
-//                     return false;
-
-//                 auto sqrtd = std::sqrt(discriminant);
-
-//                 // find the nearest root that lies in the acceptable range
-//                 auto root = (-h - sqrtd) / a;
-//                 if (!ray_t.surrounds(root)) {
-//                     root = (-h + sqrtd) / a;
-//                     if (!ray_t.surrounds(root))
-//                         return false;
-//                 }
-
-//                 rec.t = root;
-//                 rec.p = r.at(rec.t);
-//                 glm::vec3 outward_normal = (rec.p - center) / radius;
-//                 rec.set_face_normal(r, outward_normal);
-//                 rec.mat_ptr = mat;
-                
-//                 return true;
+//                 center_vec = center2 - center1;
 //             }
 
-//         private:
-//             glm::vec3 center;
-//             float radius;
-//             material* mat;
-//     };
 
-// class sphere {
-//         public:
-//             __host__ __device__
-//             sphere() {}
-//             // Stationary sphere
-//             __host__ __device__
-//             sphere(const glm::vec3& static_center, float radius, material* mat) : center(static_center, glm::vec3(0.0, 0.0, 0.0)), radius(radius), mat(mat){}
-//             // Moving sphere
-//             sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center(center1, center2 - center1), radius(radius), mat(mat){}
 //             __host__ __device__
 //             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-//                 glm::vec3 current_center = center.at(r.time());
-//                 glm::vec3 oc = current_center -  r.origin;
+//                 auto current_center = is_moving ? sphere_center(r.time()) : center1; 
+//                 glm::vec3 oc = r.origin - current_center;
 //                 auto a = glm::dot(r.direction, r.direction);
-//                 auto h = glm::dot(r.direction, oc);
+//                 auto h = glm::dot(oc, r.direction);
 //                 auto c = glm::dot(oc, oc) - radius * radius;
 
 //                 auto discriminant = h * h - a * c;
@@ -102,9 +67,17 @@ struct hitRecord {
 //             }
 
 //         private:
-//             ray center;
+//             glm::vec3 center1;
 //             float radius;
 //             material* mat;
+//             bool is_moving;
+//             glm::vec3 center_vec;
+
+//             __device__ __host__
+//             glm::vec3 sphere_center(float t) const {
+//                 /* Linearly interpolate from center1 to center2 according to time, where t = 0 yields center1 + time * center_vec */
+//                 return center1 + t * center_vec;
+//             }
 //     };
 
 class sphere {
@@ -113,22 +86,18 @@ class sphere {
             sphere() {}
             // stationary sphere
             __host__ __device__
-            sphere(const glm::vec3& center, float radius, material* mat) : center1(center), radius(radius), mat(mat), is_moving(false) {}
+            sphere(const glm::vec3& static_center, float radius, material* mat) : center(static_center, glm::vec3(0.0,0.0,0.0)), radius(radius), mat(mat){}
             
             // moving sphere
             __host__ __device__
-            sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center1(center1), radius(radius), mat(mat), is_moving(true) {
-
-                center_vec = center2 - center1;
-            }
-
+            sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) : center(center1, center2 - center1), radius(radius), mat(mat){}
 
             __host__ __device__
             bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-                auto current_center = is_moving ? sphere_center(r.time()) : center1; 
-                glm::vec3 oc = r.origin - current_center;
+                glm::vec3 current_center = center.at(r.time()); 
+                glm::vec3 oc =  r.origin - current_center;
                 auto a = glm::dot(r.direction, r.direction);
-                auto h = glm::dot(oc, r.direction);
+                auto h = glm::dot(r.direction, oc);
                 auto c = glm::dot(oc, oc) - radius * radius;
 
                 auto discriminant = h * h - a * c;
@@ -155,16 +124,16 @@ class sphere {
             }
 
         private:
-            glm::vec3 center1;
+            // glm::vec3 center1;
+            ray center;
             float radius;
             material* mat;
-            bool is_moving;
-            glm::vec3 center_vec;
+            // bool is_moving;
+            // glm::vec3 center_vec;
 
-            __device__ __host__
-            glm::vec3 sphere_center(float t) const {
-                /* Linearly interpolate from center1 to center2 according to time, where t = 0 yields center1 + time * center_vec */
-                return center1 + t * center_vec;
-            }
+            // __device__ __host__
+            // glm::vec3 sphere_center(float t) const {
+            //     /* Linearly interpolate from center1 to center2 according to time, where t = 0 yields center1 + time * center_vec */
+            //     return center1 + t * center_vec;
+            // }
     };
-
