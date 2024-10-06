@@ -73,12 +73,18 @@ struct hittable {
   
 };
 
-class hittable_list {
+class hittable_list : public hittable {
     public:
         
+        hittable* list;
+        int list_size; 
         
-        hittable_list(){}
+        hittable_list(){
+            type = LIST;
+            ptr = this;
+        }
         hittable_list(hittable* objects, int number_objects){
+            
             list_size = number_objects;
             add(objects);
         };
@@ -112,15 +118,6 @@ class hittable_list {
             return hit_anything;
         }
 
-
-
-        // public variables
-        // std::vector<hittable*> objects;
-        hittable* list;
-        int list_size; 
-
-        hittable base;
-
 };
 
 
@@ -132,9 +129,8 @@ class hittable_list {
 
 
 
-class sphere {
+class sphere : public hittable{
     public:
-        hittable base;  // base structure 
         glm::vec3 center;
         float radius;
         material* mat;
@@ -144,8 +140,8 @@ class sphere {
 
         __host__ __device__
         sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){
-            base.type = SPHERE;
-            base.ptr = this;
+            type = SPHERE;
+            ptr = this;
         }
 
         __host__ __device__
@@ -440,26 +436,26 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 }
 
 
-__device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hitRecord& rec) {
-    hitRecord temp_rec;
-    bool hit_anything = false;
-    auto closest_so_far = ray_t.max;
-    for (int i = 0; i < world.list_size; i++) {
+// __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hitRecord& rec) {
+//     hitRecord temp_rec;
+//     bool hit_anything = false;
+//     auto closest_so_far = ray_t.max;
+//     for (int i = 0; i < world.list_size; i++) {
         
-        if (world.list[i].base.type == SPHERE){
-            auto ptr = static_cast<sphere> (world.list[i]);
-            if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
-                hit_anything = true;
-                closest_so_far = temp_rec.t;
-                rec = temp_rec;
-            }
+//         if (world.list[i].type == SPHERE){
+//             auto ptr = static_cast<sphere> (world.list[i]);
+//             if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
+//                 hit_anything = true;
+//                 closest_so_far = temp_rec.t;
+//                 rec = temp_rec;
+//             }
 
-        }
+//         }
         
-    }
+//     }
 
-    return hit_anything;
-}
+//     return hit_anything;
+// }
 
 
 __device__
@@ -471,9 +467,9 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     
     for (int k = 0; k < depth; k++){
         hitRecord rec;
-        if (world.base.type == LIST)
-            auto ptr = (hittable_list*)world.base.ptr;
-        if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        if (world.type == LIST)
+            auto ptr = static_cast<hittable_list>(world.ptr);
+        if(hittable_list::hit(prt, cur_ray, interval(0.001f, FLT_MAX), rec)){
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
             glm::vec3 attenuation;
@@ -564,7 +560,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, dielectric* &bubble, metal* &right, sphere* &spheres, hittable_list* &world){
+void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, dielectric* &bubble, metal* &right, hittable* &spheres, hittable_list* &world){
 
     // allocate memory on the host
     lambertian  h_material_ground(glm::vec3(0.8f, 0.8f, 0.0f) );
@@ -587,7 +583,7 @@ void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, d
     checkCuda(cudaMemcpy(right, &h_material_right, sizeof(metal), cudaMemcpyHostToDevice) );
 
     // INCLUDE MATERIAL IN HITTABLE OBJECTS
-    sphere h_spheres[] = {
+    hittable h_spheres[] = {
             
             sphere(glm::vec3( 0.0f, -100.5f, -1.0f), 100.0f, &ground->base),
             sphere(glm::vec3( 0.0f,  0.0f,   -1.2f), 0.5f,   &center->base),
@@ -601,12 +597,12 @@ void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, d
     int number_hittables = 5;
 
     
-    checkCuda(cudaMalloc((void**)&spheres, number_hittables * sizeof(sphere)));
-    checkCuda(cudaMemcpy(spheres, h_spheres, number_hittables * sizeof(sphere), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMalloc((void**)&spheres, number_hittables * sizeof(hittable)));
+    checkCuda(cudaMemcpy(spheres, h_spheres, number_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
 
     // create a hittable list
     hittable_list h_world;
-    h_world.list = spheres;
+    h_world.add(spheres);
     h_world.list_size = number_hittables;
 
     // Allocate memory for hittable list on the device
@@ -635,7 +631,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
    metal*      d_material_right;
 
    curandState_t* d_states;
-   sphere* d_spheres;
+   hittable* d_spheres;
    hittable_list* d_world;
    
 
