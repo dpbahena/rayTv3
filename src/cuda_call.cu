@@ -69,8 +69,7 @@ struct hittable {
      HittableType type;
     //  const sphere* ptr;
      const void* ptr;
-
-   
+  
 };
 
 
