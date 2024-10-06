@@ -78,20 +78,20 @@ struct hittable {
 
 
 
-class sphere {
+class sphere : public hittable{
     public:
+        
+        glm::vec3 center;
+        float radius;
+        material* mat;
         
         __host__ __device__
         sphere() {}
 
         __host__ __device__
         sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){
-            
-            // base.hit = (bool (*)(const ray& r, interval ray_t, hitRecord& rec))hit;
-            base.type = SPHERE;
-            base.ptr = this;
-            // base.obj = this; // set this object pointer to the instance of the sphere
-            // base.hit_funct = &sphere::hit;  // assign the member function
+            type = SPHERE;
+            ptr = this;
         }
 
         __host__ __device__
@@ -130,12 +130,7 @@ class sphere {
         }
         
     // private:
-        hittable base;  // base structure
         
-         
-        glm::vec3 center;
-        float radius;
-        material* mat;
 };
 
 
@@ -405,7 +400,7 @@ __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hi
     auto closest_so_far = ray_t.max;
     for (int i = 0; i < world.list_size; i++) {
         
-        if (world.list[i].base.type == SPHERE){
+        if (world.list[i].type == SPHERE){
             auto ptr = static_cast<sphere> (world.list[i]);
             if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
                 hit_anything = true;
