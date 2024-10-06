@@ -70,97 +70,8 @@ struct hittable {
      HittableType type;
     //  const sphere* ptr;
      const void* ptr;
-
-   
+  
 };
-
-
-
-
-
-
-class sphere {
-    public:
-        
-        __host__ __device__
-        sphere() {}
-
-        __host__ __device__
-        sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){
-            
-            // base.hit = (bool (*)(const ray& r, interval ray_t, hitRecord& rec))hit;
-            base.type = SPHERE;
-            base.ptr = this;
-            // base.obj = this; // set this object pointer to the instance of the sphere
-            // base.hit_funct = &sphere::hit;  // assign the member function
-        }
-
-        __host__ __device__
-        static bool hit(const sphere* self, const ray& r, interval ray_t, hitRecord &rec)  {
-            
-            glm::vec3 oc = r.origin - self->center;
-            auto a = glm::dot(r.direction, r.direction);
-            auto h = glm::dot(oc, r.direction);
-            auto c = glm::dot(oc, oc) - self->radius * self->radius;
-
-            auto discriminant = h * h - a * c;
-            if (discriminant < 0)
-                return false;
-
-            auto sqrtd = std::sqrt(discriminant);
-
-            // find the nearest root that lies in the acceptable range
-            auto root = (-h - sqrtd) / a;
-            if (!ray_t.surrounds(root)) {
-                root = (-h + sqrtd) / a;
-                if (!ray_t.surrounds(root))
-                    return false;
-            }
-
-            rec.t = root;
-            rec.p = r.at(rec.t);
-            glm::vec3 outward_normal = (rec.p - self->center) / self->radius;
-            rec.set_face_normal(r, outward_normal);
-            rec.mat_ptr = self->mat;
-            // rec.sphere_ptr = self;
-            
-            
-            
-            
-            return true;
-        }
-        
-    // private:
-        hittable base;  // base structure 
-        glm::vec3 center;
-        float radius;
-        material* mat;
-        
-};
-
-
-
-
-
-
-struct alignas(16) material {
-    public:
-        bool (*scatter)(const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j);
-        MaterialType type;
-    
-    
-};
-
-
-
-// struct hittable_list {
-//     // sphere* list;
-//     // int list_size;
-   
-
-
-
-// };
 
 class hittable_list {
     public:
@@ -211,6 +122,82 @@ class hittable_list {
         hittable base;
 
 };
+
+
+// struct hittable_list {
+//     // sphere* list;
+//     // int list_size;
+// };
+
+
+
+
+class sphere {
+    public:
+        hittable base;  // base structure 
+        glm::vec3 center;
+        float radius;
+        material* mat;
+        
+        __host__ __device__
+        sphere() {}
+
+        __host__ __device__
+        sphere(const glm::vec3& center, float radius, material* mat) : center(center), radius(radius), mat(mat){
+            base.type = SPHERE;
+            base.ptr = this;
+        }
+
+        __host__ __device__
+        static bool hit(const sphere* self, const ray& r, interval ray_t, hitRecord &rec)  {
+            
+            glm::vec3 oc = r.origin - self->center;
+            auto a = glm::dot(r.direction, r.direction);
+            auto h = glm::dot(oc, r.direction);
+            auto c = glm::dot(oc, oc) - self->radius * self->radius;
+
+            auto discriminant = h * h - a * c;
+            if (discriminant < 0)
+                return false;
+
+            auto sqrtd = std::sqrt(discriminant);
+
+            // find the nearest root that lies in the acceptable range
+            auto root = (-h - sqrtd) / a;
+            if (!ray_t.surrounds(root)) {
+                root = (-h + sqrtd) / a;
+                if (!ray_t.surrounds(root))
+                    return false;
+            }
+
+            rec.t = root;
+            rec.p = r.at(rec.t);
+            glm::vec3 outward_normal = (rec.p - self->center) / self->radius;
+            rec.set_face_normal(r, outward_normal);
+            rec.mat_ptr = self->mat;
+            
+            return true;
+        }
+};
+
+
+
+
+
+
+struct alignas(16) material {
+    public:
+        bool (*scatter)(const ray& r_in, const hitRecord& rec, glm::vec3& attenuation, ray& scattered, curandState_t* states,  int i, int j);
+        MaterialType type;
+    
+    
+};
+
+
+
+
+
+
 
 
 
@@ -453,26 +440,26 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 }
 
 
-// __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hitRecord& rec) {
-//     hitRecord temp_rec;
-//     bool hit_anything = false;
-//     auto closest_so_far = ray_t.max;
-//     for (int i = 0; i < world.list_size; i++) {
+__device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hitRecord& rec) {
+    hitRecord temp_rec;
+    bool hit_anything = false;
+    auto closest_so_far = ray_t.max;
+    for (int i = 0; i < world.list_size; i++) {
         
-//         if (world.list[i].base.type == SPHERE){
-//             auto ptr = static_cast<sphere> (world.list[i]);
-//             if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
-//                 hit_anything = true;
-//                 closest_so_far = temp_rec.t;
-//                 rec = temp_rec;
-//             }
+        if (world.list[i].base.type == SPHERE){
+            auto ptr = static_cast<sphere> (world.list[i]);
+            if (sphere::hit(&ptr, r, interval(ray_t.min, closest_so_far), temp_rec)) {
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+            }
 
-//         }
+        }
         
-//     }
+    }
 
-//     return hit_anything;
-// }
+    return hit_anything;
+}
 
 
 __device__
@@ -486,7 +473,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
         hitRecord rec;
         if (world.base.type == LIST)
             auto ptr = (hittable_list*)world.base.ptr;
-        if(wo::hit(ptr, cur_ray, interval(0.001f, FLT_MAX), rec)){
+        if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
             glm::vec3 attenuation;
