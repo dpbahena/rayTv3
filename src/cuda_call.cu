@@ -483,21 +483,6 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
     curand_init(seed, idx, 0, &states[idx]);
 }
 
-// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, float defocusAngle, vec3 defocusDisk_u, vec3 defocusDisk_v, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, uint32_t* image, hittable_list* world) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= width || j >= height) return;
-    
-//     glm::vec3 color = {0.0, 0.0, 0.0};
-//     for (int sample = 0; sample < samples_per_pixel; sample++){
-//         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
-//         color  += ray_color(states, i, j, depth, r, *world);
-//     }
-//     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
-//     color *= pixel_sample_scale;
-//     image[width * j + i] = colorToUint32_t(color);  
-// }
 
 __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -570,12 +555,6 @@ void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, d
 void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm::vec3 center, glm::vec3 pixel00_loc, glm::vec3 pixel_delta_u, glm::vec3 pixel_delta_v, int samples_per_pixel, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v, uint32_t* colorBuffer)
 {  
 
-//    // allocate memory on the host
-//    lambertian  h_material_ground(glm::vec3(0.8f, 0.8f, 0.0f) );
-//    lambertian  h_material_center(glm::vec3(0.1f, 0.2f, 0.5f) );
-//    dielectric  h_material_left(1.50f);  //glass
-//    dielectric  h_material_bubble(1.00f / 1.50f);
-//    metal       h_material_right(glm::vec3(0.8f, 0.6f, 0.2f), 1.0f ); // fuzz 
 
    // device variables
    uint32_t*   d_image;
@@ -590,46 +569,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
    hittable_list* d_world;
    
 
-    // // ALLOCATE
-    // checkCuda(cudaMalloc((void**)&d_material_ground, sizeof(lambertian)) );
-    // checkCuda(cudaMalloc((void**)&d_material_center, sizeof(lambertian)) );
-    // checkCuda(cudaMalloc((void**)&d_material_left, sizeof(dielectric)) );
-    // checkCuda(cudaMalloc((void**)&d_material_bubble, sizeof(dielectric)) );
-    // checkCuda(cudaMalloc((void**)&d_material_right, sizeof(metal)) );
-
-    // checkCuda(cudaMemcpy(d_material_ground, &h_material_ground, sizeof(lambertian), cudaMemcpyHostToDevice) );
-    // checkCuda(cudaMemcpy(d_material_center, &h_material_center, sizeof(lambertian), cudaMemcpyHostToDevice) );
-    // checkCuda(cudaMemcpy(d_material_left, &h_material_left, sizeof(dielectric), cudaMemcpyHostToDevice) );
-    // checkCuda(cudaMemcpy(d_material_bubble, &h_material_bubble, sizeof(dielectric), cudaMemcpyHostToDevice) );
-    // checkCuda(cudaMemcpy(d_material_right, &h_material_right, sizeof(metal), cudaMemcpyHostToDevice) );
-
-    // // INCLUDE MATERIAL IN HITTABLE OBJECTS
-    // sphere h_spheres[] = {
-            
-    //         sphere(glm::vec3( 0.0f, -100.5f, -1.0f), 100.0f, &d_material_ground->base),
-    //         sphere(glm::vec3( 0.0f,  0.0f,   -1.2f), 0.5f, &d_material_center->base),
-    //         sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.5f, &d_material_left->base),
-    //         sphere(glm::vec3(-1.0f,  0.0f,   -1.0f), 0.4f, &d_material_bubble->base),
-    //         sphere(glm::vec3( 1.0f,  0.0f,   -1.0f), 0.5f, &d_material_right->base)
-    // };
-
     
-
-    // int number_hittables = 5;
-
-    
-    // checkCuda(cudaMalloc((void**)&d_spheres, number_hittables * sizeof(sphere)));
-    // checkCuda(cudaMemcpy(d_spheres, h_spheres, number_hittables * sizeof(sphere), cudaMemcpyHostToDevice) );
-
-    // // create a hittable list
-    // hittable_list h_world;
-    // h_world.list = d_spheres;
-    // h_world.list_size = number_hittables;
-
-    // // Allocate memory for hittable list on the device
-    
-    // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)));
-    // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
 
     init_objects(d_material_ground, d_material_center, d_material_left, d_material_bubble, d_material_right, d_spheres, d_world);
 
