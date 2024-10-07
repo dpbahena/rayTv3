@@ -11,26 +11,9 @@
 #include <vector>
 #include <random>
 #include <chrono>
+#include <algorithm>
 
-
-
-
-
-
-
-#define checkCuda(result) { gpuAssert((result), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
-   if (code != cudaSuccess) {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) assert(code == cudaSuccess);
-   }
-}
-
-
-struct hittable_list {
-    sphere* list;
-    int list_size;
-};
+struct hittable_list;
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
 __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
@@ -58,7 +41,240 @@ inline double random_double(float min, float max) {
     // static std::mt19937 generator;   // uncomment for same results
     static std::mt19937 generator(static_cast<unsigned int>(time(nullptr)));   // comment for same results
     return distribution(generator, std::uniform_real_distribution<double>::param_type(min, max));
-} 
+}
+
+
+
+#define checkCuda(result) { gpuAssert((result), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) assert(code == cudaSuccess);
+   }
+}
+
+
+// struct hittable_list {
+//     sphere* list;
+//     int list_size;
+//     AaBb bbox;
+//     hittable_list() {};
+//     hittable_list(sphere* objects, int size) : list(objects), list_size(size) {
+//         /* Update the bounding box incrementally as each new chidl is added */
+        
+//         if (list_size > 0) {
+//             printf("before\n");
+//             bbox = list[0].bounding_box();  // initialize first box
+//             printf("after\n");
+            
+//         }
+//         for (int i = 1; i < list_size; i++){    // then continue initializing the rest
+//             bbox = AaBb(bbox, list[i].bounding_box());
+//             // printf("ana\n");
+//         }
+        
+//     }
+    
+// };
+
+struct hittable_list {
+    sphere* list;
+    int list_size;
+    AaBb bbox;
+
+    hittable_list() {}
+
+    hittable_list(sphere* objects, int size) : list(objects), list_size(size) {
+        // Ensure the list is not empty
+        if (list_size > 0) {
+            printf("Initializing bounding box for the first sphere\n");
+            AaBb first_bbox = list[0].bounding_box();  // Get the bounding box of the first object
+            
+            // Validate the first bounding box
+            if (first_bbox.axis_interval(0).min > first_bbox.axis_interval(0).max ||
+                first_bbox.axis_interval(1).min > first_bbox.axis_interval(1).max ||
+                first_bbox.axis_interval(2).min > first_bbox.axis_interval(2).max) {
+                printf("Error: Invalid bounding box for the first sphere\n");
+                return;
+            }
+            
+            bbox = first_bbox; // Initialize with the first bounding box
+            printf("First bounding box initialized\n");
+        }
+
+        for (int i = 1; i < list_size; i++) {
+            printf("Processing sphere %d\n", i);
+            AaBb current_bbox = list[i].bounding_box();
+
+            // Validate the current bounding box before using it
+            if (current_bbox.axis_interval(0).min > current_bbox.axis_interval(0).max ||
+                current_bbox.axis_interval(1).min > current_bbox.axis_interval(1).max ||
+                current_bbox.axis_interval(2).min > current_bbox.axis_interval(2).max) {
+                printf("Error: Invalid bounding box for sphere %d\n", i);
+                continue; // Skip this sphere if its bounding box is invalid
+            }
+
+            bbox = AaBb(bbox, current_bbox);
+        }
+    }
+};
+
+/* Stores a bounding box, the indices for the left and right children, and whether the node is a leaf */
+struct BVHNode {
+    AaBb bbox;
+    int left_child_index; // Index left child in the array, -1 if it's a leaf
+    int right_child_index; // index right child in the array, -1 if it's a leaf
+    int object_index;       // index of the object the leaf represent (if it's a leaf)
+    bool is_leaf;
+
+
+};
+
+
+class BVH {
+    public:
+        BVH(const hittable_list& objects) {
+            build_bvh(objects);
+        }
+        bool hit(const ray& r, interval ray_t, hitRecord& rec, const hittable_list& objects) const {
+            return hit_bvh(r, ray_t, rec, objects);
+        }
+
+        AaBb bounding_box() const {
+            return nodes[0].bbox;  // Root node's bounding box
+        }
+
+
+
+    private:
+    std::vector<BVHNode> nodes;
+
+    void build_bvh(const hittable_list& objects) {
+        nodes.clear();
+
+        std::vector<BVHNode> node_stack;
+        node_stack.reserve(objects.list_size);
+
+        /* Build the BVH with the objects from the hittable_list */
+        recursive_build(objects, 0, objects.list_size, node_stack);
+
+        /* Store the resulting BVH in a flattened array */
+        
+        nodes = node_stack;
+
+    }
+
+    void recursive_build(const hittable_list& objects, size_t start, size_t end, std::vector<BVHNode>& node_stack) {
+        size_t object_span = end - start;
+        BVHNode node;
+
+        if(object_span == 1) {
+            node.is_leaf = true;
+            node.object_index = start; // Directly use index as object reference
+            node.left_child_index = -1;
+            node.right_child_index = -1;
+        } else {
+
+            /* Internal node case: sort the objects by a random axis */
+            int axis = int(random_double(0, 2)); // choose an axis to split
+            auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
+
+            /* Sort the objects along the chosen axis */
+
+            std::sort(objects.list + start, objects.list + end, [&](const sphere&a, const sphere& b){
+                BVHNode a_node;
+                a_node.bbox = a.bounding_box();
+                BVHNode b_node;
+                b_node.bbox = b.bounding_box();
+                return comparator(&a_node, &b_node);
+            });
+
+            /* Divide the objects into 2 groups and recursively build left and right subtrees */
+            auto mid = start + object_span / 2;
+            recursive_build(objects, start, mid, node_stack);
+            recursive_build(objects, mid, end, node_stack);
+
+            /* Set left and right child indices */
+            node.left_child_index = node_stack.size() - 2;
+            node.right_child_index = node_stack.size() - 1;
+            
+            node.is_leaf = false;
+
+            /* Conpute bounding box for interneal node by combining left and right child boxes */
+            node.bbox = AaBb(node_stack[node.left_child_index].bbox, node_stack[node.right_child_index].bbox);
+        }
+
+        /* Add the node to the stack (flat BVH array )*/
+        node_stack.push_back(node);
+
+    }
+    
+    bool hit_bvh(const ray& r, interval ray_t, hitRecord& rec, const hittable_list& objects) const {
+
+        bool hit_anything = false;
+        hitRecord temp_rec;
+        int current_node_index = 0;  // start from the root node
+
+        while (current_node_index != -1) {
+            const BVHNode& node = nodes[current_node_index];
+            
+            if (!node.bbox.hit(r, ray_t)) {
+                break ; // Skip if the bounding box is not hit
+            }
+            if (node.is_leaf) {
+                // check for object hit using hittable_list passed as a parameter 
+                if (objects.list[node.object_index].hit(r, ray_t, temp_rec)){
+                    hit_anything = true;
+                    ray_t.max = temp_rec.t;  // Update interval for closer hit
+                    rec = temp_rec;
+                }
+                break;
+            } else {
+                /* Internal node, check children */
+                bool hit_left =  nodes[node.left_child_index].bbox.hit(r, ray_t);
+                bool hit_right = nodes[node.right_child_index].bbox.hit(r, ray_t);
+
+                if (hit_left && hit_right) {
+                    current_node_index = node.left_child_index; // Go to the left first
+
+                } else if (hit_left) {
+                    current_node_index = node.left_child_index;
+                } else if (hit_right) {
+                    current_node_index = node.right_child_index;
+                } else {
+                    break;  // Neither child is hit, end transversal
+                }
+            }
+        }
+
+        return hit_anything;
+    }
+
+
+    static bool box_compare(const BVHNode* a, const BVHNode* b, int axis_index) {
+
+        /* Compare the bounding boxes of two objects along the specific axis */
+        auto a_axis_interval = a->bbox.axis_interval(axis_index);
+        auto b_axis_interval = b->bbox.axis_interval(axis_index);
+
+        return a_axis_interval.min < b_axis_interval.min; 
+    }
+
+    static bool box_x_compare (const BVHNode* a, const BVHNode* b){
+        return box_compare(a, b, 0);
+    }
+    static bool box_y_compare (const BVHNode* a, const BVHNode* b){
+        return box_compare(a, b, 1);
+    }
+    static bool box_z_compare (const BVHNode* a, const BVHNode* b){
+        return box_compare(a, b, 2);
+    }
+
+};
+
+
+
+ 
 
 
 __device__
@@ -327,7 +543,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
 void init_objects(std::vector<material*> device_materials, sphere* &spheres, hittable_list* &world){
 
     
-    std::vector<sphere> h_spheres;
+    std::vector<sphere> h_spheres;  
     lambertian*         ground;
     
 
@@ -415,7 +631,17 @@ void init_objects(std::vector<material*> device_materials, sphere* &spheres, hit
     h_spheres.push_back(sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, &d_material_3->base));
 
 
-    
+    // Validate bounding boxes on host before transferring to device
+    for (int i = 0; i < h_spheres.size(); i++) {
+        AaBb bbox = h_spheres[i].bounding_box();
+        if (bbox.axis_interval(0).min > bbox.axis_interval(0).max ||
+            bbox.axis_interval(1).min > bbox.axis_interval(1).max ||
+            bbox.axis_interval(2).min > bbox.axis_interval(2).max) {
+            printf("Invalid bounding box for sphere %d\n", i);
+        } 
+        
+
+    }
 
     
     int number_of_hittables = h_spheres.size();
@@ -423,9 +649,14 @@ void init_objects(std::vector<material*> device_materials, sphere* &spheres, hit
     checkCuda(cudaMemcpy(spheres, h_spheres.data(), number_of_hittables * sizeof(sphere), cudaMemcpyHostToDevice) );
 
     // Create a hittable list;
+    
+    printf("hittables: %d\n", number_of_hittables);
+    // hittable_list h_world(spheres, number_of_hittables);
     hittable_list h_world;
     h_world.list = spheres;
     h_world.list_size = number_of_hittables;
+    
+    
 
     /* Allocate memory for hittable list on the device */
     checkCuda(cudaMalloc((void**)&world, sizeof(hittable_list)) );

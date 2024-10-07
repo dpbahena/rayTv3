@@ -131,6 +131,7 @@ class sphere {
                 rec.set_face_normal(r, outward_normal);
                 rec.mat_ptr = mat;
                 
+                
                 return true;
             }
 

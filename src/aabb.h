@@ -46,6 +46,7 @@ class AaBb {
             x = interval(box0.x, box1.x);
             y = interval(box0.y, box1.y);
             z = interval(box0.z, box1.z);
+            
         }
         __device__ __host__
         const interval& axis_interval(int n) const {
@@ -81,88 +82,88 @@ class AaBb {
         }
 };
 
-class BVH_Node {
-    public:
+// class BVH_Node {
+//     public:
 
-        // __device__ __host__
-        // BVH_Node(hittable_boxes boxes, curandState_t* states, int i): BVH_Node(boxes.list, 0, boxes.list_size, states, i) {} 
-        // BVH_Node(std::vector<BVH_Node*>list, curandState_t* states, int i): BVH_Node(list.data(), 0, list.size(), states, i) {} 
+//         // __device__ __host__
+//         // BVH_Node(hittable_boxes boxes, curandState_t* states, int i): BVH_Node(boxes.list, 0, boxes.list_size, states, i) {} 
+//         // BVH_Node(std::vector<BVH_Node*>list, curandState_t* states, int i): BVH_Node(list.data(), 0, list.size(), states, i) {} 
 
-        __device__ 
-        BVH_Node(BVH_Node** nodeObjects, size_t start, size_t end, curandState_t* states, int i) {
-            auto x = states[i];
-            int axis = int(3 * random_float(&x));  // randomly choose an axis
-            // int axis = int(3 * random_double());  // randomly choose an axis
-            states[i] = x;  // save the value back after use
-            auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
+//         __device__ 
+//         BVH_Node(BVH_Node** nodeObjects, size_t start, size_t end, curandState_t* states, int i) {
+//             auto x = states[i];
+//             int axis = int(3 * random_float(&x));  // randomly choose an axis
+//             // int axis = int(3 * random_double());  // randomly choose an axis
+//             states[i] = x;  // save the value back after use
+//             auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
             
             
-            size_t object_span = end - start;
+//             size_t object_span = end - start;
 
-            if (object_span == 1) {
-                left = right = nodeObjects[start];
-            } else if (object_span == 2) {
-                left = nodeObjects[start];
-                right = nodeObjects[start + 1];
-            } else { 
-                thrust::sort(thrust::device, nodeObjects + start, nodeObjects + end, comparator );
-                auto mid = start + object_span / 2;
-                left = new BVH_Node(nodeObjects, start, mid, states, i);
-                right = new BVH_Node(nodeObjects, mid, end, states, i);
-            }
+//             if (object_span == 1) {
+//                 left = right = nodeObjects[start];
+//             } else if (object_span == 2) {
+//                 left = nodeObjects[start];
+//                 right = nodeObjects[start + 1];
+//             } else { 
+//                 thrust::sort(thrust::device, nodeObjects + start, nodeObjects + end, comparator );
+//                 auto mid = start + object_span / 2;
+//                 left = new BVH_Node(nodeObjects, start, mid, states, i);
+//                 right = new BVH_Node(nodeObjects, mid, end, states, i);
+//             }
             
-            bBox = AaBb(left->bounding_box(), right->bounding_box());
+//             bBox = AaBb(left->bounding_box(), right->bounding_box());
 
-        }
+//         }
 
-        __host__ __device__
-        bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
-            if(!bBox.hit(r, ray_t))
-                return false;
-            bool hit_left   = left->hit(r, ray_t, rec);
-            bool hit_right  = right->hit(r, interval(ray_t.min, hit_left ? rec.t : ray_t.max), rec);
+//         __host__ __device__
+//         bool hit(const ray& r, interval ray_t, hitRecord &rec) const  {
+//             if(!bBox.hit(r, ray_t))
+//                 return false;
+//             bool hit_left   = left->hit(r, ray_t, rec);
+//             bool hit_right  = right->hit(r, interval(ray_t.min, hit_left ? rec.t : ray_t.max), rec);
 
-            return hit_left || hit_right;
-        }
+//             return hit_left || hit_right;
+//         }
 
-        __device__ __host__
-        AaBb bounding_box() const {return bBox; }
-    private:
-        AaBb bBox;
-        BVH_Node* left;
-        BVH_Node* right;
+//         __device__ __host__
+//         AaBb bounding_box() const {return bBox; }
+//     private:
+//         AaBb bBox;
+//         BVH_Node* left;
+//         BVH_Node* right;
 
-        static bool box_compare(const BVH_Node* a, const BVH_Node* b, int axis_index){
-            auto a_axis_interval = a->bounding_box().axis_interval(axis_index);
-            auto b_axis_interval = b->bounding_box().axis_interval(axis_index);
+        // static bool box_compare(const BVH_Node* a, const BVH_Node* b, int axis_index){
+        //     auto a_axis_interval = a->bounding_box().axis_interval(axis_index);
+        //     auto b_axis_interval = b->bounding_box().axis_interval(axis_index);
             
 
-            return a_axis_interval.min < b_axis_interval.min;
-        }
+        //     return a_axis_interval.min < b_axis_interval.min;
+        // }
 
-        static bool box_x_compare (const BVH_Node* a, const BVH_Node* b){
-            return box_compare(a, b, 0);
-        }
-        static bool box_y_compare (const BVH_Node* a, const BVH_Node* b){
-            return box_compare(a, b, 1);
-        }
-        static bool box_z_compare (const BVH_Node* a, const BVH_Node* b){
-            return box_compare(a, b, 2);
-        }
+        // static bool box_x_compare (const BVH_Node* a, const BVH_Node* b){
+        //     return box_compare(a, b, 0);
+        // }
+        // static bool box_y_compare (const BVH_Node* a, const BVH_Node* b){
+        //     return box_compare(a, b, 1);
+        // }
+        // static bool box_z_compare (const BVH_Node* a, const BVH_Node* b){
+        //     return box_compare(a, b, 2);
+        // }
 
          
 
-};
+// };
 
-struct BVHNode {
-    AaBb bbox;
-    int left_child_index; // Index left child in the array, -1 if it's a leaf
-    int right_child_index; // index right child in the array, -1 if it's a leaf
-    int object_index;       // index of the object the leaf represent (if it's a leaf)
-    bool is_leaf;
+// struct BVHNode {
+//     AaBb bbox;
+//     int left_child_index; // Index left child in the array, -1 if it's a leaf
+//     int right_child_index; // index right child in the array, -1 if it's a leaf
+//     int object_index;       // index of the object the leaf represent (if it's a leaf)
+//     bool is_leaf;
 
 
-};
+// };
 
 // class BVH {
 //     public:
