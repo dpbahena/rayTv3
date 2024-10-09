@@ -5,15 +5,13 @@
 #include "hittable.h"
 #include "sphere.h"
 #include "hittable_list.h"
-// #include "material.h"
 // #include "aabb.h"
 
 #include <cstdio>
-// #include <curand_kernel.h>
 #include <vector>
 #include <random>
 #include <chrono>
-#include <algorithm>
+// #include <algorithm>
 
 struct hittable_list;
 
@@ -84,13 +82,13 @@ static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& att
 __device__
 static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, dielectric_data& dielectric, curandState_t* states,  int i, int j) {
     attenuation = glm::vec3(1.0, 1.0, 1.0);
-    double ri = rec.front_face ? (1.0/dielectric.refraction_index) : dielectric.refraction_index;
+    float ri = rec.front_face ? (1.0f / dielectric.refraction_index) : dielectric.refraction_index;
 
     glm::vec3 unit_direction = glm::normalize(r_in.direction);
-    double cos_theta = min(dot(-unit_direction, rec.normal), 1.0);
-    double sin_theta = sqrt(1.0 - cos_theta*cos_theta);
+    float cos_theta = min(glm::dot(-unit_direction, rec.normal), 1.0f);
+    float sin_theta = sqrt(1.0f - cos_theta * cos_theta);
 
-    bool cannot_refract = ri * sin_theta > 1.0;
+    bool cannot_refract = ri * sin_theta > 1.0f;
     glm::vec3 direction;
 
     curandState_t x = states[i];  // for random data
@@ -228,7 +226,7 @@ static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3
 //         } else {
 
 //             /* Internal node case: sort the objects by a random axis */
-//             int axis = int(random_double(0, 2)); // choose an axis to split
+//             int axis = int(random_float(0, 2)); // choose an axis to split
 //             auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
 
 //             /* Sort the objects along the chosen axis */
@@ -345,9 +343,9 @@ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_ove
 __device__ 
 inline float reflectance(float cosine, float refraction_index){
     // Use Schilick's approximation for reflectance
-    auto r0 = (1 - refraction_index) / (1 + refraction_index);
+    auto r0 = (1.0f - refraction_index) / (1.0f + refraction_index);
     r0 = r0 * r0;
-    return r0 + (1 - r0) * pow( (1 - cosine), 5);
+    return r0 + (1.0f - r0) * pow( (1.0f - cosine), 5.0f);
 }
 
 __device__
@@ -517,15 +515,15 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
             bool did_scatter = false;
 
             if (rec.mat->type == Type::METAL){
-                did_scatter = metal_scatter(r, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+                did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
                 // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
             } else if (rec.mat->type == Type::LAMBERTIAN){
-                did_scatter = lambertian_scatter(r, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+                did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
                 // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
             } else if (rec.mat->type == Type::DIELECTRIC){
-                did_scatter = dielectric_scatter(r, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+                did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
             }
 
             if (did_scatter){
@@ -622,6 +620,7 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
                     device_materials.push_back(d_mat);
                     glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
                     h_spheres.push_back(hittable::make_sphere(center, center2, 0.2f, d_mat));
+                    // h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
 
                 }
                 if(choose_material < 0.95f) {
@@ -748,9 +747,6 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     cudaFree(d_world);
     cudaFree(d_spheres);
     cudaFree(d_states);
-    // cudaFree(d_material_ground);
-    // cudaFree(d_material_1);
-    // cudaFree(d_material_2);
-    // cudaFree(d_material_3);
+    
     
 }
