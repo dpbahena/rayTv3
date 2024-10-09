@@ -6,10 +6,10 @@
 
 
 
-
+__device__
 bool hit_sphere(const ray& r, interval ray_t, const sphere_data& sphere, hit_record& rec) {
     glm::vec3 current_center = sphere.center.at(r.time());
-    glm::vec3 oc = r.origin - current_center;
+    glm::vec3 oc = current_center - r.origin;
     auto a = glm::dot(r.direction, r.direction);
     auto h = glm::dot(r.direction, oc);
     auto c = glm::dot(oc, oc) - sphere.radius * sphere.radius;
@@ -38,6 +38,7 @@ bool hit_sphere(const ray& r, interval ray_t, const sphere_data& sphere, hit_rec
 }
 
 /* Global or static hit function that processes hits based on the type of object */       
+__device__
 static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_record& rec){
     
     switch(obj.type) {

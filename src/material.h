@@ -13,6 +13,7 @@ __device__ inline float reflectance(float cosine, float refraction_index);
 __device__ inline float random_float(curandState_t* state);
 
 
+
 // Define a struct for lambertian material
 struct lambertian_data {
     glm::vec3 albedo;
@@ -70,54 +71,55 @@ struct material {
 
 };
 
-static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, lambertian_data& lambertian, curandState_t* states,  int i, int j) {
-    auto scatter_direction = rec.normal + random_unit_vector(states,  i, j);
+// __device__
+// static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, lambertian_data& lambertian, curandState_t* states,  int i, int j) {
+//     auto scatter_direction = rec.normal + random_unit_vector(states,  i, j);
 
-    // Catch degenerate scatter direction
-    if (near_zero(scatter_direction))
-        scatter_direction = rec.normal;
+//     // Catch degenerate scatter direction
+//     if (near_zero(scatter_direction))
+//         scatter_direction = rec.normal;
 
-    scatter = ray(rec.p, scatter_direction);
-    attenuation = lambertian.albedo;
+//     scatter = ray(rec.p, scatter_direction);
+//     attenuation = lambertian.albedo;
     
-    return true;
-}
+//     return true;
+// }
 
-
-static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, metal_data& metal, curandState_t* states,  int i, int j) {
-    glm::vec3 reflected = reflect(r_in.direction, rec.normal);
-    reflected = glm::normalize(reflected) + (metal.fuzz * random_unit_vector(states,  i, j));
-    scatter = ray(rec.p, reflected);
-    attenuation = metal.albedo;
+// __device__
+// static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, metal_data& metal, curandState_t* states,  int i, int j) {
+//     glm::vec3 reflected = reflect(r_in.direction, rec.normal);
+//     reflected = glm::normalize(reflected) + (metal.fuzz * random_unit_vector(states,  i, j));
+//     scatter = ray(rec.p, reflected);
+//     attenuation = metal.albedo;
     
-    return (dot(scatter.direction, rec.normal) > 0);
-}
+//     return (glm::dot(scatter.direction, rec.normal) > 0);
+// }
 
 
+// __device__
+// static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, dielectric_data& dielectric, curandState_t* states,  int i, int j) {
+//     attenuation = glm::vec3(1.0, 1.0, 1.0);
+//     double ri = rec.front_face ? (1.0/dielectric.refraction_index) : dielectric.refraction_index;
 
-static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, dielectric_data& dielectric, curandState_t* states,  int i, int j) {
-    attenuation = glm::vec3(1.0, 1.0, 1.0);
-    double ri = rec.front_face ? (1.0/dielectric.refraction_index) : dielectric.refraction_index;
+//     glm::vec3 unit_direction = glm::normalize(r_in.direction);
+//     double cos_theta = std::fmin(dot(-unit_direction, rec.normal), 1.0);
+//     double sin_theta = std::sqrt(1.0 - cos_theta*cos_theta);
 
-    glm::vec3 unit_direction = glm::normalize(r_in.direction);
-    double cos_theta = std::fmin(dot(-unit_direction, rec.normal), 1.0);
-    double sin_theta = std::sqrt(1.0 - cos_theta*cos_theta);
+//     bool cannot_refract = ri * sin_theta > 1.0;
+//     glm::vec3 direction;
 
-    bool cannot_refract = ri * sin_theta > 1.0;
-    glm::vec3 direction;
+//     curandState_t x = states[i];  // for random data
 
-    curandState_t x = states[i];  // for random data
-
-    if (cannot_refract || reflectance(cos_theta, ri) > random_float(&x) )
-        direction = reflect(unit_direction, rec.normal);
-    else   
-        direction = refract(unit_direction, rec.normal, ri);
+//     if (cannot_refract || reflectance(cos_theta, ri) > random_float(&x) )
+//         direction = reflect(unit_direction, rec.normal);
+//     else   
+//         direction = refract(unit_direction, rec.normal, ri);
     
-    states[i] = x; // save back value
+//     states[i] = x; // save back value
 
-    scatter = ray(rec.p, direction);
-    return true;
-}
+//     scatter = ray(rec.p, direction);
+//     return true;
+// }
 
 
 

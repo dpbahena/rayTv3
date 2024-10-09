@@ -15,7 +15,7 @@ class hit_record {
         double t;
         Type type;
         bool front_face;
-
+        __device__
         void set_face_normal(const ray& r, const glm::vec3& outward_normal){
             /* Sets the hit record normal vector. NOTE: the parameter outward_normal is assumed to be of unit length */
             front_face = glm::dot(r.direction, outward_normal) < 0;
