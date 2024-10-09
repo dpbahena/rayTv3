@@ -2,9 +2,11 @@
 #include "ray.h"
 #include "interval.h"
 
+#include "hittable.h"
 #include "sphere.h"
-#include "material.h"
-#include "aabb.h"
+#include "hittable_list.h"
+// #include "material.h"
+// #include "aabb.h"
 
 #include <cstdio>
 // #include <curand_kernel.h>
@@ -77,200 +79,200 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     
 // };
 
-struct hittable_list {
-    sphere* list;
-    int list_size;
-    AaBb bbox;
+// struct hittable_list {
+//     sphere* list;
+//     int list_size;
+//     AaBb bbox;
 
-    hittable_list() {}
+//     hittable_list() {}
 
-    hittable_list(sphere* objects, int size) : list(objects), list_size(size) {
-        // Ensure the list is not empty
-        if (list_size > 0) {
-            printf("Initializing bounding box for the first sphere\n");
-            AaBb first_bbox = list[0].bounding_box();  // Get the bounding box of the first object
+//     hittable_list(sphere* objects, int size) : list(objects), list_size(size) {
+//         // Ensure the list is not empty
+//         if (list_size > 0) {
+//             printf("Initializing bounding box for the first sphere\n");
+//             AaBb first_bbox = list[0].bounding_box();  // Get the bounding box of the first object
             
-            // Validate the first bounding box
-            if (first_bbox.axis_interval(0).min > first_bbox.axis_interval(0).max ||
-                first_bbox.axis_interval(1).min > first_bbox.axis_interval(1).max ||
-                first_bbox.axis_interval(2).min > first_bbox.axis_interval(2).max) {
-                printf("Error: Invalid bounding box for the first sphere\n");
-                return;
-            }
+//             // Validate the first bounding box
+//             if (first_bbox.axis_interval(0).min > first_bbox.axis_interval(0).max ||
+//                 first_bbox.axis_interval(1).min > first_bbox.axis_interval(1).max ||
+//                 first_bbox.axis_interval(2).min > first_bbox.axis_interval(2).max) {
+//                 printf("Error: Invalid bounding box for the first sphere\n");
+//                 return;
+//             }
             
-            bbox = first_bbox; // Initialize with the first bounding box
-            printf("First bounding box initialized\n");
-        }
+//             bbox = first_bbox; // Initialize with the first bounding box
+//             printf("First bounding box initialized\n");
+//         }
 
-        for (int i = 1; i < list_size; i++) {
-            printf("Processing sphere %d\n", i);
-            AaBb current_bbox = list[i].bounding_box();
+//         for (int i = 1; i < list_size; i++) {
+//             printf("Processing sphere %d\n", i);
+//             AaBb current_bbox = list[i].bounding_box();
 
-            // Validate the current bounding box before using it
-            if (current_bbox.axis_interval(0).min > current_bbox.axis_interval(0).max ||
-                current_bbox.axis_interval(1).min > current_bbox.axis_interval(1).max ||
-                current_bbox.axis_interval(2).min > current_bbox.axis_interval(2).max) {
-                printf("Error: Invalid bounding box for sphere %d\n", i);
-                continue; // Skip this sphere if its bounding box is invalid
-            }
+//             // Validate the current bounding box before using it
+//             if (current_bbox.axis_interval(0).min > current_bbox.axis_interval(0).max ||
+//                 current_bbox.axis_interval(1).min > current_bbox.axis_interval(1).max ||
+//                 current_bbox.axis_interval(2).min > current_bbox.axis_interval(2).max) {
+//                 printf("Error: Invalid bounding box for sphere %d\n", i);
+//                 continue; // Skip this sphere if its bounding box is invalid
+//             }
 
-            bbox = AaBb(bbox, current_bbox);
-        }
-    }
-};
+//             bbox = AaBb(bbox, current_bbox);
+//         }
+//     }
+// };
 
-/* Stores a bounding box, the indices for the left and right children, and whether the node is a leaf */
-struct BVHNode {
-    AaBb bbox;
-    int left_child_index; // Index left child in the array, -1 if it's a leaf
-    int right_child_index; // index right child in the array, -1 if it's a leaf
-    int object_index;       // index of the object the leaf represent (if it's a leaf)
-    bool is_leaf;
-
-
-};
+// /* Stores a bounding box, the indices for the left and right children, and whether the node is a leaf */
+// struct BVHNode {
+//     AaBb bbox;
+//     int left_child_index; // Index left child in the array, -1 if it's a leaf
+//     int right_child_index; // index right child in the array, -1 if it's a leaf
+//     int object_index;       // index of the object the leaf represent (if it's a leaf)
+//     bool is_leaf;
 
 
-class BVH {
-    public:
-        BVH(const hittable_list& objects) {
-            build_bvh(objects);
-        }
-        bool hit(const ray& r, interval ray_t, hitRecord& rec, const hittable_list& objects) const {
-            return hit_bvh(r, ray_t, rec, objects);
-        }
-
-        AaBb bounding_box() const {
-            return nodes[0].bbox;  // Root node's bounding box
-        }
+// };
 
 
+// class BVH {
+//     public:
+//         BVH(const hittable_list& objects) {
+//             build_bvh(objects);
+//         }
+//         bool hit(const ray& r, interval ray_t, hitRecord& rec, const hittable_list& objects) const {
+//             return hit_bvh(r, ray_t, rec, objects);
+//         }
 
-    private:
-    std::vector<BVHNode> nodes;
+//         AaBb bounding_box() const {
+//             return nodes[0].bbox;  // Root node's bounding box
+//         }
 
-    void build_bvh(const hittable_list& objects) {
-        nodes.clear();
 
-        std::vector<BVHNode> node_stack;
-        node_stack.reserve(objects.list_size);
 
-        /* Build the BVH with the objects from the hittable_list */
-        recursive_build(objects, 0, objects.list_size, node_stack);
+//     private:
+//     std::vector<BVHNode> nodes;
 
-        /* Store the resulting BVH in a flattened array */
+//     void build_bvh(const hittable_list& objects) {
+//         nodes.clear();
+
+//         std::vector<BVHNode> node_stack;
+//         node_stack.reserve(objects.list_size);
+
+//         /* Build the BVH with the objects from the hittable_list */
+//         recursive_build(objects, 0, objects.list_size, node_stack);
+
+//         /* Store the resulting BVH in a flattened array */
         
-        nodes = node_stack;
+//         nodes = node_stack;
 
-    }
+//     }
 
-    void recursive_build(const hittable_list& objects, size_t start, size_t end, std::vector<BVHNode>& node_stack) {
-        size_t object_span = end - start;
-        BVHNode node;
+//     void recursive_build(const hittable_list& objects, size_t start, size_t end, std::vector<BVHNode>& node_stack) {
+//         size_t object_span = end - start;
+//         BVHNode node;
 
-        if(object_span == 1) {
-            node.is_leaf = true;
-            node.object_index = start; // Directly use index as object reference
-            node.left_child_index = -1;
-            node.right_child_index = -1;
-        } else {
+//         if(object_span == 1) {
+//             node.is_leaf = true;
+//             node.object_index = start; // Directly use index as object reference
+//             node.left_child_index = -1;
+//             node.right_child_index = -1;
+//         } else {
 
-            /* Internal node case: sort the objects by a random axis */
-            int axis = int(random_double(0, 2)); // choose an axis to split
-            auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
+//             /* Internal node case: sort the objects by a random axis */
+//             int axis = int(random_double(0, 2)); // choose an axis to split
+//             auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
 
-            /* Sort the objects along the chosen axis */
+//             /* Sort the objects along the chosen axis */
 
-            std::sort(objects.list + start, objects.list + end, [&](const sphere&a, const sphere& b){
-                BVHNode a_node;
-                a_node.bbox = a.bounding_box();
-                BVHNode b_node;
-                b_node.bbox = b.bounding_box();
-                return comparator(&a_node, &b_node);
-            });
+//             std::sort(objects.list + start, objects.list + end, [&](const sphere&a, const sphere& b){
+//                 BVHNode a_node;
+//                 a_node.bbox = a.bounding_box();
+//                 BVHNode b_node;
+//                 b_node.bbox = b.bounding_box();
+//                 return comparator(&a_node, &b_node);
+//             });
 
-            /* Divide the objects into 2 groups and recursively build left and right subtrees */
-            auto mid = start + object_span / 2;
-            recursive_build(objects, start, mid, node_stack);
-            recursive_build(objects, mid, end, node_stack);
+//             /* Divide the objects into 2 groups and recursively build left and right subtrees */
+//             auto mid = start + object_span / 2;
+//             recursive_build(objects, start, mid, node_stack);
+//             recursive_build(objects, mid, end, node_stack);
 
-            /* Set left and right child indices */
-            node.left_child_index = node_stack.size() - 2;
-            node.right_child_index = node_stack.size() - 1;
+//             /* Set left and right child indices */
+//             node.left_child_index = node_stack.size() - 2;
+//             node.right_child_index = node_stack.size() - 1;
             
-            node.is_leaf = false;
+//             node.is_leaf = false;
 
-            /* Conpute bounding box for interneal node by combining left and right child boxes */
-            node.bbox = AaBb(node_stack[node.left_child_index].bbox, node_stack[node.right_child_index].bbox);
-        }
+//             /* Conpute bounding box for interneal node by combining left and right child boxes */
+//             node.bbox = AaBb(node_stack[node.left_child_index].bbox, node_stack[node.right_child_index].bbox);
+//         }
 
-        /* Add the node to the stack (flat BVH array )*/
-        node_stack.push_back(node);
+//         /* Add the node to the stack (flat BVH array )*/
+//         node_stack.push_back(node);
 
-    }
+//     }
     
-    bool hit_bvh(const ray& r, interval ray_t, hitRecord& rec, const hittable_list& objects) const {
+//     bool hit_bvh(const ray& r, interval ray_t, hitRecord& rec, const hittable_list& objects) const {
 
-        bool hit_anything = false;
-        hitRecord temp_rec;
-        int current_node_index = 0;  // start from the root node
+//         bool hit_anything = false;
+//         hitRecord temp_rec;
+//         int current_node_index = 0;  // start from the root node
 
-        while (current_node_index != -1) {
-            const BVHNode& node = nodes[current_node_index];
+//         while (current_node_index != -1) {
+//             const BVHNode& node = nodes[current_node_index];
             
-            if (!node.bbox.hit(r, ray_t)) {
-                break ; // Skip if the bounding box is not hit
-            }
-            if (node.is_leaf) {
-                // check for object hit using hittable_list passed as a parameter 
-                if (objects.list[node.object_index].hit(r, ray_t, temp_rec)){
-                    hit_anything = true;
-                    ray_t.max = temp_rec.t;  // Update interval for closer hit
-                    rec = temp_rec;
-                }
-                break;
-            } else {
-                /* Internal node, check children */
-                bool hit_left =  nodes[node.left_child_index].bbox.hit(r, ray_t);
-                bool hit_right = nodes[node.right_child_index].bbox.hit(r, ray_t);
+//             if (!node.bbox.hit(r, ray_t)) {
+//                 break ; // Skip if the bounding box is not hit
+//             }
+//             if (node.is_leaf) {
+//                 // check for object hit using hittable_list passed as a parameter 
+//                 if (objects.list[node.object_index].hit(r, ray_t, temp_rec)){
+//                     hit_anything = true;
+//                     ray_t.max = temp_rec.t;  // Update interval for closer hit
+//                     rec = temp_rec;
+//                 }
+//                 break;
+//             } else {
+//                 /* Internal node, check children */
+//                 bool hit_left =  nodes[node.left_child_index].bbox.hit(r, ray_t);
+//                 bool hit_right = nodes[node.right_child_index].bbox.hit(r, ray_t);
 
-                if (hit_left && hit_right) {
-                    current_node_index = node.left_child_index; // Go to the left first
+//                 if (hit_left && hit_right) {
+//                     current_node_index = node.left_child_index; // Go to the left first
 
-                } else if (hit_left) {
-                    current_node_index = node.left_child_index;
-                } else if (hit_right) {
-                    current_node_index = node.right_child_index;
-                } else {
-                    break;  // Neither child is hit, end transversal
-                }
-            }
-        }
+//                 } else if (hit_left) {
+//                     current_node_index = node.left_child_index;
+//                 } else if (hit_right) {
+//                     current_node_index = node.right_child_index;
+//                 } else {
+//                     break;  // Neither child is hit, end transversal
+//                 }
+//             }
+//         }
 
-        return hit_anything;
-    }
+//         return hit_anything;
+//     }
 
 
-    static bool box_compare(const BVHNode* a, const BVHNode* b, int axis_index) {
+//     static bool box_compare(const BVHNode* a, const BVHNode* b, int axis_index) {
 
-        /* Compare the bounding boxes of two objects along the specific axis */
-        auto a_axis_interval = a->bbox.axis_interval(axis_index);
-        auto b_axis_interval = b->bbox.axis_interval(axis_index);
+//         /* Compare the bounding boxes of two objects along the specific axis */
+//         auto a_axis_interval = a->bbox.axis_interval(axis_index);
+//         auto b_axis_interval = b->bbox.axis_interval(axis_index);
 
-        return a_axis_interval.min < b_axis_interval.min; 
-    }
+//         return a_axis_interval.min < b_axis_interval.min; 
+//     }
 
-    static bool box_x_compare (const BVHNode* a, const BVHNode* b){
-        return box_compare(a, b, 0);
-    }
-    static bool box_y_compare (const BVHNode* a, const BVHNode* b){
-        return box_compare(a, b, 1);
-    }
-    static bool box_z_compare (const BVHNode* a, const BVHNode* b){
-        return box_compare(a, b, 2);
-    }
+//     static bool box_x_compare (const BVHNode* a, const BVHNode* b){
+//         return box_compare(a, b, 0);
+//     }
+//     static bool box_y_compare (const BVHNode* a, const BVHNode* b){
+//         return box_compare(a, b, 1);
+//     }
+//     static bool box_z_compare (const BVHNode* a, const BVHNode* b){
+//         return box_compare(a, b, 2);
+//     }
 
-};
+// };
 
 
 
@@ -456,6 +458,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     
     for (int k = 0; k < depth; k++){
         hitRecord rec;
+        
         if(hit(world, cur_ray, interval(0.001f, FLT_MAX), rec)){
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
@@ -540,117 +543,159 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, sphere* &spheres, hittable_list* &world){
+void init_objects(std::vector<material*> device_materials, hittable* &d_spheres, hittable_list* &d_world){
 
-    
-    std::vector<sphere> h_spheres;  
-    lambertian*         ground;
+    std::vector<hittable> h_spheres;
     
 
-    // Create the ground (a huge sphere)
-    lambertian h_ground(glm::vec3(0.5f, 0.5f, 0.5f));
-    checkCuda(cudaMalloc((void**)&ground, sizeof(lambertian)) );
-    checkCuda(cudaMemcpy(ground, &h_ground, sizeof(lambertian), cudaMemcpyHostToDevice) );
-    /* Save material pointer for later deletion */
-    device_materials.push_back(&ground->base);
-    h_spheres.push_back(sphere(glm::vec3(0.0f, -1000.0f, 0.0f), 1000, &ground->base));
+    material h_ground = material::lambertian_material((glm::vec3(0.8, 0.8, 0.0)));
+    material* d_ground;
+    checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_ground);
+    h_spheres.push_back(hittable::make_sphere(glm::vec3(0.0,-100.5, -1.0), 100, d_ground));
 
 
-    // Create random spheres 
-    for (
-        int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
-            auto choose_material = random_double();
-            glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
+
+    // std::vector<sphere> h_spheres;  
+    // lambertian*         ground;
+    
+
+    // // Create the ground (a huge sphere)
+    // lambertian h_ground(glm::vec3(0.5f, 0.5f, 0.5f));
+    // checkCuda(cudaMalloc((void**)&ground, sizeof(lambertian)) );
+    // checkCuda(cudaMemcpy(ground, &h_ground, sizeof(lambertian), cudaMemcpyHostToDevice) );
+    // /* Save material pointer for later deletion */
+    // device_materials.push_back(&ground->base);
+    // h_spheres.push_back(sphere(glm::vec3(0.0f, -1000.0f, 0.0f), 1000, &ground->base));
+
+
+    // // Create random spheres 
+    // for (
+    //     int a = -11; a < 11; a++) {
+    //     for (int b = -11; b < 11; b++) {
+    //         auto choose_material = random_double();
+    //         glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             
-            if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
-                if(choose_material < 0.8f) {
-                    // difuse
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    lambertian material(albedo);
-                    lambertian* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(lambertian)) );
-                    checkCuda(cudaMemcpy(d_mat, &material, sizeof(lambertian), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(&d_mat->base);
-                    glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
-                    h_spheres.push_back(sphere(center, center2, 0.2f, &d_mat->base));
+    //         if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
+    //             if(choose_material < 0.8f) {
+    //                 // difuse
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 lambertian material(albedo);
+    //                 lambertian* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(lambertian)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &material, sizeof(lambertian), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(&d_mat->base);
+    //                 glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
+    //                 h_spheres.push_back(sphere(center, center2, 0.2f, &d_mat->base));
 
-                }
-                if(choose_material < 0.95f) {
-                    // metal
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    float fuzz = random_double(0.0f, 0.5f);
-                    metal material(albedo, fuzz);
-                    metal* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(metal)) );
-                    checkCuda(cudaMemcpy(d_mat, &material, sizeof(metal), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(&d_mat->base);
-                    h_spheres.push_back(sphere(center, 0.2f, &d_mat->base));
+    //             }
+    //             if(choose_material < 0.95f) {
+    //                 // metal
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 float fuzz = random_double(0.0f, 0.5f);
+    //                 metal material(albedo, fuzz);
+    //                 metal* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(metal)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &material, sizeof(metal), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(&d_mat->base);
+    //                 h_spheres.push_back(sphere(center, 0.2f, &d_mat->base));
 
-                }
-                else  {
-                    // dielectric
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    dielectric material(1.5);
-                    dielectric* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(dielectric)) );
-                    checkCuda(cudaMemcpy(d_mat, &material, sizeof(dielectric), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(&d_mat->base);
-                    h_spheres.push_back(sphere(center, 0.2f, &d_mat->base));
+    //             }
+    //             else  {
+    //                 // dielectric
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 dielectric material(1.5);
+    //                 dielectric* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(dielectric)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &material, sizeof(dielectric), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(&d_mat->base);
+    //                 h_spheres.push_back(sphere(center, 0.2f, &d_mat->base));
 
-                }
-            }
-        }
-    }
+    //             }
+    //         }
+    //     }
+    // }
+
 
     // Three secundary spheres
-    dielectric  h_mat1(1.5);
-    lambertian  h_mat2(glm::vec3(0.4f, 0.2f, 0.1f));
-    metal       h_mat3(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
 
-    dielectric* d_material_1;
-    lambertian* d_material_2;
-    metal*      d_material_3;
+    material h_mat1 = material::dielectric_material(1.5f);
+    material* d_mat1;
+    checkCuda(cudaMalloc((void**)&d_mat1, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat1, &h_mat1, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat1);
+    h_spheres.push_back(hittable::make_sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, d_mat1));
 
-    checkCuda(cudaMalloc((void**)&d_material_1, sizeof(dielectric)) );
-    checkCuda(cudaMemcpy(d_material_1, &h_mat1, sizeof(dielectric), cudaMemcpyHostToDevice) );
-    /* Save material pointer for later deletion */
-    device_materials.push_back(&d_material_1->base);
-    h_spheres.push_back(sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, &d_material_1->base));
+    material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
+    material* d_mat2;
+    checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat2);
+    h_spheres.push_back(hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, d_mat2));
 
-    checkCuda(cudaMalloc((void**)&d_material_2, sizeof(lambertian)) );
-    checkCuda(cudaMemcpy(d_material_2, &h_mat2, sizeof(lambertian), cudaMemcpyHostToDevice) );
-    /* Save material pointer for later deletion */
-    device_materials.push_back(&d_material_2->base);
-    h_spheres.push_back(sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, &d_material_2->base));
-
-    checkCuda(cudaMalloc((void**)&d_material_3, sizeof(metal)) );
-    checkCuda(cudaMemcpy(d_material_3, &h_mat3, sizeof(metal), cudaMemcpyHostToDevice) );
-    /* Save material pointer for later deletion */
-    device_materials.push_back(&d_material_3->base);
-    h_spheres.push_back(sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, &d_material_3->base));
+    material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
+    material* d_mat3;
+    checkCuda(cudaMalloc((void**)&d_mat3, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat3, &h_mat3, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat3);
+    h_spheres.push_back(hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, d_mat3));
+   
 
 
-    // Validate bounding boxes on host before transferring to device
-    for (int i = 0; i < h_spheres.size(); i++) {
-        AaBb bbox = h_spheres[i].bounding_box();
-        if (bbox.axis_interval(0).min > bbox.axis_interval(0).max ||
-            bbox.axis_interval(1).min > bbox.axis_interval(1).max ||
-            bbox.axis_interval(2).min > bbox.axis_interval(2).max) {
-            printf("Invalid bounding box for sphere %d\n", i);
-        } 
+
+    // // Three secundary spheres
+    // dielectric  h_mat1(1.5);
+    // lambertian  h_mat2(glm::vec3(0.4f, 0.2f, 0.1f));
+    // metal       h_mat3(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
+
+    // dielectric* d_material_1;
+    // lambertian* d_material_2;
+    // metal*      d_material_3;
+
+    // checkCuda(cudaMalloc((void**)&d_material_1, sizeof(dielectric)) );
+    // checkCuda(cudaMemcpy(d_material_1, &h_mat1, sizeof(dielectric), cudaMemcpyHostToDevice) );
+    // /* Save material pointer for later deletion */
+    // device_materials.push_back(&d_material_1->base);
+    // h_spheres.push_back(sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, &d_material_1->base));
+
+    // checkCuda(cudaMalloc((void**)&d_material_2, sizeof(lambertian)) );
+    // checkCuda(cudaMemcpy(d_material_2, &h_mat2, sizeof(lambertian), cudaMemcpyHostToDevice) );
+    // /* Save material pointer for later deletion */
+    // device_materials.push_back(&d_material_2->base);
+    // h_spheres.push_back(sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, &d_material_2->base));
+
+    // checkCuda(cudaMalloc((void**)&d_material_3, sizeof(metal)) );
+    // checkCuda(cudaMemcpy(d_material_3, &h_mat3, sizeof(metal), cudaMemcpyHostToDevice) );
+    // /* Save material pointer for later deletion */
+    // device_materials.push_back(&d_material_3->base);
+    // h_spheres.push_back(sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, &d_material_3->base));
+
+
+    // // Validate bounding boxes on host before transferring to device
+    // for (int i = 0; i < h_spheres.size(); i++) {
+    //     AaBb bbox = h_spheres[i].bounding_box();
+    //     if (bbox.axis_interval(0).min > bbox.axis_interval(0).max ||
+    //         bbox.axis_interval(1).min > bbox.axis_interval(1).max ||
+    //         bbox.axis_interval(2).min > bbox.axis_interval(2).max) {
+    //         printf("Invalid bounding box for sphere %d\n", i);
+    //     } 
         
 
-    }
+    // }
 
     
     int number_of_hittables = h_spheres.size();
-    checkCuda(cudaMalloc((void**)&spheres, number_of_hittables * sizeof(sphere)) );
-    checkCuda(cudaMemcpy(spheres, h_spheres.data(), number_of_hittables * sizeof(sphere), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMalloc((void**)&d_spheres, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMemcpy(d_spheres, h_spheres.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+
+    hittable_list h_world;
+    h_world.
+
 
     // Create a hittable list;
     
-    printf("hittables: %d\n", number_of_hittables);
+    // printf("hittables: %d\n", number_of_hittables);
     // hittable_list h_world(spheres, number_of_hittables);
     hittable_list h_world;
     h_world.list = spheres;
@@ -680,7 +725,8 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     
     // lambertian* d_material_ground;
     
-    sphere* d_spheres;
+    // sphere* d_spheres;
+    hittable* d_spheres;
     hittable_list* d_world;
    
       
