@@ -37,6 +37,9 @@ bool hit_sphere(const ray& r, interval ray_t, const sphere_data& sphere, hit_rec
     
 }
 
+AaBb sphere_bounding_box(const sphere_data& sphere) { return sphere.bbox;}
+
+
 /* Global or static hit function that processes hits based on the type of object */       
 __device__
 static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_record& rec){

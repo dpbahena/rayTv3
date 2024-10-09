@@ -5,7 +5,7 @@
 #include "hittable.h"
 #include "sphere.h"
 #include "hittable_list.h"
-#include "aabb.h"
+// #include "aabb.h"
 
 #include <cstdio>
 #include <vector>
@@ -678,7 +678,7 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
     checkCuda(cudaMemcpy(d_spheres, h_spheres.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
 
     hittable_list h_world;
-    h_world.objects = d_spheres;
+    h_world.list = d_spheres;
     h_world.objects_size = number_of_hittables;
     
     /* Allocate memory for hittable list on the device */

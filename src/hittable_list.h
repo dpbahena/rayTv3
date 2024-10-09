@@ -12,13 +12,23 @@ static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_re
 struct hittable_list {
     public:
         // std::vector<hittable> objects;
-        hittable* objects;
+        hittable* list;
         int objects_size;
+        AaBb bbox;
         // void clear(){objects.clear(); }
 
         // void add(const hittable& object) {
         //     objects.push_back(object);
         // }
+        hittable_list() {};
+        
+        hittable_list(hittable* objects, int size){
+            list = objects;
+            bbox = sphere_bounding_box(list[0].sphere); // get the initial bbox
+            for (int i = 1; i < size; i++) {
+                bbox = AaBb(bbox, sphere_bounding_box(list[i].sphere) );
+            }
+        }
         __device__
         bool hit(const ray& r, interval ray_t, hit_record& rec) const {
             hit_record temp_rec;
@@ -27,7 +37,7 @@ struct hittable_list {
 
             for (int i = 0; i < objects_size; i++) {
             // for (const auto& object : objects ){
-                if(object_hit(r, interval(ray_t.min, closest_so_far), objects[i], temp_rec)){
+                if(object_hit(r, interval(ray_t.min, closest_so_far), list[i], temp_rec)){
                     hit_anything = true;
                     closest_so_far = temp_rec.t;
                     rec = temp_rec;
@@ -36,4 +46,6 @@ struct hittable_list {
 
             return hit_anything;
         }
+
+        AaBb bounding_box() const { return bbox;}
 };

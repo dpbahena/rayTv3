@@ -2,6 +2,7 @@
 
 
 #include "material.h"
+#include "aabb.h"
 
 
 class hit_record {
@@ -25,6 +26,7 @@ struct sphere_data {
     ray center;
     float radius;
     material* mat;
+    AaBb bbox;
 };
 
 struct hittable {
@@ -40,21 +42,31 @@ struct hittable {
     hittable() : type(Type::NONE) {}
 
     // Constructor for each type
+
+    /* STATIONARY SPHERE */
     static hittable make_sphere(const glm::vec3& static_center, float radius, material* mat) {
         hittable obj;
         obj.type = Type::SPHERE;
         obj.sphere.center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
         obj.sphere.radius = radius;
         obj.sphere.mat = mat;
+        auto rvec = glm::vec3(radius, radius, radius);
+        obj.sphere.bbox = AaBb(static_center - rvec, static_center + rvec);
+        
         return obj;
     }
-
+    /* MOVING SPHERE */
     static hittable make_sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) {
         hittable obj;
         obj.type = Type::SPHERE;
         obj.sphere.center = ray(center1, center2 - center1);
         obj.sphere.radius = radius;
         obj.sphere.mat = mat;
+        auto rvec = glm::vec3(radius, radius, radius);
+        AaBb box1(obj.sphere.center.at(0) - rvec, obj.sphere.center.at(0) + rvec);
+        AaBb box2(obj.sphere.center.at(1) - rvec, obj.sphere.center.at(1) + rvec);
+        obj.sphere.bbox = AaBb(box1, box2);
+
         return obj;
     }
 
