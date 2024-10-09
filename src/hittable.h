@@ -1,11 +1,8 @@
 #pragma once
 
 
-// #include "rt_definitions.h"
 #include "material.h"
 
-
-// struct material;
 
 class hit_record {
     public:
@@ -63,16 +60,4 @@ struct hittable {
 
 
 };
-
-// /* Global or static hit function that processes hits based on the type of object */       
-// static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_record& rec){
-    
-//     switch(obj.type) {
-//         case Type::SPHERE:
-//             return hit_sphere(r, ray_t, obj.sphere, rec);
-        
-//         // handle other types ....
-//         default:
-//             return false;
-//     }
-// }        
+     
