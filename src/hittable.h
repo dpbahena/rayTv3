@@ -3,6 +3,7 @@
 
 #include "material.h"
 #include "aabb.h"
+#include <vector>
 
 
 class hit_record {
@@ -21,12 +22,30 @@ class hit_record {
         }
 };
 
+/* Stores a bounding box, the indices for the left and right children, and whether the node is a leaf */
+struct BVHNode {
+    AaBb bbox;
+    int left_child_index; // Index left child in the array, -1 if it's a leaf
+    int right_child_index; // index right child in the array, -1 if it's a leaf
+    int object_index;       // index of the object the leaf represent (if it's a leaf)
+    bool is_leaf;           // is this node a leaf?
+
+
+};
+
 // Define a struct for sphere data
 struct sphere_data {
     ray center;
     float radius;
     material* mat;
     AaBb bbox;
+};
+
+// Define a struct for bvh_node
+struct bvh_data {
+
+    BVHNode node;    
+    
 };
 
 struct hittable {
@@ -36,6 +55,8 @@ struct hittable {
     // Use the define struct in the union
     union {
         sphere_data sphere;
+        bvh_data BVH;
+
     };
 
     // default constructor
