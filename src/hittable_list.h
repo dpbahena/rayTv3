@@ -22,12 +22,15 @@ struct hittable_list {
         // }
         hittable_list() {};
         
-        hittable_list(hittable* objects, int size){
+        hittable_list(hittable* objects, int size, AaBb bbox){
             list = objects;
-            bbox = sphere_bounding_box(list[0].sphere); // get the initial bbox
-            for (int i = 1; i < size; i++) {
-                bbox = AaBb(bbox, sphere_bounding_box(list[i].sphere) );
-            }
+            objects_size = size;
+            bbox = bbox;
+            // bbox = list[0].sphere.bbox;
+            // bbox = sphere_bounding_box(list[0].sphere); // get the initial bbox
+            // for (int i = 1; i < size; i++) {
+            //     bbox = AaBb(bbox, sphere_bounding_box(list[i].sphere) );
+            // }
         }
         __device__
         bool hit(const ray& r, interval ray_t, hit_record& rec) const {

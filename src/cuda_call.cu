@@ -6,7 +6,7 @@
 #include "sphere.h"
 #include "hittable_list.h"
 // #include "aabb.h"
-// #include "bvh_node.h"
+#include "bvh_node.h"
 
 #include <cstdio>
 #include <vector>
@@ -14,7 +14,7 @@
 #include <chrono>
 
 
-struct hittable_list;
+// struct hittable_list;
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
 __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
@@ -519,15 +519,22 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
     checkCuda(cudaMemcpy(d_mat3, &h_mat3, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_mat3);
     h_spheres.push_back(hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, d_mat3));
+    AaBb bbox;
+    for (auto &obj : h_spheres){
+        bbox = AaBb(bbox, obj.sphere.bbox);
+    }
+
    
     
     int number_of_hittables = h_spheres.size();
     checkCuda(cudaMalloc((void**)&d_spheres, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_spheres, h_spheres.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
 
-    hittable_list h_world;
-    h_world.list = d_spheres;
-    h_world.objects_size = number_of_hittables;
+    // hittable_list h_world;
+    // h_world.list = d_spheres;
+    // h_world.objects_size = number_of_hittables;
+    hittable_list h_world(d_spheres, number_of_hittables, bbox);
+    // h_world.bbox = bbox;
     
     /* Allocate memory for hittable list on the device */
     checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );

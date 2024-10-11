@@ -68,11 +68,13 @@ class BVH {
             auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
 
             /* Sort the objects along the chosen axis */
-
-            // std::sort(objects.list + start, objects.list + end, [&](const sphere&a, const sphere& b){
+            
+            // std::sort(objects.list + start, objects.list + end, [&](const sphere&a, const sphere& b)
+            // std::sort(objects.list + start, objects.list + end, [&](const sphere_data& a, const sphere_data& b)
             std::sort(objects.list + start, objects.list + end, comparator);
+            
             // {
-            //     BVHNode a_node;
+            //     BVHNode a_node; 
             //     a_node.bbox = a.bounding_box();
             //     BVHNode b_node;
             //     b_node.bbox = b.bounding_box();
@@ -142,22 +144,30 @@ class BVH {
     // }
 
 
-    static bool box_compare(const BVHNode* a, const BVHNode* b, int axis_index) {
 
+    // static bool box_compare(const BVHNode* a, const BVHNode* b, int axis_index) {
+    static bool box_compare(const hittable& a, const hittable& b, int axis_index) {
+        
         /* Compare the bounding boxes of two objects along the specific axis */
-        auto a_axis_interval = a->bbox.axis_interval(axis_index);
-        auto b_axis_interval = b->bbox.axis_interval(axis_index);
+        // a.sphere.bbox.axis_interval(
+        // auto a_axis_interval = a->bbox.axis_interval(axis_index);
+        // auto b_axis_interval = b->bbox.axis_interval(axis_index);
+        auto a_axis_interval = a.sphere.bbox.axis_interval(axis_index);
+        auto b_axis_interval = b.sphere.bbox.axis_interval(axis_index);
 
         return a_axis_interval.min < b_axis_interval.min; 
     }
 
-    static bool box_x_compare (const BVHNode* a, const BVHNode* b){
+    // static bool box_x_compare ( BVHNode* a,  BVHNode* b){
+    static bool box_x_compare (const hittable& a, const hittable& b){
         return box_compare(a, b, 0);
     }
-    static bool box_y_compare (const BVHNode* a, const BVHNode* b){
+    // static bool box_y_compare ( BVHNode* a,  BVHNode* b){
+    static bool box_y_compare (const hittable& a, const hittable& b){
         return box_compare(a, b, 1);
     }
-    static bool box_z_compare (const BVHNode* a, const BVHNode* b){
+    // static bool box_z_compare ( BVHNode* a,  BVHNode* b){
+    static bool box_z_compare (const hittable& a, const hittable& b){
         return box_compare(a, b, 2);
     }
 

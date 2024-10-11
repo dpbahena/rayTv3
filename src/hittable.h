@@ -42,11 +42,11 @@ struct sphere_data {
 };
 
 // Define a struct for bvh_node
-struct bvh_data {
+// struct bvh_data {
 
-    BVHNode node;    
+//     BVHNode node;    
     
-};
+// };
 
 struct hittable {
 
@@ -55,7 +55,7 @@ struct hittable {
     // Use the define struct in the union
     union {
         sphere_data sphere;
-        bvh_data BVH;
+        // bvh_data BVH;
 
     };
 
