@@ -1,0 +1,34 @@
+#include "hittable.h"
+
+__device__ void hit_record::set_face_normal(const ray& r, const glm::vec3& outward_normal) {
+    front_face = glm::dot(r.direction, outward_normal) < 0;
+    normal = front_face ? outward_normal : -outward_normal;
+}
+
+hittable::hittable() : type(Type::NONE) {}
+
+hittable hittable::make_sphere(const glm::vec3& static_center, float radius, material* mat) {
+    hittable obj;
+    obj.type = Type::SPHERE;
+    obj.sphere.center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
+    obj.sphere.radius = radius;
+    obj.sphere.mat = mat;
+    auto rvec = glm::vec3(radius, radius, radius);
+    obj.sphere.bbox = AaBb(static_center - rvec, static_center + rvec);
+
+    return obj;
+}
+
+hittable hittable::make_sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) {
+    hittable obj;
+    obj.type = Type::SPHERE;
+    obj.sphere.center = ray(center1, center2 - center1);
+    obj.sphere.radius = radius;
+    obj.sphere.mat = mat;
+    auto rvec = glm::vec3(radius, radius, radius);
+    AaBb box1(obj.sphere.center.at(0) - rvec, obj.sphere.center.at(0) + rvec);
+    AaBb box2(obj.sphere.center.at(1) - rvec, obj.sphere.center.at(1) + rvec);
+    obj.sphere.bbox = AaBb(box1, box2);
+
+    return obj;
+}

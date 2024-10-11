@@ -1,0 +1,36 @@
+#include "material.h"
+
+
+
+// Forward declarations of utility functions
+__device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
+__device__ inline bool near_zero(const glm::vec3 v);
+__device__ inline float reflectance(float cosine, float refraction_index);
+__device__ inline float random_float(curandState_t* state);
+
+// Constructors for material types
+material::material() : type(Type::NONE) {}
+
+material material::lambertian_material(const glm::vec3& albedo) {
+    material obj;
+    obj.type = Type::LAMBERTIAN;
+    obj.lambertian.albedo = albedo;
+    return obj;
+}
+
+material material::metal_material(const glm::vec3& albedo, double fuzz) {
+    material obj;
+    obj.type = Type::METAL;
+    obj.metal.albedo = albedo;
+    obj.metal.fuzz = fuzz < 1 ? fuzz : 1.0;
+    return obj;
+}
+
+material material::dielectric_material(double refraction_index) {
+    material obj;
+    obj.type = Type::DIELECTRIC;
+    obj.dielectric.refraction_index = refraction_index;
+    return obj;
+}
+
+// Optionally, you may also move implementation of the utility functions here if they have substantial content.
