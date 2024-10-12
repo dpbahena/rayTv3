@@ -2,19 +2,19 @@
 #include "ray.h"
 #include "interval.h"
 
-#include "hittable.h"
+
 #include "sphere.h"
 #include "hittable_list.h"
-// #include "aabb.h"
 #include "bvh_node.h"
 
 #include <cstdio>
 #include <vector>
 #include <random>
 #include <chrono>
+#include <curand_kernel.h>
 
 
-// struct hittable_list;
+
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
 __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
@@ -27,6 +27,10 @@ __device__ glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
 __device__ glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
 __device__ ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v);
 __device__ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world);
+__device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
+__device__ inline bool near_zero(const glm::vec3 v);
+__device__ inline float reflectance(float cosine, float refraction_index);
+__device__ inline float random_float(curandState_t* state);
 
 
 

@@ -1,16 +1,16 @@
 #pragma once
 
-#include "ray.h"
-#include <curand_kernel.h>
+
+// #include <curand_kernel.h>
 
 
 
 enum class Type {NONE, SPHERE, BBOX, LAMBERTIAN, METAL, DIELECTRIC};
 
-__device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
-__device__ inline bool near_zero(const glm::vec3 v);
-__device__ inline float reflectance(float cosine, float refraction_index);
-__device__ inline float random_float(curandState_t* state);
+// __device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
+// __device__ inline bool near_zero(const glm::vec3 v);
+// __device__ inline float reflectance(float cosine, float refraction_index);
+// __device__ inline float random_float(curandState_t* state);
 
 
 
