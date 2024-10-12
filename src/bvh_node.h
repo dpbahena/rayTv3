@@ -1,7 +1,7 @@
 #pragma once
 
-#include "aabb.h"
-#include "sphere.h"
+// #include "aabb.h"
+// #include "sphere.h"
 
 #include <algorithm>
 
@@ -44,7 +44,7 @@ class BVH {
         node_stack.reserve(objects.objects_size);
 
         /* Build the BVH with the objects from the hittable_list */
-        // recursive_build(objects, 0, objects.objects_size, node_stack);
+        recursive_build(objects, 0, objects.objects_size, node_stack);
 
         /* Store the resulting BVH in a flattened array */
         

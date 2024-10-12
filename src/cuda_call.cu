@@ -20,17 +20,16 @@ __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, 
 __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
 __device__ inline glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max);
 __device__ inline glm::vec3 random_vector(curandState_t* states,  int i, int j);
-__device__ inline float random_float_in_range(curandState_t* state, float a, float b);
+__device__ inline float     random_float_in_range(curandState_t* state, float a, float b);
 __device__ inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n);
 __device__ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_over_etat);
-__device__ glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
-__device__ glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
-__device__ ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v);
-__device__ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world);
+__device__ inline glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
+__device__ inline glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
+__device__ inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world);
 __device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
-__device__ inline bool near_zero(const glm::vec3 v);
-__device__ inline float reflectance(float cosine, float refraction_index);
-__device__ inline float random_float(curandState_t* state);
+__device__ inline bool      near_zero(const glm::vec3 v);
+__device__ inline float     reflectance(float cosine, float refraction_index);
+__device__ inline float     random_float(curandState_t* state);
 
 
 
@@ -523,6 +522,7 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
     checkCuda(cudaMemcpy(d_mat3, &h_mat3, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_mat3);
     h_spheres.push_back(hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, d_mat3));
+    
     AaBb bbox;
     for (auto &obj : h_spheres){
         bbox = AaBb(bbox, obj.sphere.bbox);

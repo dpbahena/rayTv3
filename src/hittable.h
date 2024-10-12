@@ -29,8 +29,6 @@ struct BVHNode {
     int right_child_index; // index right child in the array, -1 if it's a leaf
     int object_index;       // index of the object the leaf represent (if it's a leaf)
     bool is_leaf;           // is this node a leaf?
-
-
 };
 
 // Define a struct for sphere data
