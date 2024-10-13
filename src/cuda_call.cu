@@ -5,7 +5,7 @@
 
 #include "sphere.h"
 #include "hittable_list.h"
-#include "bvh_node.h"
+// #include "bvh_node.h"
 
 #include <cstdio>
 #include <vector>
