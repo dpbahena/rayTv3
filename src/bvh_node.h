@@ -152,8 +152,8 @@ class BVH {
         // a.sphere.bbox.axis_interval(
         // auto a_axis_interval = a->bbox.axis_interval(axis_index);
         // auto b_axis_interval = b->bbox.axis_interval(axis_index);
-        auto a_axis_interval = a.sphere.bbox.axis_interval(axis_index);
-        auto b_axis_interval = b.sphere.bbox.axis_interval(axis_index);
+        auto a_axis_interval = a.sphere.bbox->axis_interval(axis_index);
+        auto b_axis_interval = b.sphere.bbox->axis_interval(axis_index);
 
         return a_axis_interval.min < b_axis_interval.min; 
     }

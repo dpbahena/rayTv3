@@ -22,7 +22,7 @@ struct hittable_list {
         // }
         hittable_list() {};
         
-        hittable_list(hittable* objects, int size, AaBb bbox){
+        hittable_list(hittable* objects, int size){
             list = objects;
             objects_size = size;
             bbox = bbox;
