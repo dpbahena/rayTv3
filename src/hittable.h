@@ -40,13 +40,15 @@ struct sphere_data {
     material* mat;
     AaBb bbox;
 };
-
+struct hittable;
 // Define a struct for bvh_node
-// struct bvh_data {
+struct bvh_data {
 
-//     BVHNode node;    
+    BVHNode* nodes;
+    // AaBb* nodes;
+    hittable* objects;    
     
-// };
+};
 
 struct hittable {
 
@@ -55,7 +57,7 @@ struct hittable {
     // Use the define struct in the union
     union {
         sphere_data sphere;
-        // bvh_data BVH;
+        bvh_data BVHTree;
 
     };
 
@@ -87,6 +89,15 @@ struct hittable {
         AaBb box1(obj.sphere.center.at(0) - rvec, obj.sphere.center.at(0) + rvec);
         AaBb box2(obj.sphere.center.at(1) - rvec, obj.sphere.center.at(1) + rvec);
         obj.sphere.bbox = AaBb(box1, box2);
+
+        return obj;
+    }
+
+    static hittable make_bvhTree(BVHNode* nodes, hittable* objects) {
+        hittable obj;
+        obj.type = Type::BBOX;
+        obj.BVHTree.nodes = nodes;
+        obj.BVHTree.objects = objects;
 
         return obj;
     }

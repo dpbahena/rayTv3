@@ -1,7 +1,7 @@
 #pragma once
 
 #include "aabb.h"
-#include "sphere.h"
+#include "hittable_list.h"
 
 #include <algorithm>
 
@@ -21,6 +21,8 @@ inline double random_double(float min, float max);
 
 class BVH {
     public:
+        std::vector<BVHNode> nodes;
+
         BVH(const hittable_list& objects) {
             build_bvh(objects);
         }
@@ -30,12 +32,13 @@ class BVH {
 
         AaBb bounding_box() const {
             return nodes[0].bbox;  // Root node's bounding box
+            
         }
 
 
 
     private:
-    std::vector<BVHNode> nodes;
+    // std::vector<BVHNode> nodes;
 
     void build_bvh(const hittable_list& objects) {
         nodes.clear();
@@ -102,10 +105,10 @@ class BVH {
 
     }
     
-    // bool hit_bvh(const ray& r, interval ray_t, hitRecord& rec, const hittable_list& objects) const {
+    // bool hit_bvh(const ray& r, interval ray_t, hit_record& rec, const hittable_list& objects) const {
 
     //     bool hit_anything = false;
-    //     hitRecord temp_rec;
+    //     hit_record temp_rec;
     //     int current_node_index = 0;  // start from the root node
 
     //     while (current_node_index != -1) {
@@ -172,4 +175,46 @@ class BVH {
     }
 
 };
+__device__
+static bool hit_bvh(const ray& r, interval ray_t, hit_record& rec, const bvh_data& BVHTree /* const hittable_list& objects */)  {
 
+    bool hit_anything = false;
+    hit_record temp_rec;
+    int current_node_index = 0;  // start from the root node
+
+    while (current_node_index != -1) {
+        // const BVHNode& node = nodes[current_node_index];
+        const BVHNode& node = BVHTree.nodes[current_node_index];
+        
+        if (!node.bbox.hit(r, ray_t)) {
+            break ; // Skip if the bounding box is not hit
+        }
+        if (node.is_leaf) {
+            // check for object hit using hittable_list passed as a parameter 
+            if (object_hit(r, ray_t, BVHTree.objects[node.object_index], temp_rec)){
+            // if (objects.list[node.object_index].hit(r, ray_t, temp_rec)){
+                hit_anything = true;
+                ray_t.max = temp_rec.t;  // Update interval for closer hit
+                rec = temp_rec;
+            }
+            break;
+        } else {
+            /* Internal node, check children */
+            bool hit_left =  BVHTree.nodes[node.left_child_index].bbox.hit(r, ray_t);
+            bool hit_right = BVHTree.nodes[node.right_child_index].bbox.hit(r, ray_t);
+
+            if (hit_left && hit_right) {
+                current_node_index = node.left_child_index; // Go to the left first
+
+            } else if (hit_left) {
+                current_node_index = node.left_child_index;
+            } else if (hit_right) {
+                current_node_index = node.right_child_index;
+            } else {
+                break;  // Neither child is hit, end transversal
+            }
+        }
+    }
+
+    return hit_anything;
+}

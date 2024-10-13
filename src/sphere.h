@@ -3,6 +3,7 @@
 #pragma once
 
 #include "hittable.h"
+#include "bvh_node.h"
 
 
 
@@ -47,6 +48,8 @@ static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_re
     switch(obj.type) {
         case Type::SPHERE:
             return hit_sphere(r, ray_t, obj.sphere, rec);
+        case Type::BBOX:
+            return hit_bvh(r, ray_t, rec, obj.BVHTree );
         
         // handle other types ....
         default:

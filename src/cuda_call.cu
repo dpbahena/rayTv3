@@ -527,12 +527,12 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
         bbox = AaBb(bbox, obj.sphere.bbox);
     }
 
-    printf("min: %f, max: %f\n", h_spheres[0].sphere.bbox.axis_interval(1).min, h_spheres[0].sphere.bbox.axis_interval(1).max);
+    // printf("min: %f, max: %f\n", h_spheres[0].sphere.bbox.axis_interval(1).min, h_spheres[0].sphere.bbox.axis_interval(1).max);
     
     hittable_list hh_world(h_spheres);
     BVH tree = BVH(hh_world);
-    printf("min: %f, max: %f\n", hh_world.list[0].sphere.bbox.axis_interval(1).min, hh_world.list[0].sphere.bbox.axis_interval(1).max);
-
+    // printf("min: %f, max: %f\n", hh_world.list[0].sphere.bbox.axis_interval(1).min, hh_world.list[0].sphere.bbox.axis_interval(1).max);
+    auto bvh_nodes = tree.nodes;
 
     int number_of_hittables = h_spheres.size();
     checkCuda(cudaMalloc((void**)&d_spheres, number_of_hittables * sizeof(hittable)) );
@@ -542,12 +542,13 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
     // h_world.list = d_spheres;
     // h_world.objects_size = number_of_hittables;
     hittable_list h_world(d_spheres, number_of_hittables, bbox);
+    auto t_world(hittable::make_bvhTree(bvh_nodes.data(), h_world.list));
     // h_world.bbox = bbox;
     // printf("min: %f, max: %f\n", h_world.list[0].sphere.bbox.axis_interval(1).min, h_world.list[0].sphere.bbox.axis_interval(1).max);
     
     /* Allocate memory for hittable list on the device */
     checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
-    checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMemcpy(d_world, &t_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
 
 
 

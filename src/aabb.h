@@ -52,9 +52,9 @@ class AaBb {
         }
         __device__ __host__
         const interval& axis_interval(int n) const {
-            if (n == 1) {printf("Y.min: %f, Y.max: %f\n", y.min, y.max); return y;}
-            if (n == 2) {printf("Z.min: %f, Z.max: %f\n", z.min, z.max);return z;}
-            printf("X.min: %f, X.max: %f\n", x.min, x.max);
+            if (n == 1) {/* printf("Y.min: %f, Y.max: %f\n", y.min, y.max); */ return y;}
+            if (n == 2) {/* printf("Z.min: %f, Z.max: %f\n", z.min, z.max); */return z;}
+            // printf("X.min: %f, X.max: %f\n", x.min, x.max);
             return x;
         }
         __device__ __host__
