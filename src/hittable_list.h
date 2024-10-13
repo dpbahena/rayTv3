@@ -32,6 +32,10 @@ struct hittable_list {
             //     bbox = AaBb(bbox, sphere_bounding_box(list[i].sphere) );
             // }
         }
+        hittable_list(std::vector<hittable>& objects) {
+            list = objects.data();
+            objects_size = objects.size();
+        }
         __device__
         bool hit(const ray& r, interval ray_t, hit_record& rec) const {
             hit_record temp_rec;

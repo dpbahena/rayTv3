@@ -427,6 +427,9 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (i >= width || j >= height) return;
+    // if (i == 0 and j == 0) {
+    //     printf("min: %f, max: %f\n", world->list[0].sphere.bbox.axis_interval(1).min, world->list[0].sphere.bbox.axis_interval(1).max);
+    // }
     
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
     for (int sample = 0; sample < samples_per_pixel; sample++){
@@ -524,8 +527,13 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
         bbox = AaBb(bbox, obj.sphere.bbox);
     }
 
-   
+    printf("min: %f, max: %f\n", h_spheres[0].sphere.bbox.axis_interval(1).min, h_spheres[0].sphere.bbox.axis_interval(1).max);
     
+    hittable_list hh_world(h_spheres);
+    BVH tree = BVH(hh_world);
+    printf("min: %f, max: %f\n", hh_world.list[0].sphere.bbox.axis_interval(1).min, hh_world.list[0].sphere.bbox.axis_interval(1).max);
+
+
     int number_of_hittables = h_spheres.size();
     checkCuda(cudaMalloc((void**)&d_spheres, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_spheres, h_spheres.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
@@ -535,6 +543,7 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
     // h_world.objects_size = number_of_hittables;
     hittable_list h_world(d_spheres, number_of_hittables, bbox);
     // h_world.bbox = bbox;
+    // printf("min: %f, max: %f\n", h_world.list[0].sphere.bbox.axis_interval(1).min, h_world.list[0].sphere.bbox.axis_interval(1).max);
     
     /* Allocate memory for hittable list on the device */
     checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );

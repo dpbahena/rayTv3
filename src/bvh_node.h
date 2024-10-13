@@ -44,7 +44,7 @@ class BVH {
         node_stack.reserve(objects.objects_size);
 
         /* Build the BVH with the objects from the hittable_list */
-        // recursive_build(objects, 0, objects.objects_size, node_stack);
+        recursive_build(objects, 0, objects.objects_size, node_stack);
 
         /* Store the resulting BVH in a flattened array */
         
@@ -64,7 +64,7 @@ class BVH {
         } else {
 
             /* Internal node case: sort the objects by a random axis */
-            int axis = int(random_double(0, 2)); // choose an axis to split
+            int axis = int(random_double(0, 3)); // choose an axis to split
             auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
 
             /* Sort the objects along the chosen axis */
