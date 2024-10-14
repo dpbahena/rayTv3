@@ -52,6 +52,7 @@ class AaBb {
         }
         __device__ __host__
         const interval& axis_interval(int n) const {
+            
             if (n == 1) {/* printf("Y.min: %f, Y.max: %f\n", y.min, y.max); */ return y;}
             if (n == 2) {/* printf("Z.min: %f, Z.max: %f\n", z.min, z.max); */return z;}
             // printf("X.min: %f, X.max: %f\n", x.min, x.max);
@@ -59,16 +60,19 @@ class AaBb {
         }
         __device__ __host__
         bool hit(const ray& r, interval ray_t) const {
+            
             const glm::vec3& ray_orig = r.origin;
             const glm::vec3& ray_dir  = r.direction;
 
             for (int axis = 0; axis < 3; axis++) {
+                
                 const interval& ax = axis_interval(axis);
+                
                 const double adinv = 1.0 / ray_dir[axis];
-
+                printf("res: %f\n", ax.min);
                 auto t0 = (ax.min - ray_orig[axis]) * adinv;
                 auto t1 = (ax.max - ray_orig[axis]) * adinv;
-
+                
                 if (t0 < t1) {
                     if (t0 > ray_t.min) ray_t.min = t0;
                     if (t1 < ray_t.max) ray_t.max = t1;

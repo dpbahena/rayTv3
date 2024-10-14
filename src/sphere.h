@@ -8,7 +8,7 @@
 
 
 __device__
-bool hit_sphere(const ray& r, interval ray_t, const sphere_data& sphere, hit_record& rec) {
+bool hit_sphere(const ray& r, interval ray_t, hit_record& rec, const sphere_data& sphere) {
     glm::vec3 current_center = sphere.center.at(r.time());
     glm::vec3 oc = current_center - r.origin;
     auto a = glm::dot(r.direction, r.direction);
@@ -43,16 +43,28 @@ static AaBb sphere_bounding_box(const sphere_data& sphere) { return sphere.bbox;
 
 /* Global or static hit function that processes hits based on the type of object */       
 __device__
-static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_record& rec){
+static bool object_hit(const ray& r, interval ray_t, hit_record& rec, const hittable& obj){
+
+    
     
     switch(obj.type) {
         case Type::SPHERE:
-            return hit_sphere(r, ray_t, obj.sphere, rec);
+            printf("dario\n");
+            return hit_sphere(r, ray_t, rec, obj.sphere);
         case Type::BBOX:
+            printf("ariana\n");
             return hit_bvh(r, ray_t, rec, obj.BVHTree );
         
         // handle other types ....
         default:
+            // printf("nada\n");
             return false;
     }
+}
+
+__device__
+static bool object2_hit(const ray& r, interval ray_t, hit_record& rec, const hittable& obj){
+       
+    
+    return hit_bvh(r, ray_t, rec, obj.BVHTree );
 }

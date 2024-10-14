@@ -7,18 +7,6 @@
 
 inline double random_double(float min, float max);
 
-// /* Stores a bounding box, the indices for the left and right children, and whether the node is a leaf */
-// struct BVHNode {
-//     AaBb bbox;
-//     int left_child_index; // Index left child in the array, -1 if it's a leaf
-//     int right_child_index; // index right child in the array, -1 if it's a leaf
-//     int object_index;       // index of the object the leaf represent (if it's a leaf)
-//     bool is_leaf;
-
-
-// };
-
-
 class BVH {
     public:
         std::vector<BVHNode> nodes;
@@ -26,20 +14,15 @@ class BVH {
         BVH(const hittable_list& objects) {
             build_bvh(objects);
         }
-        // bool hit(const ray& r, interval ray_t, hit_record& rec, const hittable_list& objects) const {
-        //     return hit_bvh(r, ray_t, rec, objects);
-        // }
-
+        
         AaBb bounding_box() const {
-            return nodes[0].bbox;  // Root node's bounding box
-            
+            return nodes[0].bbox;  // Root node's bounding box   
         }
 
 
 
     private:
-    // std::vector<BVHNode> nodes;
-
+    
     void build_bvh(const hittable_list& objects) {
         nodes.clear();
 
@@ -57,7 +40,7 @@ class BVH {
 
     void recursive_build(const hittable_list& objects, size_t start, size_t end, std::vector<BVHNode>& node_stack) {
         size_t object_span = end - start;
-        BVHNode node;
+        BVHNode node = {};  // zero-initialized
 
         if(object_span == 1) {
             node.is_leaf = true;
@@ -71,19 +54,8 @@ class BVH {
             auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
 
             /* Sort the objects along the chosen axis */
-            
-            // std::sort(objects.list + start, objects.list + end, [&](const sphere&a, const sphere& b)
-            // std::sort(objects.list + start, objects.list + end, [&](const sphere_data& a, const sphere_data& b)
             std::sort(objects.list + start, objects.list + end, comparator);
             
-            // {
-            //     BVHNode a_node; 
-            //     a_node.bbox = a.bounding_box();
-            //     BVHNode b_node;
-            //     b_node.bbox = b.bounding_box();
-            //     return comparator(&a_node, &b_node);
-            // });
-
             /* Divide the objects into 2 groups and recursively build left and right subtrees */
             auto mid = start + object_span / 2;
 
@@ -104,57 +76,11 @@ class BVH {
         node_stack.push_back(node);
 
     }
-    
-    // bool hit_bvh(const ray& r, interval ray_t, hit_record& rec, const hittable_list& objects) const {
-
-    //     bool hit_anything = false;
-    //     hit_record temp_rec;
-    //     int current_node_index = 0;  // start from the root node
-
-    //     while (current_node_index != -1) {
-    //         const BVHNode& node = nodes[current_node_index];
-            
-    //         if (!node.bbox.hit(r, ray_t)) {
-    //             break ; // Skip if the bounding box is not hit
-    //         }
-    //         if (node.is_leaf) {
-    //             // check for object hit using hittable_list passed as a parameter 
-    //             if (objects.list[node.object_index].hit(r, ray_t, temp_rec)){
-    //                 hit_anything = true;
-    //                 ray_t.max = temp_rec.t;  // Update interval for closer hit
-    //                 rec = temp_rec;
-    //             }
-    //             break;
-    //         } else {
-    //             /* Internal node, check children */
-    //             bool hit_left =  nodes[node.left_child_index].bbox.hit(r, ray_t);
-    //             bool hit_right = nodes[node.right_child_index].bbox.hit(r, ray_t);
-
-    //             if (hit_left && hit_right) {
-    //                 current_node_index = node.left_child_index; // Go to the left first
-
-    //             } else if (hit_left) {
-    //                 current_node_index = node.left_child_index;
-    //             } else if (hit_right) {
-    //                 current_node_index = node.right_child_index;
-    //             } else {
-    //                 break;  // Neither child is hit, end transversal
-    //             }
-    //         }
-    //     }
-
-    //     return hit_anything;
-    // }
-
-
 
     // static bool box_compare(const BVHNode* a, const BVHNode* b, int axis_index) {
     static bool box_compare(const hittable& a, const hittable& b, int axis_index) {
         
         /* Compare the bounding boxes of two objects along the specific axis */
-        // a.sphere.bbox.axis_interval(
-        // auto a_axis_interval = a->bbox.axis_interval(axis_index);
-        // auto b_axis_interval = b->bbox.axis_interval(axis_index);
         auto a_axis_interval = a.sphere.bbox.axis_interval(axis_index);
         auto b_axis_interval = b.sphere.bbox.axis_interval(axis_index);
 
@@ -175,15 +101,17 @@ class BVH {
     }
 
 };
-__device__
-static bool hit_bvh(const ray& r, interval ray_t, hit_record& rec, const bvh_data& BVHTree /* const hittable_list& objects */)  {
 
+
+__device__
+static bool hit_bvh(const ray& r, interval ray_t, hit_record& rec, const bvh_data& BVHTree )  {
+       
     bool hit_anything = false;
     hit_record temp_rec;
     int current_node_index = 0;  // start from the root node
 
     while (current_node_index != -1) {
-        // const BVHNode& node = nodes[current_node_index];
+        
         const BVHNode& node = BVHTree.nodes[current_node_index];
         
         if (!node.bbox.hit(r, ray_t)) {
@@ -191,8 +119,8 @@ static bool hit_bvh(const ray& r, interval ray_t, hit_record& rec, const bvh_dat
         }
         if (node.is_leaf) {
             // check for object hit using hittable_list passed as a parameter 
-            if (object_hit(r, ray_t, BVHTree.objects[node.object_index], temp_rec)){
-            // if (objects.list[node.object_index].hit(r, ray_t, temp_rec)){
+            if (object_hit(r, ray_t, temp_rec, BVHTree.objects[node.object_index])){
+
                 hit_anything = true;
                 ray_t.max = temp_rec.t;  // Update interval for closer hit
                 rec = temp_rec;

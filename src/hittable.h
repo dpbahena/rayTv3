@@ -45,7 +45,6 @@ struct hittable;
 struct bvh_data {
 
     BVHNode* nodes;
-    // AaBb* nodes;
     hittable* objects;    
     
 };
@@ -58,7 +57,6 @@ struct hittable {
     union {
         sphere_data sphere;
         bvh_data BVHTree;
-
     };
 
     // default constructor

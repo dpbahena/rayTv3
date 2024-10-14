@@ -355,7 +355,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     for (int k = 0; k < depth; k++){
         hit_record rec;
         if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
-        // if(hit(world, cur_ray, interval(0.001f, FLT_MAX), rec)){
+        
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
             glm::vec3 attenuation;
@@ -364,11 +364,9 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
 
             if (rec.mat->type == Type::METAL){
                 did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-                // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
             } else if (rec.mat->type == Type::LAMBERTIAN){
                 did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-                // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
             } else if (rec.mat->type == Type::DIELECTRIC){
                 did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
@@ -381,6 +379,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
                 final_color = glm::vec3(0.0f, 0.0f, 0.0f);  // if no scattering, no contribution
             }
         } else {  // color background
+            
             glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
             float a = 0.5f * (unitDirection.y + 1.0f);
             glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
@@ -430,7 +429,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     // if (i == 0 and j == 0) {
     //     printf("min: %f, max: %f\n", world->list[0].sphere.bbox.axis_interval(1).min, world->list[0].sphere.bbox.axis_interval(1).max);
     // }
-    
+
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
     for (int sample = 0; sample < samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
@@ -441,7 +440,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, hittable* &d_spheres, hittable_list* &d_world){
+void init_objects(std::vector<material*> device_materials, hittable* &d_spheres, BVHNode* &d_nodes, hittable_list* &d_world){
 
     std::vector<hittable> h_spheres;
     
@@ -453,51 +452,51 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
     device_materials.push_back(d_ground);
     h_spheres.push_back(hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, d_ground));
 
-    // Create random spheres 
-    for (
-        int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
-            auto choose_material = random_double();
-            glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
+    // // Create random spheres 
+    // for (
+    //     int a = -11; a < 11; a++) {
+    //     for (int b = -11; b < 11; b++) {
+    //         auto choose_material = random_double();
+    //         glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             
-            if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
-                if(choose_material < 0.8f) {
-                    // difuse
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    auto a_material = material::lambertian_material(albedo);
-                    material* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(d_mat);
-                    glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
-                    h_spheres.push_back(hittable::make_sphere(center, center2, 0.2f, d_mat));
-                    // h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
+    //         if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
+    //             if(choose_material < 0.8f) {
+    //                 // difuse
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 auto a_material = material::lambertian_material(albedo);
+    //                 material* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(d_mat);
+    //                 glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
+    //                 h_spheres.push_back(hittable::make_sphere(center, center2, 0.2f, d_mat));
+    //                 // h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
 
-                }
-                if(choose_material < 0.95f) {
-                    // metal
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    float fuzz = random_double(0.0f, 0.5f);
-                    auto a_material = material::metal_material(albedo, fuzz);
-                    material* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(d_mat);
-                    h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
-                }
-                else  {
-                    // dielectric
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    auto a_material = material::dielectric_material(1.5);
-                    material* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(d_mat);
-                    h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
-                }
-            }
-        }
-    }
+    //             }
+    //             if(choose_material < 0.95f) {
+    //                 // metal
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 float fuzz = random_double(0.0f, 0.5f);
+    //                 auto a_material = material::metal_material(albedo, fuzz);
+    //                 material* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(d_mat);
+    //                 h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
+    //             }
+    //             else  {
+    //                 // dielectric
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 auto a_material = material::dielectric_material(1.5);
+    //                 material* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(d_mat);
+    //                 h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
+    //             }
+    //         }
+    //     }
+    // }
 
 
     // Three secundary spheres
@@ -523,32 +522,44 @@ void init_objects(std::vector<material*> device_materials, hittable* &d_spheres,
     device_materials.push_back(d_mat3);
     h_spheres.push_back(hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, d_mat3));
     AaBb bbox;
-    for (auto &obj : h_spheres){
+    for(auto &obj: h_spheres){
         bbox = AaBb(bbox, obj.sphere.bbox);
-    }
-
-    // printf("min: %f, max: %f\n", h_spheres[0].sphere.bbox.axis_interval(1).min, h_spheres[0].sphere.bbox.axis_interval(1).max);
+    }    
+        
     
-    hittable_list hh_world(h_spheres);
-    BVH tree = BVH(hh_world);
-    // printf("min: %f, max: %f\n", hh_world.list[0].sphere.bbox.axis_interval(1).min, hh_world.list[0].sphere.bbox.axis_interval(1).max);
-    auto bvh_nodes = tree.nodes;
+    // hittable_list hh_world(h_spheres);
+
+    // BVH tree = BVH(hh_world);
+    // auto bvh_nodes = tree.nodes;
+
+    // BVH bvh = BVH(h_spheres);
+    std::vector<BVHNode> h_nodes = BVH(h_spheres).nodes;
+    for(auto &node : h_nodes){
+        printf("Index: %d, is leaf? %d, leftIndex: %d, rightIndex: %d \n", node.object_index, node.is_leaf, node.left_child_index, node.right_child_index);
+    }
+    
+
+
+
 
     int number_of_hittables = h_spheres.size();
     checkCuda(cudaMalloc((void**)&d_spheres, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_spheres, h_spheres.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
 
-    // hittable_list h_world;
-    // h_world.list = d_spheres;
-    // h_world.objects_size = number_of_hittables;
-    hittable_list h_world(d_spheres, number_of_hittables, bbox);
-    auto t_world(hittable::make_bvhTree(bvh_nodes.data(), h_world.list));
-    // h_world.bbox = bbox;
-    // printf("min: %f, max: %f\n", h_world.list[0].sphere.bbox.axis_interval(1).min, h_world.list[0].sphere.bbox.axis_interval(1).max);
-    
+    int number_of_nodes = h_nodes.size();
+    checkCuda(cudaMalloc((void**)&d_nodes, number_of_nodes * sizeof(BVHNode)) );
+    checkCuda(cudaMemcpy(d_nodes, h_nodes.data(), number_of_nodes * sizeof(BVHNode), cudaMemcpyHostToDevice) );
+
+
+
+    // hittable_list h_world(d_spheres, number_of_hittables);
+
+    auto t_world(hittable::make_bvhTree(d_nodes, d_spheres));
+    hittable_list h_world(&t_world, number_of_nodes, bbox);
+
     /* Allocate memory for hittable list on the device */
     checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
-    checkCuda(cudaMemcpy(d_world, &t_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
 
 
 
@@ -566,15 +577,16 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     uint32_t*   d_image;    // for display buffer
     curandState_t* d_states;  // random calculations in GPU
     
-    // lambertian* d_material_ground;
     
-    // sphere* d_spheres;
+    
+
     hittable* d_spheres;
     hittable_list* d_world;
+    BVHNode* d_nodes;
    
       
 
-    init_objects(device_materials, d_spheres, d_world);
+    init_objects(device_materials, d_spheres, d_nodes, d_world);
 
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
     
@@ -611,6 +623,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     cudaFree(d_image);
     cudaFree(d_world);
     cudaFree(d_spheres);
+    cudaFree(d_nodes);
     cudaFree(d_states);
     
     
