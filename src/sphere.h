@@ -3,16 +3,20 @@
 #pragma once
 
 #include "hittable.h"
+#include <stdio.h>
 
 
 
 __device__
-bool hit_sphere(const ray& r, interval ray_t, const sphere_data& sphere, hit_record& rec) {
-    glm::vec3 current_center = sphere.center.at(r.time());
+bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec) {
+    
+    
+
+    glm::vec3 current_center = center.at(r.time());
     glm::vec3 oc = current_center - r.origin;
     auto a = glm::dot(r.direction, r.direction);
     auto h = glm::dot(r.direction, oc);
-    auto c = glm::dot(oc, oc) - sphere.radius * sphere.radius;
+    auto c = glm::dot(oc, oc) - radius * radius;
 
     auto discriminant = h * h - a * c;
     if (discriminant < 0) return false;   // no Real solution
@@ -27,29 +31,30 @@ bool hit_sphere(const ray& r, interval ray_t, const sphere_data& sphere, hit_rec
 
     rec.t = root;
     rec.p = r.at(rec.t);
-    glm::vec3 outward_normal = (rec.p - current_center) / sphere.radius;
+    glm::vec3 outward_normal = (rec.p - current_center) / radius;
     rec.set_face_normal(r, outward_normal);
     rec.type = Type::SPHERE;
-    rec.mat = sphere.mat;
+    rec.mat = mat;
    
 
     return true;
     
 }
 
-static AaBb sphere_bounding_box(const sphere_data& sphere) { return *sphere.bbox;}
+// static AaBb sphere_bounding_box(const sphere_data& sphere) { return *sphere.bbox;}
+
 
 
 /* Global or static hit function that processes hits based on the type of object */       
-__device__
-static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_record& rec){
+// __device__
+// static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_record& rec){
     
-    switch(obj.type) {
-        case Type::SPHERE:
-            return hit_sphere(r, ray_t, obj.sphere, rec);
+//     switch(obj.type) {
+//         case Type::SPHERE:
+//             return hit_sphere(r, ray_t, obj.sphere, rec);
         
-        // handle other types ....
-        default:
-            return false;
-    }
-}
+//         // handle other types ....
+//         default:
+//             return false;
+//     }
+// }

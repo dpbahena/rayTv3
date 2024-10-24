@@ -5,7 +5,7 @@
 
 #include "sphere.h"
 #include "hittable_list.h"
-#include "bvh_node.h"
+// #include "bvh_node.h"
 
 #include <cstdio>
 #include <vector>
@@ -45,6 +45,11 @@ inline double random_double(float min, float max) {
     // static std::mt19937 generator;   // uncomment for same results
     static std::mt19937 generator(static_cast<unsigned int>(time(nullptr)));   // comment for same results
     return distribution(generator, std::uniform_real_distribution<double>::param_type(min, max));
+}
+
+inline int random_int(int min, int max) {
+    // Returns a random integer in [min,max].
+    return int(random_double(min, max+1));
 }
 
 
@@ -357,7 +362,9 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     
     for (int k = 0; k < depth; k++){
         hit_record rec;
+        
         if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        
         // if(hit(world, cur_ray, interval(0.001f, FLT_MAX), rec)){
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
@@ -404,7 +411,7 @@ ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::
     auto pixel_sample = pixel00_loc 
                         + ((i + offset.x) * delta_u)
                         + ((j + offset.y) * delta_v);
-
+    
     auto ray_origin =  (defocusAngle <= 0) ? cameraCenter : defocus_disk_sample(states, i, j, cameraCenter, defocusDisk_u, defocusDisk_v);
     auto ray_direction = pixel_sample - ray_origin;
     auto x = states[i];
@@ -443,17 +450,19 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, std::vector<AaBb*> device_boxes, hittable* &d_spheres, hittable_list* &d_world){
+void init_objects(std::vector<material*> device_materials, hittable* &d_sphere_list, hittable_list* &d_world){
 
-    std::vector<hittable> h_spheres;
+    // std::vector<hittable> h_spheres;
+    hittable_list h_world;
+    std::vector<hittable> h_sphere_list;
     material* d_ground;
-    AaBb* d_bbox;  // temporary holder of pointers
-    checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );   // set only once
-    AaBb box;      // temporary holder of a bbox
+    // AaBb* d_bbox;  // temporary holder of pointers
+    // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );   // set only once
+    // AaBb box;      // temporary holder of a bbox
     glm::vec3 static_center; // temporary
-    ray center;             // temporary
+    // ray center;             // temporary
     float radius;           // temporary
-    glm::vec3 rvec;         // temporary
+    // glm::vec3 rvec;         // temporary
     
     // ground 
     /* material */
@@ -463,20 +472,27 @@ void init_objects(std::vector<material*> device_materials, std::vector<AaBb*> de
     device_materials.push_back(d_ground);
     /* AaBb bbox */
     static_center = glm::vec3(0.0,-1000.0, 0.0);
-    center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
+    // center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
     radius = 1000;
-    rvec = glm::vec3(radius, radius, radius);
-    box = AaBb(static_center - rvec, static_center + rvec);
+    // rvec = glm::vec3(radius, radius, radius);
+    // box = AaBb(static_center - rvec, static_center + rvec);
     // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );   // set only once
-    checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
-    device_boxes.push_back(d_bbox);   // store for later deletion
-    h_spheres.push_back(hittable::make_sphere(static_center, radius, d_ground, d_bbox));
+    // checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
+    // device_boxes.push_back(d_bbox);   // store for later deletion
+    // h_spheres.push_back(hittable::make_sphere(static_center, radius, d_ground, d_bbox));
+    auto sphere = hittable::make_sphere(static_center, radius, d_ground);
+    h_sphere_list.push_back(sphere);
+    // checkCuda(cudaMalloc((void**)&d_sphere, sizeof(hittable)) );
+    // checkCuda(cudaMemcpy(d_sphere, &sphere, sizeof(hittable), cudaMemcpyHostToDevice) );
+    // device_spheres.push_back(d_sphere);
+    
+    // world.add(d_sphere);
+    
 
     // printf("min: %f, max: %f\n", h_spheres[0].sphere.bbox->axis_interval(0).min, h_spheres[0].sphere.bbox->axis_interval(0).max );
 
     // Create random spheres 
-    for (
-        int a = -11; a < 11; a++) {
+    for (int a = -11; a < 11; a++) {
         for (int b = -11; b < 11; b++) {
             auto choose_material = random_double();
             glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
@@ -491,18 +507,19 @@ void init_objects(std::vector<material*> device_materials, std::vector<AaBb*> de
                     checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
                     device_materials.push_back(d_mat);
                     glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
-                    ray a_center = ray(center, center2 - center);
+                    // ray a_center = ray(center, center2 - center);
                     radius = 0.2f;
-                    rvec = glm::vec3(radius, radius, radius);
+                    // rvec = glm::vec3(radius, radius, radius);
                     /* bbox */
-                    AaBb box1 = AaBb(a_center.at(0) - rvec, a_center.at(0) + rvec);
-                    AaBb box2 = AaBb(a_center.at(1) - rvec, a_center.at(1) + rvec);
-                    box = AaBb(box1, box2);
+                    // AaBb box1 = AaBb(a_center.at(0) - rvec, a_center.at(0) + rvec);
+                    // AaBb box2 = AaBb(a_center.at(1) - rvec, a_center.at(1) + rvec);
+                    // box = AaBb(box1, box2);
                     // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
-                    checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
-                    device_boxes.push_back(d_bbox);   // store for later deletion
-
-                    h_spheres.push_back(hittable::make_sphere(center, center2, radius, d_mat, d_bbox));
+                    // checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
+                    // device_boxes.push_back(d_bbox);   // store for later deletion
+                    auto sphere = hittable::make_sphere(center, center2, radius, d_mat);
+                    h_sphere_list.push_back(sphere);
+                    // h_spheres.push_back(hittable::make_sphere(center, center2, radius, d_mat, d_bbox));
                     // h_spheres.push_back(hittable::make_sphere(center, 0.2f, d_mat));
 
                 }
@@ -517,15 +534,16 @@ void init_objects(std::vector<material*> device_materials, std::vector<AaBb*> de
                     device_materials.push_back(d_mat);
                     /* aabb bbox */
                     // static_center = glm::vec3(0.0f, 1.0f, 0.0f);
-                    ray a_center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
+                    // ray a_center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
                     radius = 0.2f;
-                    rvec = glm::vec3(radius, radius, radius);
-                    box = AaBb(center - rvec, center + rvec);
+                    // rvec = glm::vec3(radius, radius, radius);
+                    // box = AaBb(center - rvec, center + rvec);
                     // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
-                    checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
-                    device_boxes.push_back(d_bbox);   // store for later deletion
-
-                    h_spheres.push_back(hittable::make_sphere(center, radius, d_mat, d_bbox));
+                    // checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
+                    // device_boxes.push_back(d_bbox);   // store for later deletion
+                    auto sphere = hittable::make_sphere(center, radius, d_mat);
+                    h_sphere_list.push_back(sphere);
+                    // h_spheres.push_back(hittable::make_sphere(center, radius, d_mat, d_bbox));
                 }
                 else  {
                     // dielectric
@@ -537,22 +555,23 @@ void init_objects(std::vector<material*> device_materials, std::vector<AaBb*> de
                     device_materials.push_back(d_mat);
                     /* aabb bbox */
                     // static_center = glm::vec3(0.0f, 1.0f, 0.0f);
-                    ray a_center = ray(center, glm::vec3(0.0f, 0.0f, 0.0f));
+                    // ray a_center = ray(center, glm::vec3(0.0f, 0.0f, 0.0f));
                     radius = 0.2f;
-                    rvec = glm::vec3(radius, radius, radius);
-                    box = AaBb(center - rvec, center + rvec);
+                    // rvec = glm::vec3(radius, radius, radius);
+                    // box = AaBb(center - rvec, center + rvec);
                     // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
-                    checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
-                    device_boxes.push_back(d_bbox);   // store for later deletion
-
-                    h_spheres.push_back(hittable::make_sphere(center, radius, d_mat, d_bbox));
+                    // checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
+                    // device_boxes.push_back(d_bbox);   // store for later deletion
+                    auto sphere = hittable::make_sphere(center, radius, d_mat);
+                    h_sphere_list.push_back(sphere);
+                    // h_spheres.push_back(hittable::make_sphere(center, radius, d_mat, d_bbox));
                 }
             }
         }
     }
 
 
-    // Three secundary spheres
+    // // Three secundary spheres
 
     /* material */
     material h_mat1 = material::dielectric_material(1.5f);
@@ -561,33 +580,36 @@ void init_objects(std::vector<material*> device_materials, std::vector<AaBb*> de
     checkCuda(cudaMemcpy(d_mat1, &h_mat1, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_mat1);
 
-    /* aabb bbox */
+    // /* aabb bbox */
     static_center = glm::vec3(0.0f, 1.0f, 0.0f);
-    center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
+    // center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
     radius = 1.0f;
-    rvec = glm::vec3(radius, radius, radius);
-    box = AaBb(static_center - rvec, static_center + rvec);
-    // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
-    checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
-    device_boxes.push_back(d_bbox);   // store for later deletion
-    h_spheres.push_back(hittable::make_sphere(static_center, radius, d_mat1, d_bbox));
-
+    // rvec = glm::vec3(radius, radius, radius);
+    // box = AaBb(static_center - rvec, static_center + rvec);
+    // // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
+    // checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
+    // device_boxes.push_back(d_bbox);   // store for later deletion
+    sphere = hittable::make_sphere(static_center, radius, d_mat1);
+    h_sphere_list.push_back(sphere);
+    
     /* Material */
     material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
     material* d_mat2;
     checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
     checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_mat2);
-    /* aabb bbox */
+    // /* aabb bbox */
     static_center = glm::vec3(-4.0f, 1.0f, 0.0f);
-    center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
+    // center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
     radius = 1.0f;
-    rvec = glm::vec3(radius, radius, radius);
-    box = AaBb(static_center - rvec, static_center + rvec);
-    // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
-    checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
-    device_boxes.push_back(d_bbox);   // store for later deletion
-    h_spheres.push_back(hittable::make_sphere(static_center, radius, d_mat2, d_bbox));
+    // rvec = glm::vec3(radius, radius, radius);
+    // box = AaBb(static_center - rvec, static_center + rvec);
+    // // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
+    // checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
+    // device_boxes.push_back(d_bbox);   // store for later deletion
+    sphere = hittable::make_sphere(static_center, radius, d_mat2);
+    h_sphere_list.push_back(sphere);
+    // h_spheres.push_back(hittable::make_sphere(static_center, radius, d_mat2, d_bbox));
 
     /* Material */
     material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
@@ -595,30 +617,37 @@ void init_objects(std::vector<material*> device_materials, std::vector<AaBb*> de
     checkCuda(cudaMalloc((void**)&d_mat3, sizeof(material)) );
     checkCuda(cudaMemcpy(d_mat3, &h_mat3, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_mat3);
-    /* aabb bbox */
+    // /* aabb bbox */
     static_center = glm::vec3(4.0f, 1.0f, 0.0f);
-    center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
+    // center = ray(static_center, glm::vec3(0.0f, 0.0f, 0.0f));
     radius = 1.0f;
-    rvec = glm::vec3(radius, radius, radius);
-    box = AaBb(static_center - rvec, static_center + rvec);
-    // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
-    checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
-    device_boxes.push_back(d_bbox);   // store for later deletion
-    h_spheres.push_back(hittable::make_sphere(static_center, radius, d_mat3, d_bbox));
+    // rvec = glm::vec3(radius, radius, radius);
+    // box = AaBb(static_center - rvec, static_center + rvec);
+    // // checkCuda(cudaMalloc((void**)&d_bbox, sizeof(AaBb)) );
+    // checkCuda(cudaMemcpy(d_bbox, &box, sizeof(AaBb), cudaMemcpyHostToDevice) );
+    // device_boxes.push_back(d_bbox);   // store for later deletion
+    sphere = hittable::make_sphere(static_center, radius, d_mat3);
+    h_sphere_list.push_back(sphere);
+    // h_spheres.push_back(hittable::make_sphere(static_center, radius, d_mat3, d_bbox));
  
     
-    int number_of_hittables = h_spheres.size();
-    checkCuda(cudaMalloc((void**)&d_spheres, number_of_hittables * sizeof(hittable)) );
-    checkCuda(cudaMemcpy(d_spheres, h_spheres.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
-
-   
-    hittable_list h_world(d_spheres, number_of_hittables);
+    size_t number_of_hittables = h_sphere_list.size();
+    
+    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+     
+    h_world.hittables = d_sphere_list;
+    h_world.objects_size = number_of_hittables;
+    h_world.add_bbox();
     
     
 
 
-    // printf("min: %f, max: %f\n", h_world.list[0].sphere.bbox->axis_interval(0).min, h_world.list[0].sphere.bbox->axis_interval(0).max );
     
+    
+
+    
+
     /* Allocate memory for hittable list on the device */
     checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
     checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
@@ -635,7 +664,8 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 {  
 
     std::vector<material*>  device_materials;  
-    std::vector<AaBb*> device_boxes;  
+    hittable* d_spheres_list;
+    // std::vector<AaBb*> device_boxes;  
 
     /* device variables */
     uint32_t*   d_image;    // for display buffer
@@ -644,13 +674,13 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     // lambertian* d_material_ground;
     
     // sphere* d_spheres;
-    hittable* d_spheres;
+    
     hittable_list* d_world;
    
       
-
-    init_objects(device_materials, device_boxes, d_spheres, d_world);
-
+    
+    init_objects(device_materials, d_spheres_list, d_world);
+    
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
     
     clock_t start, stop;
@@ -682,12 +712,10 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     // delete all device pointers of the materials and AaBb boxes
     for(auto& device : device_materials) 
         cudaFree(device);
-    for(auto& device : device_boxes)
-        cudaFree(device);
-
+    
+    cudaFree(d_spheres_list);
     cudaFree(d_image);
     cudaFree(d_world);
-    cudaFree(d_spheres);
     cudaFree(d_states);
     
     
