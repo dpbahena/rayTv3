@@ -121,75 +121,6 @@ static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3
     return true;
 }
 
-// struct hittable_list {
-//     sphere* list;
-//     int list_size;
-//     AaBb bbox;
-//     hittable_list() {};
-//     hittable_list(sphere* objects, int size) : list(objects), list_size(size) {
-//         /* Update the bounding box incrementally as each new chidl is added */
-        
-//         if (list_size > 0) {
-//             printf("before\n");
-//             bbox = list[0].bounding_box();  // initialize first box
-//             printf("after\n");
-            
-//         }
-//         for (int i = 1; i < list_size; i++){    // then continue initializing the rest
-//             bbox = AaBb(bbox, list[i].bounding_box());
-//             // printf("ana\n");
-//         }
-        
-//     }
-    
-// };
-
-// struct hittable_list {
-//     sphere* list;
-//     int list_size;
-//     AaBb bbox;
-
-//     hittable_list() {}
-
-//     hittable_list(sphere* objects, int size) : list(objects), list_size(size) {
-//         // Ensure the list is not empty
-//         if (list_size > 0) {
-//             printf("Initializing bounding box for the first sphere\n");
-//             AaBb first_bbox = list[0].bounding_box();  // Get the bounding box of the first object
-            
-//             // Validate the first bounding box
-//             if (first_bbox.axis_interval(0).min > first_bbox.axis_interval(0).max ||
-//                 first_bbox.axis_interval(1).min > first_bbox.axis_interval(1).max ||
-//                 first_bbox.axis_interval(2).min > first_bbox.axis_interval(2).max) {
-//                 printf("Error: Invalid bounding box for the first sphere\n");
-//                 return;
-//             }
-            
-//             bbox = first_bbox; // Initialize with the first bounding box
-//             printf("First bounding box initialized\n");
-//         }
-
-//         for (int i = 1; i < list_size; i++) {
-//             printf("Processing sphere %d\n", i);
-//             AaBb current_bbox = list[i].bounding_box();
-
-//             // Validate the current bounding box before using it
-//             if (current_bbox.axis_interval(0).min > current_bbox.axis_interval(0).max ||
-//                 current_bbox.axis_interval(1).min > current_bbox.axis_interval(1).max ||
-//                 current_bbox.axis_interval(2).min > current_bbox.axis_interval(2).max) {
-//                 printf("Error: Invalid bounding box for sphere %d\n", i);
-//                 continue; // Skip this sphere if its bounding box is invalid
-//             }
-
-//             bbox = AaBb(bbox, current_bbox);
-//         }
-//     }
-// };
-
-
-
- 
-
 
 __device__
 inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n){
@@ -344,23 +275,6 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 }
 
 
-/* __device__ bool hit(const hittable_list& world, const ray& r, interval ray_t, hitRecord& rec) {
-    hitRecord temp_rec;
-    bool hit_anything = false;
-    auto closest_so_far = ray_t.max;
-    
-    for (int i = 0; i < world.list_size; i++) {
-        if (world.list[i].hit(r, interval(ray_t.min, closest_so_far), temp_rec)) {
-            hit_anything = true;
-            closest_so_far = temp_rec.t;
-            rec = temp_rec;
-        }
-    }
-
-    return hit_anything;
-} */
-
-
 __device__
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
 glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
@@ -460,7 +374,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world){
+void init_objects(std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes, hittable* &d_sphere_list, /* hittable_list* &d_world, */ node_list* &dB_world){
 
     // std::vector<hittable> h_spheres;
     hittable_list h_world;
@@ -562,8 +476,8 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     h_world.hittables = d_sphere_list;
     h_world.objects_size = number_of_hittables;
     /* Allocate memory for hittable list on the device */
-    checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
-    checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
+    // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
     
 
     /* AaBb implementation*/
@@ -590,16 +504,12 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     uint32_t*   d_image;    // for display buffer
     curandState_t* d_states;  // random calculations in GPU
     
-    // lambertian* d_material_ground;
-    
-    // sphere* d_spheres;
-    
-    hittable_list* d_world;
+    // hittable_list* d_world;
     node_list* dB_world;
    
       
     
-    init_objects(device_materials, allocated_nodes, d_spheres_list, d_world, dB_world);
+    init_objects(device_materials, allocated_nodes, d_spheres_list, /* d_world, */ dB_world);
     
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
     
@@ -639,7 +549,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     
     cudaFree(d_spheres_list);
     cudaFree(d_image);
-    cudaFree(d_world);
+    // cudaFree(d_world);
     cudaFree(dB_world);
     cudaFree(d_states);
     
