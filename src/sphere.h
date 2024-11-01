@@ -3,14 +3,12 @@
 #pragma once
 
 #include "hittable.h"
-#include <stdio.h>
 
 
 
-__device__
+
+__device__ __host__
 bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec) {
-    
-    
 
     glm::vec3 current_center = center.at(r.time());
     glm::vec3 oc = current_center - r.origin;
@@ -41,20 +39,3 @@ bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec) {
     
 }
 
-// static AaBb sphere_bounding_box(const sphere_data& sphere) { return *sphere.bbox;}
-
-
-
-/* Global or static hit function that processes hits based on the type of object */       
-// __device__
-// static bool object_hit(const ray& r, interval ray_t, const hittable& obj, hit_record& rec){
-    
-//     switch(obj.type) {
-//         case Type::SPHERE:
-//             return hit_sphere(r, ray_t, obj.sphere, rec);
-        
-//         // handle other types ....
-//         default:
-//             return false;
-//     }
-// }

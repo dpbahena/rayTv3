@@ -14,7 +14,7 @@ class hit_record {
         double t;
         Type type;
         bool front_face;
-        __device__
+        __device__ __host__
         void set_face_normal(const ray& r, const glm::vec3& outward_normal){
             /* Sets the hit record normal vector. NOTE: the parameter outward_normal is assumed to be of unit length */
             front_face = glm::dot(r.direction, outward_normal) < 0;
@@ -31,8 +31,8 @@ struct sphere_data {
     material* mat;
     AaBb bbox;
     
-    AaBb bounding_box()  {return bbox;}
-    __device__
+    AaBb bounding_box() const {return bbox;}
+    __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec);
 };
 
@@ -53,7 +53,6 @@ struct hittable {
     // Constructor for each type
 
     /* STATIONARY SPHERE */
-    // static hittable make_sphere(const glm::vec3& static_center, float radius, material* mat, AaBb* bbox) {
     static hittable make_sphere(const glm::vec3& static_center, float radius, material* mat) {
         hittable obj;
         obj.type = Type::SPHERE;
@@ -67,7 +66,6 @@ struct hittable {
         return obj;
     }
     /* MOVING SPHERE */
-    // static hittable make_sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat, AaBb* bbox) {
     static hittable make_sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) {
         hittable obj;
         obj.type = Type::SPHERE;
