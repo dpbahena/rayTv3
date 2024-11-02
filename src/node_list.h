@@ -42,6 +42,9 @@ struct flat_node_list {
     
     BVH2* tree;
     BVHNode** nodes;
+
+    BVHNode* cudaNodes;
+    hittable* hittables;
     
     flat_node_list(){}
     void add(BVH2* tree){
@@ -60,6 +63,11 @@ struct flat_node_list {
         // }
     }
 
+    void addCudaNode(BVHNode* nodes, hittable* hittables){
+        cudaNodes = nodes;
+        this->hittables = hittables;
+    }
+
     
 
 
@@ -69,7 +77,8 @@ struct flat_node_list {
         bool hit_anything = false;
         auto closest_so_far = ray_t.max;
         
-        if(tree->hit(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, tree->hittables)){
+        // if(tree->hit(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, tree->hittables)){
+        if(BVH2::hit2(r, interval(ray_t.min, closest_so_far), temp_rec, cudaNodes, hittables)){
             
             hit_anything = true;
             closest_so_far = temp_rec.t;

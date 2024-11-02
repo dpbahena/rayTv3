@@ -32,6 +32,7 @@ I started with Chapter 13 defocus Blur
 
    another comparison:
    * at 500 samples 100 depth  ...using BVH2   1920x1080 NUC-computer  420.000650  seconds!!!!!  too slow
+   , 418.699608
    * with NO aabb just as chap2 (motion blur)  1290x1080 NUC-computer  198.905236  seconds!!!!!  50% FASTER!!! NO BOXES!!!
 
    (198.91 - 420.00) / 198.91 = BOXES (NOT EFFICIENT FOR CUDA) = 111.15 %  SLOWER
@@ -39,3 +40,12 @@ I started with Chapter 13 defocus Blur
    or
 
    (420.00 - 198.91) / 420.00 = NO BOXES just like cha2 Motion Blur CUDA = 52.6 % FASTER
+
+## MOVED BVH2 node_build NON-RECURSIVE construction OF FLAT NODES to GPU as kernel   BVH.hit() NON-RECURSIVE function in GPU  
+* at 500 samples 100 depth  1920x1080 NUC-computer  375.000650 , 372.935474 seconds!!!!!  still too slow but faster than above
+
+ (198.91 - 372.94) / 198.91 = BOXES (NOT EFFICIENT FOR CUDA) = 87.49 %  SLOWER
+
+   or
+
+(372.94 - 198.91) / 372.94 = NO BOXES just like cha2 Motion Blur CUDA = 46.7 % FASTER

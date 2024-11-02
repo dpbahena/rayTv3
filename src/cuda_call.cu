@@ -3,10 +3,11 @@
 #include "interval.h"
 
 
-#include "sphere.h"
+// #include "sphere.h"
 #include "hittable_list.h"
 #include "node_list.h"
 #include "bvh_node.h"
+#include "cuda_bvh_node.h"
 
 #include <cstdio>
 #include <vector>
@@ -34,11 +35,8 @@ __device__ inline float     random_float(curandState_t* state);
 
 
 
-const interval interval::empty = interval(+MAXFLOAT, -MAXFLOAT);
-const interval interval::universe = interval(-MAXFLOAT, + MAXFLOAT);
 
-const AaBb AaBb::empty    = AaBb(interval::empty,    interval::empty,    interval::empty);
-const AaBb AaBb::universe = AaBb(interval::universe, interval::universe, interval::universe);
+
 
 
 inline double random_double() {
@@ -269,6 +267,11 @@ glm::vec3 random_vector(curandState_t* states,  int i, int j){
 
 
 
+
+
+
+
+
 __device__ float random_float_in_range(curandState_t* state, float a, float b) {
     // return a + (b - a) * curand_uniform_float(state);  // this does not include b  e.g -1 to 1.0  it does not include 1.0
     return a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
@@ -376,7 +379,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes, std::vector<BVHNode*> allocated_flat_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
+void init_objects(std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
 
     // std::vector<hittable> h_spheres;
     hittable_list h_world;
@@ -497,14 +500,21 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     
     /* AaBb implementation NON-Recursive FLAT NODE CREATION */
     
-    auto tree = new BVH2(h_world, allocated_flat_nodes);
+    // auto tree = new BVH2(h_world, allocated_flat_nodes);   // CPU 
+    // flat_node_list fworld;
+    // fworld.add(tree); 
+    // checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+    // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+
+    /* Implement BVH nodes in Cuda by allocating 2n+log2(n) space */
+    checkCuda(cudaMallocManaged((void**)&bvh_nodes, (2 * number_of_hittables + log2(number_of_hittables)) * sizeof(BVHNode)) );
+    build_bvh_NR<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
     flat_node_list fworld;
-    fworld.add(tree); 
+    fworld.addCudaNode(bvh_nodes, d_sphere_list);
     checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
     checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
 
-
-
+    
 
 
 }
@@ -526,10 +536,11 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     hittable_list* d_world;
     node_list* dB_world;
     flat_node_list* dBF_world;
+    BVHNode* bvh_nodes;
    
       
     
-    init_objects(device_materials, allocated_nodes, allocated_flat_nodes, d_spheres_list, d_world, dB_world, dBF_world);
+    init_objects(device_materials, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
     
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
     
@@ -572,10 +583,11 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     
     cudaFree(d_spheres_list);
     cudaFree(d_image);
-    // cudaFree(d_world);
+    cudaFree(d_world);
     cudaFree(dB_world);
     cudaFree(dBF_world);
     cudaFree(d_states);
+    cudaFree(bvh_nodes);
     
     
 }

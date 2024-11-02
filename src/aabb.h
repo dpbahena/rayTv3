@@ -55,6 +55,7 @@ class AaBb {
 
             return true;
         }
+        __device__ __host__
         int longest_axis() const {
             // Returns the index of the longest axis of the bounding box.
 
@@ -64,6 +65,7 @@ class AaBb {
                 return y.size() > z.size() ? 1 : 2;
         }
 
+        
         static const AaBb empty, universe;
 };
 

@@ -233,6 +233,57 @@ class BVH2 {
             return hit_anything;  // Return true if a hit was detected
 
         }
+
+        __device__ __host__
+        static bool hit2(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
+            
+            const int MAX = 1024;
+            BVHNode* node_stack_arr[MAX];  // created on stack 
+            int top = -1;        
+          
+            node_stack_arr[++top] = (nodes + 0);
+            
+            bool hit_anything = false;
+            
+            // Initialize a temporary record to store the closest hit found during the traversal.
+            hit_record temp_rec;
+            // Loop until there are no more nodes to process in the stack.
+            while (top >= 0) {
+                
+                // Retrieve and remove the top node from the stack.
+                const BVHNode* current = node_stack_arr[top];
+                --top;
+                // Check if the ray intersects the bounding box of the current node.
+                // If not, skip further processing for this node.
+                if (!current->bbox.hit(r, ray_t)) {
+                    continue;
+
+                }
+                // If the current node has a left child node, add it to the stack for further processing.
+                if (current->left_child_index != -1 ) {
+                    node_stack_arr[++top] = (nodes + current->left_child_index);
+                }
+                // If the current node has a right child node, add it to the stack for further processing.
+                if (current->right_child_index != -1 ) {
+                    node_stack_arr[++top] = (nodes + current->right_child_index);
+                }
+                // Perform a hit test on the left child if it is a leaf node (i.e., it contains an actual object).
+                if (current->is_leaf && (hittables + current->object_index)->sphere.hit(r, ray_t, temp_rec)) {
+                    
+                    hit_anything = true; // A hit was found; update the hit_left flag and the closest hit record.
+                    // Update the maximum boundary of the ray interval to the hit point, ensuring that any subsequent hits are closer than the current hit.
+                    ray_t.max = temp_rec.t;
+                    rec = temp_rec;  // Update the closest hit record with the details of the new closest hit.
+                }
+            }
+            return hit_anything;  // Return true if a hit was detected
+
+        }
+
+
+
+
+
         AaBb bounding_box() { return bbox; }
 
     private:
@@ -251,7 +302,8 @@ class BVH2 {
             
             traversalStack[++top] ={0, hittables_size, -1, true};  // push()
 
-            while (top >= 0) {
+            // while (top >= 0) {
+            for (;top >= 0;) {
                
                 StackNode current = traversalStack[top];
                 --top; // pop()

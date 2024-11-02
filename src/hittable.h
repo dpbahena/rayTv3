@@ -30,7 +30,7 @@ struct sphere_data {
     float radius;
     material* mat;
     AaBb bbox;
-    
+    __device__ __host__
     AaBb bounding_box() const {return bbox;}
     __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec);
