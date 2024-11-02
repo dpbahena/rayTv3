@@ -475,6 +475,9 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     checkCuda(cudaMallocManaged((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
+
+    /* no AABB */  
+
     h_world.hittables = d_sphere_list;
     h_world.objects_size = number_of_hittables;
     /* Allocate memory for hittable list on the device */
@@ -490,8 +493,10 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     // aworld.add(node);
     // checkCuda(cudaMalloc((void**)&dB_world, sizeof(node_list)) );
     // checkCuda(cudaMemcpy(dB_world, &aworld, sizeof(node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+
     
     /* AaBb implementation NON-Recursive FLAT NODE CREATION */
+    
     // auto tree = new BVH2(h_world, allocated_flat_nodes);
     // flat_node_list fworld;
     // fworld.add(tree); 
