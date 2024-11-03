@@ -281,7 +281,7 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 __device__
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const flat_node_list& world) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const flat_node_list& world, BVHNode* nodes, hittable* hittables) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -290,7 +290,8 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        // if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables)){
         
         // if(hit(world, cur_ray, interval(0.001f, FLT_MAX), rec)){
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
@@ -361,7 +362,7 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 
 // __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world) {
 // __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, node_list* world) {
-__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, flat_node_list* world) {
+__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, flat_node_list* world, BVHNode* nodes, hittable* hittables) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -372,7 +373,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
     for (int sample = 0; sample < samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
-        color  += ray_color(states, i, j, depth, r, *world);
+        color  += ray_color(states, i, j, depth, r, *world, nodes, hittables);
     }
     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
     color *= pixel_sample_scale;
@@ -475,7 +476,7 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     
     size_t number_of_hittables = h_sphere_list.size();
     
-    checkCuda(cudaMallocManaged((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
@@ -562,7 +563,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 
     // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world);
     // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dB_world);
-    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dBF_world);
+    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dBF_world, bvh_nodes, d_spheres_list);
     // checkCuda(cudaPeekAtLastError() );
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());

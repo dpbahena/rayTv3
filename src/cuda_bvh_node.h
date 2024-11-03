@@ -202,4 +202,168 @@ __device__
 static bool box_z_compare (const hittable& a, const hittable& b) {
     return box_compare(a, b, 2);
 }
-       
+
+
+// __global__ void hit3(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables, bool &gotHit) { 
+// __device__ 
+// bool hit3(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
+//     const int MAX = 15;
+//     __shared__ BVHNode* node_stack_arr[MAX];  // Shared among threads in a block
+//     __shared__ int top;
+
+//     if (threadIdx.x == 0) top = 0; // Initialize top only once per block
+//     __syncthreads();
+
+//     bool hit_anything = false;
+//     hit_record temp_rec;
+
+//     // Initial push by thread 0, ensuring we stay within bounds
+//     if (threadIdx.x == 0 && top < MAX) {
+//         node_stack_arr[atomicAdd(&top, 1)] = (nodes + 0);
+//     }
+//     __syncthreads();
+
+//     // Loop until stack is empty
+//     while (top > 0) {
+//         int current_top = atomicAdd(&top, -1) - 1;  // Pop a node and decrement top
+//         if (current_top < 0) break;  // Exit if stack is empty
+
+//         BVHNode* current = node_stack_arr[current_top];
+
+//         if (!current->bbox.hit(r, ray_t)) continue;
+
+//         // Push children onto stack if they exist and within bounds
+//         if (current->left_child_index != -1 && top < MAX) {
+//             node_stack_arr[atomicAdd(&top, 1)] = (nodes + current->left_child_index);
+//         }
+//         if (current->right_child_index != -1 && top < MAX) {
+//             node_stack_arr[atomicAdd(&top, 1)] = (nodes + current->right_child_index);
+//         }
+
+//         if (current->is_leaf && (hittables + current->object_index)->sphere.hit(r, ray_t, temp_rec)) {
+//             hit_anything = true;
+//             ray_t.max = temp_rec.t;
+//             rec = temp_rec;
+//         }
+
+//         __syncthreads();
+//     }
+//     return hit_anything;
+// }
+
+__device__ 
+bool hit31(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
+    const int MAX = 15;
+    __shared__ int node_stack_arr[MAX];  // Store node indices instead of pointers
+    __shared__ int top;
+    
+    if (threadIdx.x == 0) top = 0; // Initialize top only once per block
+    __syncthreads();
+
+    bool hit_anything = false;
+    hit_record temp_rec;
+
+    // Initial push by thread 0, using index 0 for the root node
+    if (threadIdx.x == 0 && top < MAX) {
+        node_stack_arr[atomicAdd(&top, 1)] = 0; // Push root node index
+    }
+    __syncthreads();
+
+    // Loop until stack is empty
+    while (top > 0) {
+        int current_top = atomicAdd(&top, -1) - 1;  // Pop a node and decrement top
+        if (current_top < 0) break;  // Exit if stack is empty
+
+        // Access the current node using its index
+        BVHNode* current = &nodes[node_stack_arr[current_top]];
+
+        if (!current->bbox.hit(r, ray_t)) continue;
+
+        // Push children onto stack if they exist and within bounds
+        if (current->left_child_index != -1 && top < MAX) {
+            node_stack_arr[atomicAdd(&top, 1)] = current->left_child_index;
+        }
+        if (current->right_child_index != -1 && top < MAX) {
+            node_stack_arr[atomicAdd(&top, 1)] = current->right_child_index;
+        }
+
+        if (current->is_leaf && (hittables + current->object_index)->sphere.hit(r, ray_t, temp_rec)) {
+            hit_anything = true;
+            ray_t.max = temp_rec.t;
+            rec = temp_rec;
+        }
+
+        __syncthreads();
+    }
+    return hit_anything;
+}
+
+
+__device__
+bool hit3(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
+    
+    const int MAX = 15;
+    BVHNode* node_stack_arr[MAX];  // created on stack 
+    int top = -1;        
+    
+    node_stack_arr[++top] = (nodes + 0);
+    
+    bool hit_anything = false;
+    
+    // Initialize a temporary record to store the closest hit found during the traversal.
+    hit_record temp_rec;
+    // Loop until there are no more nodes to process in the stack.
+    while (top >= 0) {
+        
+        // Retrieve and remove the top node from the stack.
+        const BVHNode* current = node_stack_arr[top];
+        --top;
+        // Check if the ray intersects the bounding box of the current node.
+        // If not, skip further processing for this node.
+        if (!current->bbox.hit(r, ray_t)) {
+            continue;
+
+        }
+        // If the current node has a left child node, add it to the stack for further processing.
+        if (current->left_child_index != -1 ) {
+            node_stack_arr[++top] = (nodes + current->left_child_index);
+        }
+        // If the current node has a right child node, add it to the stack for further processing.
+        if (current->right_child_index != -1 ) {
+            node_stack_arr[++top] = (nodes + current->right_child_index);
+        }
+        // Perform a hit test on the left child if it is a leaf node (i.e., it contains an actual object).
+        if (current->is_leaf && (hittables + current->object_index)->sphere.hit(r, ray_t, temp_rec)) {
+            
+            hit_anything = true; // A hit was found; update the hit_left flag and the closest hit record.
+            // Update the maximum boundary of the ray interval to the hit point, ensuring that any subsequent hits are closer than the current hit.
+            ray_t.max = temp_rec.t;
+            rec = temp_rec;  // Update the closest hit record with the details of the new closest hit.
+        }
+    }
+    return hit_anything;  // Return true if a hit was detected
+
+}
+
+__device__
+bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables )  {
+    hit_record temp_rec;
+    bool hit_anything = false;
+    auto closest_so_far = ray_t.max;
+    // bool gotHit;
+    
+    // if(tree->hit(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, tree->hittables)){
+    if(hit3(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
+    // hit3<<<1, 1>>>(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, gotHit);
+    // if(gotHit){
+        
+        hit_anything = true;
+        closest_so_far = temp_rec.t;
+        rec = temp_rec;
+    }
+    
+
+    return hit_anything;
+}
+
+
