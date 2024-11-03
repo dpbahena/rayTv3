@@ -507,7 +507,7 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
 
     /* Implement BVH nodes in Cuda by allocating 2n+log2(n) space */
-    checkCuda(cudaMallocManaged((void**)&bvh_nodes, (2 * number_of_hittables + log2(number_of_hittables)) * sizeof(BVHNode)) );
+    checkCuda(cudaMalloc((void**)&bvh_nodes, (2 * number_of_hittables + log2(number_of_hittables)) * sizeof(BVHNode)) );
     build_bvh_NR<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
     flat_node_list fworld;
     fworld.addCudaNode(bvh_nodes, d_sphere_list);
