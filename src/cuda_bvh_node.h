@@ -32,11 +32,11 @@ __device__ static bool box_z_compare (const hittable& a, const hittable& b);
 
 
 
-const interval interval::empty = interval(+MAXFLOAT, -MAXFLOAT);
-const interval interval::universe = interval(-MAXFLOAT, + MAXFLOAT);
+// const interval interval::empty = interval(+MAXFLOAT, -MAXFLOAT);
+// const interval interval::universe = interval(-MAXFLOAT, + MAXFLOAT);
 
-const AaBb AaBb::empty    = AaBb(interval::empty,    interval::empty,    interval::empty);
-const AaBb AaBb::universe = AaBb(interval::universe, interval::universe, interval::universe);
+// const AaBb AaBb::empty    = AaBb(interval::empty,    interval::empty,    interval::empty);
+// const AaBb AaBb::universe = AaBb(interval::universe, interval::universe, interval::universe);
 
 
 
@@ -47,7 +47,7 @@ __global__ void build_bvh_NR(BVHNode* nodes, hittable* hittables, size_t N) {
 
     //std::vector<BVHNode*> node_stack;
     int index = 0;
-    const int MAX = 1024;
+    const int MAX = 15;
     StackNode traversalStack[MAX];
     int top = -1 ;  // initialize stack
     
@@ -62,7 +62,7 @@ __global__ void build_bvh_NR(BVHNode* nodes, hittable* hittables, size_t N) {
         size_t object_span = current.end - current.start;
 
         // **Compute the bounding box of the current node upfront**
-        AaBb bbox; // = AaBb::empty;
+        AaBb bbox = AaBb::empty(); // = AaBb::empty;
         for (size_t i = current.start; i < current.end; ++i) {
             bbox = AaBb(bbox, (hittables + i)->sphere.bounding_box());
         }

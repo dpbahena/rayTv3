@@ -42,10 +42,10 @@ I started with Chapter 13 defocus Blur
    (420.00 - 198.91) / 420.00 = NO BOXES just like cha2 Motion Blur CUDA = 52.6 % FASTER
 
 ## MOVED BVH2 node_build NON-RECURSIVE construction OF FLAT NODES to GPU as kernel   BVH.hit() NON-RECURSIVE function in GPU  
-* at 500 samples 100 depth  1920x1080 NUC-computer  375.000650 , 372.935474 seconds!!!!!  still too slow but faster than above
+* at 500 samples 100 depth  1920x1080 NUC-computer  375.000650 , 372.935474 354.97 seconds!!!!!   still too slow but faster than above
 
- (198.91 - 372.94) / 198.91 = BOXES (NOT EFFICIENT FOR CUDA) = 87.49 %  SLOWER
+ (198.91 - 354.97) / 198.91 = BOXES (NOT EFFICIENT FOR CUDA) = 78.45 %  SLOWER (negative)
 
    or
 
-(372.94 - 198.91) / 372.94 = NO BOXES just like cha2 Motion Blur CUDA = 46.7 % FASTER
+(354.97 - 198.91) / 354.97 = NO BOXES just like cha2 Motion Blur CUDA = 43.9 % FASTER

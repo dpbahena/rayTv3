@@ -29,7 +29,7 @@ class BVH {
         {
             // int axis = random_int(0,2);
             // Build the bounding box of the span of source objects.
-            bbox = AaBb::empty;
+            bbox = AaBb::empty();
             for (size_t object_index=start; object_index < end; object_index++)
                 bbox = AaBb(bbox, (objects + object_index)->sphere.bounding_box());
 
@@ -67,7 +67,7 @@ class BVH {
         bool hit(const ray& r, interval ray_t, hit_record& rec) {
             // Initialize a stack to manage the BVH nodes to be processed.
             // std::stack<const BVH*> nodes;
-            const int MAX = 1024;
+            const int MAX = 15;
             BVH* stack_arr[MAX];
             int top = -1;  // clear() stack
             
@@ -191,7 +191,7 @@ class BVH2 {
         __device__ __host__
         bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNode** nodes, /* const std::vector<BVHNode*> &nodes, */ hittable* &hittables) {
             
-            const int MAX = 1024;
+            const int MAX = 15;
             BVHNode* node_stack_arr[MAX];  // created on stack 
             int top = -1;        
           
@@ -237,7 +237,7 @@ class BVH2 {
         __device__ __host__
         static bool hit2(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
             
-            const int MAX = 1024;
+            const int MAX = 15;
             BVHNode* node_stack_arr[MAX];  // created on stack 
             int top = -1;        
           
@@ -311,7 +311,7 @@ class BVH2 {
                 size_t object_span = current.end - current.start;
 
                 // **Compute the bounding box of the current node upfront**
-                AaBb bbox = AaBb::empty;
+                AaBb bbox = AaBb::empty();
                 for (size_t i = current.start; i < current.end; ++i) {
                     bbox = AaBb(bbox, (hittables + i)->sphere.bounding_box());
                 }

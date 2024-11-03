@@ -66,7 +66,14 @@ class AaBb {
         }
 
         
-        static const AaBb empty, universe;
+        // static const AaBb empty, universe;
+        __host__ __device__ static AaBb empty() {
+            return AaBb(interval::empty(), interval::empty(), interval::empty());
+        }
+
+        __host__ __device__ static AaBb universe() {
+            return AaBb(interval::universe(), interval::universe(), interval::universe());
+        }
 };
 
 

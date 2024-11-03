@@ -47,7 +47,15 @@ class interval {
 
             
 
-            static const interval empty, universe;
+            // static const interval empty, universe;
+            // Static member functions returning intervals
+            __host__ __device__ static interval empty() {
+                return interval(+FLT_MAX, -FLT_MAX);
+            }
+
+            __host__ __device__ static interval universe() {
+                return interval(-FLT_MAX, +FLT_MAX);
+            }
 
         private:
 
