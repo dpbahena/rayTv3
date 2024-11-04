@@ -5,8 +5,6 @@
 #include "hittable.h"
 
 
-
-
 __device__ __host__
 bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec) {
 

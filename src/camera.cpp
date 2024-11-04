@@ -8,8 +8,6 @@ void Camera::render() {
     gpuOperations.cudaCall(image_width, image_height, max_depth, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocus_angle, defocus_disk_u, defocus_disk_v, colorBuffer);
 }
 
-
-
 void Camera::initialize() {
         // Calculate the image height and ensure that it's at least 1
     image_height = int(image_width / aspect_ratio);

@@ -1,12 +1,7 @@
 #include "cuda_call.h"
 #include "ray.h"
 #include "interval.h"
-
-
-// #include "sphere.h"
 #include "hittable_list.h"
-#include "node_list.h"
-#include "bvh_node.h"
 #include "cuda_bvh_node.h"
 
 #include <cstdio>
@@ -265,13 +260,6 @@ glm::vec3 random_vector(curandState_t* states,  int i, int j){
 
 }
 
-
-
-
-
-
-
-
 __device__ float random_float_in_range(curandState_t* state, float a, float b) {
     // return a + (b - a) * curand_uniform_float(state);  // this does not include b  e.g -1 to 1.0  it does not include 1.0
     return a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
@@ -279,9 +267,7 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 
 
 __device__
-// glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
-// glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const flat_node_list& world, BVHNode* nodes, hittable* hittables) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r,  BVHNode* nodes, hittable* hittables) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -290,10 +276,10 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        // if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        
         if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables)){
         
-        // if(hit(world, cur_ray, interval(0.001f, FLT_MAX), rec)){
+        
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
             glm::vec3 attenuation;
@@ -330,8 +316,6 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     return final_color;
 }
 
-
-
 __device__
 ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
     /* Construct a camara ray originating from the defocus disk and directed at a randdomly sampled point around the pixel locations i, j */
@@ -360,29 +344,24 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 }
 
 
-// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world) {
-// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, node_list* world) {
-__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, flat_node_list* world, BVHNode* nodes, hittable* hittables) {
+__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, BVHNode* nodes, hittable* hittables) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (i >= width || j >= height) return;
-    // if(i == 0 && j == 0){
-    //     printf("min: %f, max: %f\n", world->list[2].sphere.bbox->axis_interval(2).min, world->list[2].sphere.bbox->axis_interval(2).max );    
-    // }
+
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
     for (int sample = 0; sample < samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
-        color  += ray_color(states, i, j, depth, r, *world, nodes, hittables);
+        color  += ray_color(states, i, j, depth, r, nodes, hittables);
     }
     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
     color *= pixel_sample_scale;
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
+void init_objects(std::vector<material*> device_materials, std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list){
 
-    // std::vector<hittable> h_spheres;
     hittable_list h_world;
     std::vector<hittable> h_sphere_list;
     material* d_ground;
@@ -480,42 +459,13 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    /* no AABB */  
-
     h_world.hittables = d_sphere_list;
     h_world.objects_size = number_of_hittables;
-    /* Allocate memory for hittable list on the device */
-    // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
-    // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
-    
-
-    /* AaBb implementation RECURSIVE NODE CREATION */
-       
-    // auto node = new BVH(h_world, allocated_nodes);   
-    // allocated_nodes.push_back(node);    // keep track of all allocated bvh_nodes and clean later
-    // node_list aworld;
-    // aworld.add(node);
-    // checkCuda(cudaMalloc((void**)&dB_world, sizeof(node_list)) );
-    // checkCuda(cudaMemcpy(dB_world, &aworld, sizeof(node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
-
-    
-    /* AaBb implementation NON-Recursive FLAT NODE CREATION */
-    
-    // auto tree = new BVH2(h_world, allocated_flat_nodes);   // CPU 
-    // flat_node_list fworld;
-    // fworld.add(tree); 
-    // checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
-    // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
-
+        
     /* Implement BVH nodes in Cuda by allocating 2n+log2(n) space */
     checkCuda(cudaMalloc((void**)&bvh_nodes, (2 * number_of_hittables + log2(number_of_hittables)) * sizeof(BVHNode)) );
-    build_bvh_NR<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
-    flat_node_list fworld;
-    fworld.addCudaNode(bvh_nodes, d_sphere_list);
-    checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
-    checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
 
-    
+    build_bvh_NR<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
 
 
 }
@@ -525,25 +475,20 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 {  
 
     std::vector<material*>  device_materials;  
-    std::vector<BVH*>       allocated_nodes;
     std::vector<BVHNode*>   allocated_flat_nodes; 
     hittable*               d_spheres_list;
-    // std::vector<AaBb*> device_boxes;  
+ 
 
     /* device variables */
     uint32_t*   d_image;    // for display buffer
-    curandState_t* d_states;  // random calculations in GPU
-    
-    hittable_list* d_world;
-    node_list* dB_world;
-    flat_node_list* dBF_world;
+    curandState_t* d_states;  // random calculations in GPU 
     BVHNode* bvh_nodes;
    
       
     
-    init_objects(device_materials, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
+    init_objects(device_materials, allocated_flat_nodes, bvh_nodes, d_spheres_list);
     
-    checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
+    checkCuda(cudaMallocManaged((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
     
     clock_t start, stop;
     start = clock();
@@ -561,11 +506,9 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     init_random<<<gridSize, blockSize>>>(seed, d_states);
     // checkCuda(cudaDeviceSynchronize() );
 
-    // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world);
-    // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dB_world);
-    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dBF_world, bvh_nodes, d_spheres_list);
+    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, bvh_nodes, d_spheres_list);
     // checkCuda(cudaPeekAtLastError() );
-    checkCuda(cudaGetLastError());
+    // checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
     stop = clock();
     double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
@@ -574,8 +517,7 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     checkCuda(cudaMemcpy(colorBuffer, d_image, image_width * image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
     // delete all device pointers of the materials and AaBb boxes
-    for (auto nodes : allocated_nodes)
-        delete nodes;
+
     for (auto nodes : allocated_flat_nodes)
         delete nodes;
     
@@ -584,9 +526,6 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     
     cudaFree(d_spheres_list);
     cudaFree(d_image);
-    cudaFree(d_world);
-    cudaFree(dB_world);
-    cudaFree(dBF_world);
     cudaFree(d_states);
     cudaFree(bvh_nodes);
     

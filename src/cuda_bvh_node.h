@@ -4,20 +4,13 @@
 #include "aabb.h"
 #include <thrust/sort.h>
 
-
-
-// __device__ __host__
-// BVHNode* bvh_nodes;
-
-
-// struct BVHNode {
-//     int left_child_index = -1;     // Index of left child in the BVH array (-1 if it's a leaf)
-//     int right_child_index = -1;    // Index of right child in the BVH array (-1 if it's a leaf)
-//     int object_index = -1;         // Index of the object (used if it's a leaf)
-//     bool is_leaf;             // Is this node a leaf?
-//     AaBb bbox;
-// };
-
+struct BVHNode {
+    int left_child_index = -1;     // Index of left child in the BVH array (-1 if it's a leaf)
+    int right_child_index = -1;    // Index of right child in the BVH array (-1 if it's a leaf)
+    int object_index = -1;         // Index of the object (used if it's a leaf)
+    bool is_leaf;             // Is this node a leaf?
+    AaBb bbox;
+};
 
 struct StackNode {
             size_t start, end;
@@ -29,18 +22,6 @@ __device__ static bool box_compare(const hittable& a, const hittable& b, int axi
 __device__ static bool box_x_compare (const hittable& a, const hittable& b);
 __device__ static bool box_y_compare (const hittable& a, const hittable& b);
 __device__ static bool box_z_compare (const hittable& a, const hittable& b);
-
-
-
-// const interval interval::empty = interval(+MAXFLOAT, -MAXFLOAT);
-// const interval interval::universe = interval(-MAXFLOAT, + MAXFLOAT);
-
-// const AaBb AaBb::empty    = AaBb(interval::empty,    interval::empty,    interval::empty);
-// const AaBb AaBb::universe = AaBb(interval::universe, interval::universe, interval::universe);
-
-
-
-
 
 __global__ void build_bvh_NR(BVHNode* nodes, hittable* hittables, size_t N) {
     
