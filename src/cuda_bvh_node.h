@@ -154,11 +154,6 @@ __global__ void build_bvh_NR(BVHNode* nodes, hittable* hittables, size_t N) {
             traversalStack[++top] = {current.start, mid, node_index, true};       // Left child
         }
     }
-
-    // **Assign the built nodes to the class member**
-    // if (!node_stack.empty()) {
-    //     nodes = node_stack;
-    // }
 }
 
 
