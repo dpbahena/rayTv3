@@ -385,7 +385,7 @@ static bool box_z_compare (const hittable& a, const hittable& b) {
 
 __device__
 bool hit3x(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes, hittable* hittables) {
-    const int MAX = 64;
+    const int MAX = 15;
     int node_stack_arr[MAX];
     int top = -1;
 
