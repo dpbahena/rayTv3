@@ -22,8 +22,8 @@ int main(int arg, char** argv) {
         cam.samples_per_pixel = atoi(argv[1]);
         cam.max_depth = atoi(argv[2]);
      } else {
-        cam.samples_per_pixel = 500;
-        cam.max_depth = 100;
+        cam.samples_per_pixel = 50;
+        cam.max_depth = 20;
         printf("Usage:  ./raytracer <# samples per pixel> <max depth>\n");
      }
 
@@ -36,7 +36,7 @@ int main(int arg, char** argv) {
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
 
-    cam.defocus_angle = 0.6f;
+    cam.defocus_angle = 0.3f;  //0.6f;
     cam.focus_dist = 10.0f; 
     printf("Raytrace with %d samples with %d depth\n", cam.samples_per_pixel, cam.max_depth);
 

@@ -267,7 +267,7 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 
 
 __device__
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r,  BVHNode* nodes, hittable* hittables) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r,  BVHNodeSoA* &nodes, hittable* &hittables) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -344,10 +344,10 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 }
 
 
-__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, BVHNode* nodes, hittable* hittables) {
+__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, BVHNodeSoA* &nodes, hittable* &hittables) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
+    
     if (i >= width || j >= height) return;
 
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
@@ -360,7 +360,34 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list){
+__global__ void init_nodes(BVHNodeSoA* &nodes, int N){
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    if (idx >= N ) return;
+    // Initialize nodes' members
+    nodes->is_leaf[idx] = false;
+    nodes->left_child_index[idx] = -1;
+    nodes->right_child_index[idx] = -1;
+    // nodes->object_index[idx] = -1;
+    // nodes->bbox[idx] = AaBb::empty();
+}
+
+__global__ void print_nodes(BVHNodeSoA* bvh_nodes, int number_of_nodes) {
+    int i = threadIdx.x + blockDim.x * blockIdx.x;
+    if (i >= number_of_nodes) return;
+    
+    printf("Left_child: %d\n", bvh_nodes->left_child_index[i]);
+    printf("righ_child: %d\n", bvh_nodes->right_child_index[i]);
+    printf("Object_index: %d\n", bvh_nodes->object_index[i]);
+    printf("BBOX: [%f, %f], [%f, %f], [%f, %f] \n", bvh_nodes->bbox[i].x.min, bvh_nodes->bbox[i].x.max, bvh_nodes->bbox[i].y.min, bvh_nodes->bbox[i].y.max, bvh_nodes->bbox[i].z.min, bvh_nodes->bbox[i].z.max);
+    if (bvh_nodes->is_leaf[i]) 
+        printf("LEAF\n");
+    else
+        printf("NODE\n");
+}
+
+
+
+void init_objects(std::vector<material*> device_materials, int &number_of_nodes, BVHNodeSoA* &bvh_nodes, hittable* &d_sphere_list){
 
     hittable_list h_world;
     std::vector<hittable> h_sphere_list;
@@ -376,51 +403,51 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVHNode*>
     h_sphere_list.push_back(hittable_obj);
 
     // Create random spheres 
-    for (int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
-            auto choose_material = random_double();
-            glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
+    // for (int a = -11; a < 11; a++) {
+    //     for (int b = -11; b < 11; b++) {
+    //         auto choose_material = random_double();
+    //         glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             
-            if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
-                if(choose_material < 0.8f) {
-                    // difuse
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    auto a_material = material::lambertian_material(albedo);
-                    material* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(d_mat);
-                    glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
-                    auto sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
-                    h_sphere_list.push_back(sphere);
+    //         if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
+    //             if(choose_material < 0.8f) {
+    //                 // difuse
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 auto a_material = material::lambertian_material(albedo);
+    //                 material* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(d_mat);
+    //                 glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
+    //                 auto sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
+    //                 h_sphere_list.push_back(sphere);
 
-                }
-                if(choose_material < 0.95f) {
-                    // metal
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    float fuzz = random_double(0.0f, 0.5f);
-                    auto a_material = material::metal_material(albedo, fuzz);
-                    material* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(d_mat);
-                    auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
-                    h_sphere_list.push_back(sphere);
-                }
-                else  {
-                    // dielectric
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    auto a_material = material::dielectric_material(1.5);
-                    material* d_mat;
-                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-                    device_materials.push_back(d_mat);
-                    auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
-                    h_sphere_list.push_back(sphere);
-                }
-            }
-        }
-    }
+    //             }
+    //             if(choose_material < 0.95f) {
+    //                 // metal
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 float fuzz = random_double(0.0f, 0.5f);
+    //                 auto a_material = material::metal_material(albedo, fuzz);
+    //                 material* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(d_mat);
+    //                 auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
+    //                 h_sphere_list.push_back(sphere);
+    //             }
+    //             else  {
+    //                 // dielectric
+    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+    //                 auto a_material = material::dielectric_material(1.5);
+    //                 material* d_mat;
+    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+    //                 device_materials.push_back(d_mat);
+    //                 auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
+    //                 h_sphere_list.push_back(sphere);
+    //             }
+    //         }
+    //     }
+    // }
 
 
     // Three secundary spheres
@@ -455,17 +482,53 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVHNode*>
     
     size_t number_of_hittables = h_sphere_list.size();
     
-    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMallocManaged((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
     h_world.hittables = d_sphere_list;
     h_world.objects_size = number_of_hittables;
         
+
+    BVHNodeSoA h_nodes;
+    number_of_nodes = 2 * number_of_hittables - 1; // log2(number_of_hittables);
+
     /* Implement BVH nodes in Cuda by allocating 2n+log2(n) space */
-    checkCuda(cudaMalloc((void**)&bvh_nodes, (2 * number_of_hittables + log2(number_of_hittables)) * sizeof(BVHNode)) );
+    checkCuda(cudaMallocManaged((void**)&h_nodes.is_leaf, number_of_nodes * sizeof(bool)) );
+    checkCuda(cudaMallocManaged((void**)&h_nodes.left_child_index, number_of_nodes * sizeof(int)) );
+    checkCuda(cudaMallocManaged((void**)&h_nodes.right_child_index, number_of_nodes * sizeof(int)) );
+    checkCuda(cudaMallocManaged((void**)&h_nodes.object_index, number_of_nodes * sizeof(int)) );
+    checkCuda(cudaMallocManaged((void**)&h_nodes.bbox, number_of_nodes * sizeof(AaBb)) );
+
+    checkCuda(cudaMallocManaged(&bvh_nodes, sizeof(BVHNodeSoA)));
+    checkCuda(cudaMemcpy(bvh_nodes, &h_nodes, sizeof(BVHNodeSoA), cudaMemcpyHostToDevice));
+    
+    int threads = 1;
+    int blocks = (number_of_nodes * threads - 1) / threads;
+    init_nodes<<<blocks, threads>>>(bvh_nodes, number_of_nodes);
+    checkCuda(cudaDeviceSynchronize() );
+    
 
     build_bvh_NR<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+    checkCuda(cudaDeviceSynchronize() );
+    threads = 256;
+    blocks = (number_of_nodes + threads -1) / threads;
+
+    // print_nodes<<<blocks, threads>>>(bvh_nodes, number_of_nodes);
+
+    
+    // for (int i = 0; i < number_of_nodes; i++) {
+    //     printf("Left_child: %d\n", bvh_nodes->left_child_index[i]);
+    //     printf("righ_child: %d\n", bvh_nodes->right_child_index[i]);
+    //     printf("Object_index: %d\n", bvh_nodes->object_index[i]);
+    //     printf("BBOX: [%f, %f], [%f, %f], [%f, %f] \n", bvh_nodes->bbox[i].x.min, bvh_nodes->bbox[i].x.max, bvh_nodes->bbox[i].y.min, bvh_nodes->bbox[i].y.max, bvh_nodes->bbox[i].z.min, bvh_nodes->bbox[i].z.max);
+    //     if (bvh_nodes->is_leaf[i]) 
+    //         printf("LEAF\n");
+    //     else
+    //         printf("NODE\n");
+    // }
+
+    
 
 
 }
@@ -475,23 +538,25 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 {  
 
     std::vector<material*>  device_materials;  
-    std::vector<BVHNode*>   allocated_flat_nodes; 
     hittable*               d_spheres_list;
  
 
     /* device variables */
     uint32_t*   d_image;    // for display buffer
     curandState_t* d_states;  // random calculations in GPU 
-    BVHNode* bvh_nodes;
+    BVHNodeSoA* bvh_nodes = nullptr;
+    int number_of_nodes;
+    
+
+
    
       
     
-    init_objects(device_materials, allocated_flat_nodes, bvh_nodes, d_spheres_list);
+    init_objects(device_materials, number_of_nodes, bvh_nodes, d_spheres_list);
     
-    checkCuda(cudaMallocManaged((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
+    checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
     
-    clock_t start, stop;
-    start = clock();
+    
 
     int threads = 16;
     dim3 blockSize(threads, threads);
@@ -504,7 +569,16 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     
     checkCuda(cudaMalloc(&d_states, num_threads * sizeof(curandState_t)));
     init_random<<<gridSize, blockSize>>>(seed, d_states);
-    // checkCuda(cudaDeviceSynchronize() );
+    checkCuda(cudaDeviceSynchronize() );
+
+    // threads = 16;
+    // dim3 blockSize1(threads, threads);
+    // blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
+    // blocks_y = (image_height + blockSize.y - 1) / blockSize.y;
+    // dim3 gridSize1(blocks_x, blocks_y);
+
+    clock_t start, stop;
+    start = clock();
 
     rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, bvh_nodes, d_spheres_list);
     // checkCuda(cudaPeekAtLastError() );
@@ -516,18 +590,27 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 
     checkCuda(cudaMemcpy(colorBuffer, d_image, image_width * image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
-    // delete all device pointers of the materials and AaBb boxes
-
-    for (auto nodes : allocated_flat_nodes)
-        delete nodes;
     
+    
+    for (int i = 0; i < number_of_nodes; i++)     
+    {
+        cudaFree(bvh_nodes->left_child_index + i);
+        cudaFree(bvh_nodes->right_child_index + i);
+        cudaFree(bvh_nodes->object_index + i);
+        cudaFree(bvh_nodes->bbox + i);
+        cudaFree(bvh_nodes->is_leaf + i); 
+    }
+
+    cudaFree(bvh_nodes);
+        
+
     for(auto& device : device_materials) 
         cudaFree(device);
     
     cudaFree(d_spheres_list);
     cudaFree(d_image);
     cudaFree(d_states);
-    cudaFree(bvh_nodes);
+    
     
     
 }
