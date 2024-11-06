@@ -360,15 +360,15 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-__global__ void init_nodes(BVHNodeSoA* &nodes, int N){
+__global__ void init_nodes(BVHNodeSoA* nodes, int N){
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     if (idx >= N ) return;
     // Initialize nodes' members
     nodes->is_leaf[idx] = false;
     nodes->left_child_index[idx] = -1;
     nodes->right_child_index[idx] = -1;
-    // nodes->object_index[idx] = -1;
-    // nodes->bbox[idx] = AaBb::empty();
+    nodes->object_index[idx] = -1;
+    nodes->bbox[idx] = AaBb::empty();
 }
 
 __global__ void print_nodes(BVHNodeSoA* bvh_nodes, int number_of_nodes) {
@@ -482,7 +482,7 @@ void init_objects(std::vector<material*> device_materials, int &number_of_nodes,
     
     size_t number_of_hittables = h_sphere_list.size();
     
-    checkCuda(cudaMallocManaged((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
@@ -494,16 +494,22 @@ void init_objects(std::vector<material*> device_materials, int &number_of_nodes,
     number_of_nodes = 2 * number_of_hittables - 1; // log2(number_of_hittables);
 
     /* Implement BVH nodes in Cuda by allocating 2n+log2(n) space */
-    checkCuda(cudaMallocManaged((void**)&h_nodes.is_leaf, number_of_nodes * sizeof(bool)) );
-    checkCuda(cudaMallocManaged((void**)&h_nodes.left_child_index, number_of_nodes * sizeof(int)) );
-    checkCuda(cudaMallocManaged((void**)&h_nodes.right_child_index, number_of_nodes * sizeof(int)) );
-    checkCuda(cudaMallocManaged((void**)&h_nodes.object_index, number_of_nodes * sizeof(int)) );
-    checkCuda(cudaMallocManaged((void**)&h_nodes.bbox, number_of_nodes * sizeof(AaBb)) );
+    checkCuda(cudaMalloc((void**)&h_nodes.is_leaf, number_of_nodes * sizeof(bool)) );
+    checkCuda(cudaMalloc((void**)&h_nodes.left_child_index, number_of_nodes * sizeof(int)) );
+    checkCuda(cudaMalloc((void**)&h_nodes.right_child_index, number_of_nodes * sizeof(int)) );
+    checkCuda(cudaMalloc((void**)&h_nodes.object_index, number_of_nodes * sizeof(int)) );
+    checkCuda(cudaMalloc((void**)&h_nodes.bbox, number_of_nodes * sizeof(AaBb)) );
 
     checkCuda(cudaMallocManaged(&bvh_nodes, sizeof(BVHNodeSoA)));
-    checkCuda(cudaMemcpy(bvh_nodes, &h_nodes, sizeof(BVHNodeSoA), cudaMemcpyHostToDevice));
+
+    bvh_nodes->is_leaf = h_nodes.is_leaf;
+    bvh_nodes->bbox = h_nodes.bbox;
+    bvh_nodes->left_child_index = h_nodes.left_child_index;
+    bvh_nodes->right_child_index = h_nodes.right_child_index;
+    bvh_nodes->object_index = h_nodes.object_index;
+
     
-    int threads = 1;
+    int threads = 256;
     int blocks = (number_of_nodes * threads - 1) / threads;
     init_nodes<<<blocks, threads>>>(bvh_nodes, number_of_nodes);
     checkCuda(cudaDeviceSynchronize() );
@@ -514,9 +520,10 @@ void init_objects(std::vector<material*> device_materials, int &number_of_nodes,
     threads = 256;
     blocks = (number_of_nodes + threads -1) / threads;
 
+    // * Method 1
     // print_nodes<<<blocks, threads>>>(bvh_nodes, number_of_nodes);
 
-    
+    // * Method 2
     // for (int i = 0; i < number_of_nodes; i++) {
     //     printf("Left_child: %d\n", bvh_nodes->left_child_index[i]);
     //     printf("righ_child: %d\n", bvh_nodes->right_child_index[i]);
@@ -528,7 +535,7 @@ void init_objects(std::vector<material*> device_materials, int &number_of_nodes,
     //         printf("NODE\n");
     // }
 
-    
+   
 
 
 }
@@ -591,15 +598,12 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     checkCuda(cudaMemcpy(colorBuffer, d_image, image_width * image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
     
+    cudaFree(bvh_nodes->left_child_index);
+    cudaFree(bvh_nodes->right_child_index);
+    cudaFree(bvh_nodes->object_index);
+    cudaFree(bvh_nodes->bbox);
+    cudaFree(bvh_nodes->is_leaf); 
     
-    for (int i = 0; i < number_of_nodes; i++)     
-    {
-        cudaFree(bvh_nodes->left_child_index + i);
-        cudaFree(bvh_nodes->right_child_index + i);
-        cudaFree(bvh_nodes->object_index + i);
-        cudaFree(bvh_nodes->bbox + i);
-        cudaFree(bvh_nodes->is_leaf + i); 
-    }
 
     cudaFree(bvh_nodes);
         
