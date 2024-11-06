@@ -3,15 +3,10 @@
 #include "sphere.h"
 #include "aabb.h"
 #include <thrust/sort.h>
+#include <curand_kernel.h>
 
-// struct BVHNode {
-//     int left_child_index = -1;     // Index of left child in the BVH array (-1 if it's a leaf)
-//     int right_child_index = -1;    // Index of right child in the BVH array (-1 if it's a leaf)
-//     int object_index = -1;         // Index of the object (used if it's a leaf)
-//     bool is_leaf;             // Is this node a leaf?
-//     AaBb bbox;
-// };
 
+__device__ int random_int_device(curandState_t* state, int min, int max);
 
 struct box_compare {
     int axis;

@@ -8,7 +8,7 @@
 #include <vector>
 #include <random>
 #include <chrono>
-#include <curand_kernel.h>
+
 
 
 
@@ -22,7 +22,6 @@ __device__ inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n);
 __device__ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_over_etat);
 __device__ inline glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
 __device__ inline glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
-__device__ inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world);
 __device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
 __device__ inline bool      near_zero(const glm::vec3 v);
 __device__ inline float     reflectance(float cosine, float refraction_index);
@@ -139,6 +138,14 @@ inline float reflectance(float cosine, float refraction_index){
 __device__
 inline float random_float(curandState_t* state){
     return curand_uniform_double(state);
+}
+
+__device__
+int random_int_device(curandState_t* state, int min, int max){
+    int range = max - min + 1; // inclusive range
+    return min + (curand(state) % range);
+
+
 }
 
 __device__ 
@@ -546,7 +553,6 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 
     std::vector<material*>  device_materials;  
     hittable*               d_spheres_list;
- 
 
     /* device variables */
     uint32_t*   d_image;    // for display buffer
@@ -554,16 +560,9 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     BVHNodeSoA* bvh_nodes = nullptr;
     int number_of_nodes;
     
-
-
-   
-      
-    
     init_objects(device_materials, number_of_nodes, bvh_nodes, d_spheres_list);
     
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
-    
-    
 
     int threads = 16;
     dim3 blockSize(threads, threads);
