@@ -403,51 +403,51 @@ void init_objects(std::vector<material*> device_materials, int &number_of_nodes,
     h_sphere_list.push_back(hittable_obj);
 
     // Create random spheres 
-    // for (int a = -11; a < 11; a++) {
-    //     for (int b = -11; b < 11; b++) {
-    //         auto choose_material = random_double();
-    //         glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
+    for (int a = -11; a < 11; a++) {
+        for (int b = -11; b < 11; b++) {
+            auto choose_material = random_double();
+            glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             
-    //         if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
-    //             if(choose_material < 0.8f) {
-    //                 // difuse
-    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-    //                 auto a_material = material::lambertian_material(albedo);
-    //                 material* d_mat;
-    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-    //                 device_materials.push_back(d_mat);
-    //                 glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
-    //                 auto sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
-    //                 h_sphere_list.push_back(sphere);
+            if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
+                if(choose_material < 0.8f) {
+                    // difuse
+                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+                    auto a_material = material::lambertian_material(albedo);
+                    material* d_mat;
+                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+                    device_materials.push_back(d_mat);
+                    glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
+                    auto sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
+                    h_sphere_list.push_back(sphere);
 
-    //             }
-    //             if(choose_material < 0.95f) {
-    //                 // metal
-    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-    //                 float fuzz = random_double(0.0f, 0.5f);
-    //                 auto a_material = material::metal_material(albedo, fuzz);
-    //                 material* d_mat;
-    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-    //                 device_materials.push_back(d_mat);
-    //                 auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
-    //                 h_sphere_list.push_back(sphere);
-    //             }
-    //             else  {
-    //                 // dielectric
-    //                 glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-    //                 auto a_material = material::dielectric_material(1.5);
-    //                 material* d_mat;
-    //                 checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-    //                 checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
-    //                 device_materials.push_back(d_mat);
-    //                 auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
-    //                 h_sphere_list.push_back(sphere);
-    //             }
-    //         }
-    //     }
-    // }
+                }
+                if(choose_material < 0.95f) {
+                    // metal
+                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+                    float fuzz = random_double(0.0f, 0.5f);
+                    auto a_material = material::metal_material(albedo, fuzz);
+                    material* d_mat;
+                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+                    device_materials.push_back(d_mat);
+                    auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
+                    h_sphere_list.push_back(sphere);
+                }
+                else  {
+                    // dielectric
+                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
+                    auto a_material = material::dielectric_material(1.5);
+                    material* d_mat;
+                    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+                    checkCuda(cudaMemcpy(d_mat, &a_material, sizeof(material), cudaMemcpyHostToDevice) );
+                    device_materials.push_back(d_mat);
+                    auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
+                    h_sphere_list.push_back(sphere);
+                }
+            }
+        }
+    }
 
 
     // Three secundary spheres
