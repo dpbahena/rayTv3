@@ -213,27 +213,31 @@ bool object_hit(const ray& r, interval ray_t, hit_record& rec, const BVHNodeSoA*
         int node_index = node_stack_arr[top--];  // Pop the node index
         //* OPTION 1. Let the compiler optimize optimize memory access _restrict__  ---> UNCOMMENT OR COMMENT 
         //! FASTER
-        // const AaBb& current_bbox = nodes->bbox[node_index];
-        // const int current_left_child = nodes->left_child_index[node_index];
-        // const int current_right_child = nodes->right_child_index[node_index];
-        // const int current_is_leaf = nodes->is_leaf[node_index];
-        // const int current_node_object_index = nodes->object_index[node_index];
+        const AaBb& current_bbox = nodes->bbox[node_index];
+        const int current_left_child = nodes->left_child_index[node_index];
+        const int current_right_child = nodes->right_child_index[node_index];
+        const int current_is_leaf = nodes->is_leaf[node_index];
+        const int current_node_object_index = nodes->object_index[node_index];
         
 
         //* OPTION 2:  You load data directly using __ldg   ---> UNCOMMENT or COMMENT
         //! SLOWER
-        double min_x = __ldg(&nodes->bbox[node_index].x.min);  // needs conversion to accepted types
-        double min_y = __ldg(&nodes->bbox[node_index].y.min);
-        double min_z = __ldg(&nodes->bbox[node_index].z.min);
-        double max_x = __ldg(&nodes->bbox[node_index].x.max);
-        double max_y = __ldg(&nodes->bbox[node_index].y.max);
-        double max_z = __ldg(&nodes->bbox[node_index].z.max);
-        AaBb current_bbox = AaBb(glm::vec3(min_x, min_y, min_z), glm::vec3(max_x, max_y, max_z));
-        const int current_left_child = __ldg(&nodes->left_child_index[node_index]);
-        const int current_right_child = __ldg(&nodes->right_child_index[node_index]);
-        int8_t is_leaf = __ldg(reinterpret_cast<const int8_t*>(&nodes->is_leaf[node_index])); // needs conversion to accepted types
-        bool current_is_leaf = static_cast<bool>(is_leaf);
-        const int current_node_object_index = __ldg(&nodes->object_index[node_index]);
+        // double min_x = __ldg(&nodes->bbox[node_index].x.min);  // needs conversion to accepted types
+        // double min_y = __ldg(&nodes->bbox[node_index].y.min);
+        // double min_z = __ldg(&nodes->bbox[node_index].z.min);
+        // double max_x = __ldg(&nodes->bbox[node_index].x.max);
+        // double max_y = __ldg(&nodes->bbox[node_index].y.max);
+        // double max_z = __ldg(&nodes->bbox[node_index].z.max);
+        // interval x = interval(min_x, max_x);
+        // interval y = interval(min_y, max_y);
+        // interval z = interval(min_z, max_z);
+        // AaBb current_bbox = AaBb(x, y, z);  //! faster
+        // AaBb current_bbox = AaBb(glm::vec3(min_x, min_y, min_z), glm::vec3(max_x, max_y, max_z)); //! slower
+        // const int current_left_child = __ldg(&nodes->left_child_index[node_index]);
+        // const int current_right_child = __ldg(&nodes->right_child_index[node_index]);
+        // int8_t is_leaf = __ldg(reinterpret_cast<const int8_t*>(&nodes->is_leaf[node_index])); // needs conversion to accepted types
+        // bool current_is_leaf = static_cast<bool>(is_leaf);
+        // const int current_node_object_index = __ldg(&nodes->object_index[node_index]);
 
         if (!current_bbox.hit(r, ray_t)) {
             continue;
