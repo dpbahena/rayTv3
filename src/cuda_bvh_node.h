@@ -5,6 +5,7 @@
 #include <thrust/sort.h>
 #include <curand_kernel.h>
 
+const int MAX_STACK_SIZE = 12;
 
 __device__ int random_int_device(curandState_t* state, int min, int max);
 
@@ -198,9 +199,9 @@ static bool box_z_compare (const hittable& a, const hittable& b) {
 }
 
 __device__
-bool object_hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes, hittable* hittables) {
-    const int MAX = 15;
-    int node_stack_arr[MAX];
+bool object_hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes, hittable* hittables, int* node_stack_arr) {
+    // const int MAX = 12;
+    // int node_stack_arr[MAX];
     int top = -1;
 
     node_stack_arr[++top] = 0;  // Start with the root node index
@@ -229,15 +230,15 @@ bool object_hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes
             }
         } else {
             if (current_left_child != -1) {
-                if (top + 1 >= MAX) {
-                    printf("Error: Stack overflow in hit3x\n");
+                if (top + 1 >= MAX_STACK_SIZE) {
+                    printf("Error: Stack overflow in object_hit()  increase STACK SIZE\n");
                     return false;
                 }
                 node_stack_arr[++top] = current_left_child;
             }
             if (current_right_child != -1) {
-                if (top + 1 >= MAX) {
-                    printf("Error: Stack overflow in hit3x\n");
+                if (top + 1 >= MAX_STACK_SIZE) {
+                    printf("Error: Stack overflow in object_hit()  increase STACK SIZE\n");
                     return false;
                 }
                 node_stack_arr[++top] = current_right_child;
@@ -249,13 +250,13 @@ bool object_hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes
 
 
 __device__
-bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* &nodes, hittable* &hittables )  {
+bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* &nodes, hittable* &hittables, int* node_stack_arr )  {
     hit_record temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
    
 
-    if(object_hit(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
+    if(object_hit(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, node_stack_arr)){
         
         hit_anything = true;
         closest_so_far = temp_rec.t;
