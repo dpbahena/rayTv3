@@ -381,6 +381,7 @@ __global__ void init_nodes(BVHNodeSoA* nodes, int N){
     nodes->left_child_index[idx] = -1;
     nodes->right_child_index[idx] = -1;
     nodes->object_index[idx] = -1;
+    nodes->rope_index[idx] = -1;
     nodes->bbox[idx] = AaBb::empty();
 }
 
@@ -391,6 +392,7 @@ __global__ void print_nodes(BVHNodeSoA* bvh_nodes, int number_of_nodes) {
     printf("Left_child: %d\n", bvh_nodes->left_child_index[i]);
     printf("righ_child: %d\n", bvh_nodes->right_child_index[i]);
     printf("Object_index: %d\n", bvh_nodes->object_index[i]);
+    printf("Rope index: %d\n", bvh_nodes->rope_index[i]);
     printf("BBOX: [%f, %f], [%f, %f], [%f, %f] \n", bvh_nodes->bbox[i].x.min, bvh_nodes->bbox[i].x.max, bvh_nodes->bbox[i].y.min, bvh_nodes->bbox[i].y.max, bvh_nodes->bbox[i].z.min, bvh_nodes->bbox[i].z.max);
     if (bvh_nodes->is_leaf[i]) 
         printf("LEAF\n");
@@ -511,6 +513,7 @@ void init_objects(std::vector<material*> device_materials, int &number_of_nodes,
     checkCuda(cudaMalloc((void**)&h_nodes.left_child_index, number_of_nodes * sizeof(int)) );
     checkCuda(cudaMalloc((void**)&h_nodes.right_child_index, number_of_nodes * sizeof(int)) );
     checkCuda(cudaMalloc((void**)&h_nodes.object_index, number_of_nodes * sizeof(int)) );
+    checkCuda(cudaMalloc((void**)&h_nodes.rope_index, number_of_nodes * sizeof(int)) );
     checkCuda(cudaMalloc((void**)&h_nodes.bbox, number_of_nodes * sizeof(AaBb)) );
 
     checkCuda(cudaMallocManaged(&bvh_nodes, sizeof(BVHNodeSoA)));
@@ -519,6 +522,7 @@ void init_objects(std::vector<material*> device_materials, int &number_of_nodes,
     bvh_nodes->bbox = h_nodes.bbox;
     bvh_nodes->left_child_index = h_nodes.left_child_index;
     bvh_nodes->right_child_index = h_nodes.right_child_index;
+    bvh_nodes->rope_index = h_nodes.rope_index;
     bvh_nodes->object_index = h_nodes.object_index;
 
     
