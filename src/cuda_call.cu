@@ -377,7 +377,7 @@ __global__ void init_nodes(BVHNodeSoA* nodes, int N){
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     if (idx >= N ) return;
     // Initialize nodes' members
-    nodes->is_leaf[idx] = false;
+    nodes->is_leaf[idx] = -1;
     nodes->left_child_index[idx] = -1;
     nodes->right_child_index[idx] = -1;
     nodes->object_index[idx] = -1;

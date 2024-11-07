@@ -37,6 +37,7 @@ struct StackNode {
             size_t start{}, end{};
             int parentIndex{};
             bool isLeftChild{};
+            int parentRopeIndex{};
 };
 
 __device__ static bool box_compare(const hittable& a, const hittable& b, int axis_index);
@@ -51,7 +52,7 @@ __global__ void build_bvh_NR(BVHNodeSoA* nodes, hittable* hittables, size_t N) {
     StackNode traversalStack[MAX];
     int top = -1 ;  // initialize stack
     
-    traversalStack[++top] ={0, N, -1, true};  // push()
+    traversalStack[++top] ={0, N, -1, true, -1};  // push()
 
     while (top >= 0 ) {
         
@@ -66,36 +67,66 @@ __global__ void build_bvh_NR(BVHNodeSoA* nodes, hittable* hittables, size_t N) {
             bbox = AaBb(bbox, hittables[i].sphere.bounding_box());
         }
 
-        if (object_span == 1) {
-            // **Create a leaf node**
-            // BVHNode node;
-            nodes->is_leaf[index] = true;
-            nodes->object_index[index] = current.start;
-            nodes->left_child_index[index] = -1;
-            nodes->right_child_index[index] = -1;
-            nodes->rope_index[index] = -1;
-            nodes->bbox[index] = bbox;  // Bounding box of the single object
-            int node_index = index++;
+        int node_index = index++;
+        nodes->bbox[node_index] = bbox;
+        nodes->rope_index[node_index] = -1; //* initialize rope to null
+
+        if (object_span <= 2) {
+            // **Handle leaf nodes**
+            nodes->is_leaf[node_index] = true;
+            nodes->object_index[node_index] = current.start;
+            nodes->left_child_index[node_index] = -1;
+            nodes->right_child_index[node_index] = -1;
+            // nodes->rope_index[index] = -1;
+            // nodes->bbox[index] = bbox;  // Bounding box of the single object
+            // int node_index = index++;
+
+            //* Set ropt to parent's node
+            nodes->rope_index[node_index] = current.parentRopeIndex;
+
 
             // **Update parent's child index**
             if (current.parentIndex != -1) {
 
                 auto& parent_node_left_child_index = nodes->left_child_index[current.parentIndex];
                 auto& parent_node_right_child_index = nodes->right_child_index[current.parentIndex];
-                auto& parent_node_rope_index = nodes->rope_index[current.parentIndex];
+                // auto& parent_node_rope_index = nodes->rope_index[current.parentIndex];
 
                 if (current.isLeftChild) {
                     parent_node_left_child_index = node_index;
-                    nodes->rope_index[node_index] = parent_node_right_child_index;
+                    // nodes->rope_index[node_index] = parent_node_right_child_index;
                 } else {
                     parent_node_right_child_index = node_index;
-                    nodes->rope_index[node_index] = parent_node_rope_index;
+                    // nodes->rope_index[node_index] = parent_node_rope_index;
                 }
             }
 
        
 
         } else {
+            //* Handle internal nodes
+
+            nodes->is_leaf[node_index] = false;
+            nodes->left_child_index[node_index] = -1;
+            nodes->right_child_index[node_index] = -1;
+
+            // **Update parent's child index**
+            if (current.parentIndex != -1) {
+                auto& parent_node_left_child_index = nodes->left_child_index[current.parentIndex];
+                auto& parent_node_right_child_index = nodes->right_child_index[current.parentIndex];
+                // auto& parent_node_rope_index =  nodes->rope_index[current.parentIndex];
+
+                if (current.isLeftChild) {
+                    parent_node_left_child_index = node_index;
+                    // nodes->rope_index[node_index] = parent_node_right_child_index;
+                } else {
+                    parent_node_right_child_index = node_index;
+                    // nodes->rope_index[node_index] = parent_node_rope_index;
+                }
+            }
+
+
+
             // **Select the longest axis based on the bounding box**
             int axis = bbox.longest_axis();  // Implement this function in your aabb class
 
@@ -109,33 +140,37 @@ __global__ void build_bvh_NR(BVHNodeSoA* nodes, hittable* hittables, size_t N) {
             // **Split the objects into two halves**
             size_t mid = current.start + object_span / 2;
 
-            // **Create an internal node**
-            nodes->is_leaf[index] = false;
-            nodes->left_child_index[index] = -1;  // Will be set after processing children
-            nodes->right_child_index[index] = -1; // Will be set after processing children
-            nodes->rope_index[index] = -1; 
-            nodes->bbox[index] = bbox;  // Bounding box of all objects in the span
-            int node_index = index++;
+            // **Set ropes for child nodes
+
+            int leftRopeIndex = nodes->right_child_index[node_index];
+            int rightRopeIndex = current.parentRopeIndex;
+
+            // nodes->is_leaf[index] = false;
+            // nodes->left_child_index[index] = -1;  // Will be set after processing children
+            // nodes->right_child_index[index] = -1; // Will be set after processing children
+            // nodes->rope_index[index] = -1; 
+            // nodes->bbox[index] = bbox;  // Bounding box of all objects in the span
+            // int node_index = index++;
 
             // **Update parent's child index**
-            if (current.parentIndex != -1) {
-                auto& parent_node_left_child_index = nodes->left_child_index[current.parentIndex];
-                auto& parent_node_right_child_index = nodes->right_child_index[current.parentIndex];
-                auto& parent_node_rope_index =  nodes->rope_index[current.parentIndex];
+            // if (current.parentIndex != -1) {
+            //     auto& parent_node_left_child_index = nodes->left_child_index[current.parentIndex];
+            //     auto& parent_node_right_child_index = nodes->right_child_index[current.parentIndex];
+            //     auto& parent_node_rope_index =  nodes->rope_index[current.parentIndex];
 
-                if (current.isLeftChild) {
-                    parent_node_left_child_index = node_index;
-                    nodes->rope_index[node_index] = parent_node_right_child_index;
-                } else {
-                    parent_node_right_child_index = node_index;
-                    nodes->rope_index[node_index] = parent_node_rope_index;
-                }
-            }
+            //     if (current.isLeftChild) {
+            //         parent_node_left_child_index = node_index;
+            //         nodes->rope_index[node_index] = parent_node_right_child_index;
+            //     } else {
+            //         parent_node_right_child_index = node_index;
+            //         nodes->rope_index[node_index] = parent_node_rope_index;
+            //     }
+            // }
 
-            // **Push child nodes onto the stack for further processing**
+            // **Push child nodes onto the stack with appropriate rope indices for further processing**
             
-            traversalStack[++top] = {mid, current.end, node_index, false};        // Right child
-            traversalStack[++top] = {current.start, mid, node_index, true};       // Left child
+            traversalStack[++top] = {mid, current.end, node_index, false, rightRopeIndex};        // Right child
+            traversalStack[++top] = {current.start, mid, node_index, true, leftRopeIndex};       // Left child
         }
     }
     
@@ -241,25 +276,25 @@ bool object_hit_rope(const ray& r, interval ray_t, hit_record& rec, const BVHNod
     
   
     BVHNodeSoA current;
-    current.bbox = &nodes->bbox[0];
-    current.is_leaf = &nodes->is_leaf[0];
-    current.left_child_index = &nodes->left_child_index[0];
-    current.right_child_index = &nodes->right_child_index[0];
-    current.rope_index = &nodes->rope_index[0];
-    current.object_index = &nodes->object_index[0];
+    current.bbox = nodes->bbox;
+    current.is_leaf = nodes->is_leaf;
+    current.left_child_index = nodes->left_child_index;
+    current.right_child_index = nodes->right_child_index;
+    current.rope_index = nodes->rope_index;
+    current.object_index = nodes->object_index;
     
 
     bool hit_anything = false;
     hit_record temp_rec;
 
-    while (current.is_leaf != nullptr) {
+    while (*current.rope_index != -1) {
                
         if (current.bbox->hit(r, ray_t)) {
             
             if (*current.is_leaf) {
-                printf("hello\n");
-                if ((hittables + *current.object_index)->sphere.hit(r, ray_t, temp_rec)) {
-                     
+                printf("current_object_indes %d\n", *current.object_index);
+                if (hittables[*current.object_index].sphere.hit(r, ray_t, temp_rec)) {
+                    
                     hit_anything = true;
                     ray_t.max = temp_rec.t;
                     rec = temp_rec;
@@ -267,6 +302,7 @@ bool object_hit_rope(const ray& r, interval ray_t, hit_record& rec, const BVHNod
                 // Move to the next node using the rope
                
                 if (*current.rope_index != -1) {
+                    
                     current.bbox = &nodes->bbox[*current.rope_index];
                     current.is_leaf = &nodes->is_leaf[*current.rope_index];
                     current.left_child_index = &nodes->left_child_index[*current.rope_index];
@@ -274,12 +310,13 @@ bool object_hit_rope(const ray& r, interval ray_t, hit_record& rec, const BVHNod
                     current.rope_index = &nodes->rope_index[*current.rope_index];
                     current.object_index = &nodes->object_index[*current.rope_index];
                 } else {
-                    current.bbox = nullptr; 
-                    current.is_leaf = nullptr;
-                    current.left_child_index = nullptr; 
-                    current.right_child_index = nullptr; 
-                    current.rope_index = nullptr; 
-                    current.object_index = nullptr;
+                    
+                    *current.bbox = AaBb::empty(); 
+                    *current.is_leaf = -1;
+                    *current.left_child_index = -1; 
+                    *current.right_child_index = -1; 
+                    *current.rope_index = -1; 
+                    *current.object_index = -1;
                 }
 
 
@@ -287,6 +324,7 @@ bool object_hit_rope(const ray& r, interval ray_t, hit_record& rec, const BVHNod
 
             } else {
                 // If it is not a leaf node, first go to the left child
+                
                 current.bbox = &nodes->bbox[*current.left_child_index];
                 current.is_leaf = &nodes->is_leaf[*current.left_child_index];
                 current.left_child_index = &nodes->left_child_index[*current.left_child_index];
@@ -306,12 +344,12 @@ bool object_hit_rope(const ray& r, interval ray_t, hit_record& rec, const BVHNod
                 current.rope_index = &nodes->rope_index[*current.rope_index];
                 current.object_index = &nodes->object_index[*current.rope_index];
             } else {
-                current.bbox = nullptr;
-                current.is_leaf = nullptr; 
-                current.left_child_index = nullptr; 
-                current.right_child_index = nullptr; 
-                current.rope_index = nullptr; 
-                current.object_index = nullptr; 
+                *current.bbox = AaBb::empty();
+                *current.is_leaf = -1; 
+                *current.left_child_index = -1; 
+                *current.right_child_index = -1; 
+                *current.rope_index = -1; 
+                *current.object_index = -1; 
             }
         }
     }
