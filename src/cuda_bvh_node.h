@@ -199,7 +199,7 @@ static bool box_z_compare (const hittable& a, const hittable& b) {
 }
 
 __device__
-bool object_hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes, hittable* hittables, int* node_stack_arr) {
+bool object_hit(const ray& r, interval ray_t, hit_record& rec, const BVHNodeSoA* __restrict__ nodes, const hittable* __restrict__ hittables, int* node_stack_arr) {
     // const int MAX = 12;
     // int node_stack_arr[MAX];
     int top = -1;
@@ -211,18 +211,36 @@ bool object_hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes
 
     while (top >= 0) {
         int node_index = node_stack_arr[top--];  // Pop the node index
+        //* OPTION 1. Let the compiler optimize optimize memory access _restrict__  ---> UNCOMMENT OR COMMENT 
+        //! FASTER
+        // const AaBb& current_bbox = nodes->bbox[node_index];
+        // const int current_left_child = nodes->left_child_index[node_index];
+        // const int current_right_child = nodes->right_child_index[node_index];
+        // const int current_is_leaf = nodes->is_leaf[node_index];
+        // const int current_node_object_index = nodes->object_index[node_index];
+        
 
-        const AaBb& current_bbox = nodes->bbox[node_index];
-        const int current_left_child = nodes->left_child_index[node_index];
-        const int current_right_child = nodes->right_child_index[node_index];
-        const bool current_is_leaf = nodes->is_leaf[node_index];
-        const int current_node_object_index = nodes->object_index[node_index];
+        //* OPTION 2:  You load data directly using __ldg   ---> UNCOMMENT or COMMENT
+        //! SLOWER
+        double min_x = __ldg(&nodes->bbox[node_index].x.min);  // needs conversion to accepted types
+        double min_y = __ldg(&nodes->bbox[node_index].y.min);
+        double min_z = __ldg(&nodes->bbox[node_index].z.min);
+        double max_x = __ldg(&nodes->bbox[node_index].x.max);
+        double max_y = __ldg(&nodes->bbox[node_index].y.max);
+        double max_z = __ldg(&nodes->bbox[node_index].z.max);
+        AaBb current_bbox = AaBb(glm::vec3(min_x, min_y, min_z), glm::vec3(max_x, max_y, max_z));
+        const int current_left_child = __ldg(&nodes->left_child_index[node_index]);
+        const int current_right_child = __ldg(&nodes->right_child_index[node_index]);
+        int8_t is_leaf = __ldg(reinterpret_cast<const int8_t*>(&nodes->is_leaf[node_index])); // needs conversion to accepted types
+        bool current_is_leaf = static_cast<bool>(is_leaf);
+        const int current_node_object_index = __ldg(&nodes->object_index[node_index]);
 
         if (!current_bbox.hit(r, ray_t)) {
             continue;
         }
 
         if (current_is_leaf) {
+            
             if (hittables[current_node_object_index].sphere.hit(r, ray_t, temp_rec)) {
                 hit_anything = true;
                 ray_t.max = temp_rec.t;
@@ -250,7 +268,7 @@ bool object_hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* nodes
 
 
 __device__
-bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNodeSoA* &nodes, hittable* &hittables, int* node_stack_arr )  {
+bool hit(const ray& r, interval ray_t, hit_record& rec, const BVHNodeSoA* __restrict__ nodes, const hittable* __restrict__ hittables, int* node_stack_arr )  {
     hit_record temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;

@@ -274,7 +274,7 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 
 
 __device__
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r,  BVHNodeSoA* &nodes, hittable* &hittables, int* node_stack_arr) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const BVHNodeSoA* __restrict__ nodes, const hittable* __restrict__ hittables, int* node_stack_arr) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -351,7 +351,7 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 }
 
 
-__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, BVHNodeSoA* &nodes, hittable* &hittables) {
+__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, const BVHNodeSoA* __restrict__ nodes, const hittable* __restrict__ hittables) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 

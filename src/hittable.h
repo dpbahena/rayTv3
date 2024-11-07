@@ -33,7 +33,7 @@ struct sphere_data {
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
     __device__ __host__
-    bool hit(const ray& r, interval ray_t, hit_record& rec);
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const ;
 };
 
 
