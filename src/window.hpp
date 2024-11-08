@@ -112,6 +112,8 @@
             x_winPos = secondDisplayBounds.x;
             y_winPos = secondDisplayBounds.y;
 
+            
+
         } else {  // center the window in current display
             SDL_Rect firstDisplayBounds;
             SDL_GetDisplayBounds(0, &firstDisplayBounds);

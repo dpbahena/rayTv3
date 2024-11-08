@@ -48,11 +48,13 @@ struct hittable {
     };
 
     // default constructor
+    __device__ __host__
     hittable() : type(Type::NONE) {}
 
     // Constructor for each type
 
     /* STATIONARY SPHERE */
+    __device__ __host__
     static hittable make_sphere(const glm::vec3& static_center, float radius, material* mat) {
         hittable obj;
         obj.type = Type::SPHERE;
@@ -66,6 +68,7 @@ struct hittable {
         return obj;
     }
     /* MOVING SPHERE */
+    __device__ __host__
     static hittable make_sphere(const glm::vec3& center1, const glm::vec3& center2, float radius, material* mat) {
         hittable obj;
         obj.type = Type::SPHERE;

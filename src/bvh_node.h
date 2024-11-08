@@ -13,7 +13,9 @@ struct BVHNode {
     int right_child_index = -1;    // Index of right child in the BVH array (-1 if it's a leaf)
     int object_index = -1;         // Index of the object (used if it's a leaf)
     bool is_leaf;             // Is this node a leaf?
+    int rope_index = -1;
     AaBb bbox;
+    
 };
 
 

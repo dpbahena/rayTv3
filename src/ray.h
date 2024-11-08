@@ -18,6 +18,8 @@ class ray {
 
         __host__ __device__
         glm::vec3 at(float t) const { return origin + t * direction; }
+        __device__
+        int direction_major_axis() const;
 
         
 

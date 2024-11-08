@@ -8,7 +8,7 @@
 
 
 __device__ __host__
-bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec) {
+bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec)  {
 
     glm::vec3 current_center = center.at(r.time());
     glm::vec3 oc = current_center - r.origin;
