@@ -456,13 +456,13 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     // h_sphere_list.push_back(hittable_obj);
     
     // /* Material */
-    material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
-    material* d_mat2;
-    checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_mat2);
-    hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, d_mat2);
-    h_sphere_list.push_back(hittable_obj);
+    // material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
+    // material* d_mat2;
+    // checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_mat2);
+    // hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, d_mat2);
+    // h_sphere_list.push_back(hittable_obj);
 
     // // /* Material */
     material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);

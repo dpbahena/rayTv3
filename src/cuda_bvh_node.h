@@ -639,9 +639,13 @@ __global__ void build_bvh_NR_ROPE5(BVHNode* nodes, hittable* hittables, size_t N
                 }
             }
 
+
             // Select axis and sort
             int axis = bbox.longest_axis();
-            thrust::sort(thrust::device, hittables + current.start, hittables + current.end, BoxCompare(axis));
+            auto comparator = (axis == 0) ? box_x_compare
+                            : (axis == 1) ? box_y_compare
+                                          : box_z_compare;
+            thrust::sort(thrust::device, hittables + current.start, hittables + current.end, comparator /* BoxCompare(axis) */);
 
             // Split the objects
             size_t mid = current.start + object_span / 2;
@@ -649,7 +653,8 @@ __global__ void build_bvh_NR_ROPE5(BVHNode* nodes, hittable* hittables, size_t N
             // Prepare rope indices for child nodes
             int left_rope_index = index;               // Right child will be the next node
             int right_rope_index = node.rope_index;    // Inherit from current node
-
+            // printf("index: %d, node_rope_index %d\n ", index, node.rope_index);
+            
             // Push child nodes onto the stack
             traversalStack[++top] = {mid, current.end, node_index, false, right_rope_index};
             traversalStack[++top] = {current.start, mid, node_index, true, left_rope_index};
