@@ -23,6 +23,16 @@ struct StackNode {
             int ropeIndex;
 };
 
+struct StackNode0 {
+            size_t start, end;
+            int parentIndex;
+            bool isLeftChild;           
+            // int parentRopeIndex;
+            // int ropeIndex;
+};
+
+
+
 __device__ static bool box_compare(const hittable& a, const hittable& b, int axis_index);
 __device__ static bool box_x_compare (const hittable& a, const hittable& b);
 __device__ static bool box_y_compare (const hittable& a, const hittable& b);
@@ -34,7 +44,7 @@ __global__ void build_bvh_NR(BVHNode* nodes, hittable* hittables, size_t N) {
     //std::vector<BVHNode*> node_stack;
     int index = 0;
     const int MAX = 15;
-    StackNode traversalStack[MAX];
+    StackNode0 traversalStack[MAX];
     int top = -1 ;  // initialize stack
     
     traversalStack[++top] ={0, N, -1, true};  // push()
@@ -42,7 +52,7 @@ __global__ void build_bvh_NR(BVHNode* nodes, hittable* hittables, size_t N) {
     // while (top >= 0) {
     for (;top >= 0;) {
         
-        StackNode current = traversalStack[top];
+        StackNode0 current = traversalStack[top];
         --top; // pop()
 
         size_t object_span = current.end - current.start;
@@ -128,7 +138,7 @@ __global__ void build_bvh_NR(BVHNode* nodes, hittable* hittables, size_t N) {
             auto comparator = (axis == 0) ? box_x_compare
                             : (axis == 1) ? box_y_compare
                                             : box_z_compare;
-
+            
             thrust::sort(thrust::device, hittables + current.start, hittables + current.end, comparator);
 
             // **Split the objects into two halves**

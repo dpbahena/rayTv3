@@ -456,15 +456,15 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     // h_sphere_list.push_back(hittable_obj);
     
     // /* Material */
-    // material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
-    // material* d_mat2;
-    // checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_mat2);
-    // hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, d_mat2);
-    // h_sphere_list.push_back(hittable_obj);
+    material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
+    material* d_mat2;
+    checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat2);
+    hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, d_mat2);
+    h_sphere_list.push_back(hittable_obj);
 
-    // // /* Material */
+    /* Material */
     material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
     material* d_mat3;
     checkCuda(cudaMalloc((void**)&d_mat3, sizeof(material)) );
@@ -516,9 +516,9 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
 
     /** Implementing ROPE based BHV nodes ind cuda */
-    
-    checkCuda(cudaMalloc((void**)&bvh_nodes, (2 * number_of_hittables - 1) * sizeof(BVHNode)) );
-    build_bvh_NR_ROPE5<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+    int number_of_nodes = (2 * number_of_hittables -1);
+    checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    build_bvh_NR_ROPE5<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_nodes);
     flat_node_list fworld;
     fworld.addCudaNode(bvh_nodes, d_sphere_list);
     checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
