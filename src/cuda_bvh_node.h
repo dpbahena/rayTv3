@@ -594,7 +594,7 @@ bool hit_rope3(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
 
 __global__ void build_bvh_NR_ROPE5(BVHNode* nodes, hittable* hittables, size_t N) {
     int index = 0;
-    const int MAX = 64;
+    const int MAX = 5;
     StackNode traversalStack[MAX];
     int top = -1;
 

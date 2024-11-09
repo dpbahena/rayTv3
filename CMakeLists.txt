@@ -73,5 +73,5 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_options(${PROJECT_NAME} PRIVATE 
     $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=20012>
     $<$<COMPILE_LANGUAGE:CUDA>:-rdc=true>
-    $<$<COMPILE_LANGUAGE:CUDE>:-G -g>
+    $<$<COMPILE_LANGUAGE:CUDA>:-G -g>
 )
