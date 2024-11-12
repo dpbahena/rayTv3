@@ -397,8 +397,8 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     h_sphere_list.push_back(hittable_obj);
 
     // Create random spheres 
-    for (int a = -1; a < 2; a++) {
-        for (int b = -1; b < 2; b++) {
+    for (int a = -11; a < 11; a++) {
+        for (int b = -11; b < 11; b++) {
             auto choose_material = random_double();
             glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             
@@ -519,7 +519,7 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    build_bvh_NR_ROPE6<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+    build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
     flat_node_list fworld;
     fworld.addCudaNode(bvh_nodes, d_sphere_list);
     checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );

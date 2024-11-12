@@ -17,9 +17,16 @@
 
 struct StackNode {
             size_t start, end;
+            int nodeIndex; // indext of the node being processed
             int parentIndex;
             bool isLeftChild;           
-            // int parentRopeIndex;
+            int ropeIndex;
+};
+
+struct StackNode1 {
+            size_t start, end;
+            int parentIndex;
+            bool isLeftChild;           
             int ropeIndex;
 };
 
@@ -474,13 +481,13 @@ bool hit_rope2(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
 __global__ void build_bvh_NR_ROPE3(BVHNode* nodes, hittable* hittables, size_t N) {
     int index = 0;
     const int MAX = 64;  // Adjust the size as needed
-    StackNode traversalStack[MAX];
+    StackNode1 traversalStack[MAX];
     int top = -1;
 
     traversalStack[++top] = {0, N, -1, true, -1};  // {start, end, parentIndex, isLeftChild, ropeIndex}
 
     while (top >= 0) {
-        StackNode current = traversalStack[top--];
+        StackNode1 current = traversalStack[top--];
         size_t object_span = current.end - current.start;
 
         // Compute the bounding box of the current node
@@ -595,13 +602,13 @@ bool hit_rope3(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
 __global__ void build_bvh_NR_ROPE5(BVHNode* nodes, hittable* hittables, size_t N) {
     int index = 0;
     const int MAX = 5;
-    StackNode traversalStack[MAX];
+    StackNode1 traversalStack[MAX];
     int top = -1;
 
     traversalStack[++top] = {0, N, -1, true, -1};
 
     while (top >= 0) {
-        StackNode current = traversalStack[top--];
+        StackNode1 current = traversalStack[top--];
         size_t object_span = current.end - current.start;
 
         // Compute the bounding box
@@ -675,14 +682,14 @@ __global__ void build_bvh_NR_ROPE5(BVHNode* nodes, hittable* hittables, size_t N
 __global__ void build_bvh_NR_ROPE6(BVHNode* nodes, hittable* hittables, size_t N) {
     int index = 0;
     const int MAX = 64;
-    StackNode traversalStack[MAX];
+    StackNode1 traversalStack[MAX];
     int top = -1;
     int level = 0;
 
     traversalStack[++top] = {0, N, -1, true, -1};  // {start, end, parentIndex, isLeftChild, ropeIndex}
 
     while (top >= 0) {
-        StackNode current = traversalStack[top--];
+        StackNode1 current = traversalStack[top--];
         size_t object_span = current.end - current.start;
 
         // Compute the bounding box
@@ -866,13 +873,13 @@ bool hit_rope6(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
 __global__ void build_bvh_NR_ROPE7(BVHNode* nodes, hittable* hittables, size_t N) {
     int index = 0;
     const int MAX = 64;
-    StackNode traversalStack[MAX];
+    StackNode1 traversalStack[MAX];
     int top = -1;
 
     traversalStack[++top] = {0, N, -1, true, -1};  // {start, end, parentIndex, isLeftChild, ropeIndex}
 
     while (top >= 0) {
-        StackNode current = traversalStack[top--];
+        StackNode1 current = traversalStack[top--];
         size_t object_span = current.end - current.start;
 
         // Compute the bounding box
@@ -1014,6 +1021,112 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
     return hit_anything;
 }
 
+__global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N) {
+    int index = 0;  // Tracks the next available index in the nodes array
+    const int MAX = 15;
+    StackNode traversalStack[MAX];
+    int top = -1;
+
+    // Create the root node and push it onto the stack
+    int root_index = index++;
+    traversalStack[++top] = {0, N, root_index, -1, true, -1};  // {start, end, nodeIndex, parentIndex, isLeftChild, ropeIndex}
+
+    while (top >= 0) {
+        // Pop the next node to process from the stack
+        StackNode current = traversalStack[top--];
+        size_t object_span = current.end - current.start;
+
+        // Use the nodeIndex from the stack
+        int node_index = current.nodeIndex;
+
+        // Get a reference to the current node in the nodes array
+        BVHNode& node = nodes[node_index];
+        node.start = current.start;
+        node.end = current.end;
+        node.rope_index = current.ropeIndex;
+
+        // Compute the bounding box for the current node
+        AaBb bbox = AaBb::empty();
+        for (size_t i = current.start; i < current.end; ++i) {
+            bbox = AaBb(bbox, (hittables + i)->sphere.bounding_box());
+        }
+        node.bbox = bbox;
+
+        if (object_span <= 2) {
+            // **Leaf node**
+            node.is_leaf = true;
+            node.left_child_index = -1;
+            node.right_child_index = -1;
+
+            // Update the parent's child index
+            if (current.parentIndex != -1) {
+                BVHNode& parent_node = nodes[current.parentIndex];
+                if (current.isLeftChild) {
+                    parent_node.left_child_index = node_index;
+                } else {
+                    parent_node.right_child_index = node_index;
+                }
+            }
+
+        } else {
+            // **Internal node**
+            node.is_leaf = false;
+
+            // Assign indices for child nodes
+            int left_child_index = index++;
+            int right_child_index = index++;
+
+            // Assign the left and right child indices to the current node
+            node.left_child_index = left_child_index;
+            node.right_child_index = right_child_index;
+
+            // **Assign rope indices to child nodes**
+            // Left child's rope points to right child
+            nodes[left_child_index].rope_index = right_child_index;
+
+            // Right child's rope inherits from current node
+            nodes[right_child_index].rope_index = node.rope_index;
+
+            // **Select the splitting axis and sort the objects**
+            int axis = bbox.longest_axis();
+            auto comparator = (axis == 0) ? box_x_compare
+                            : (axis == 1) ? box_y_compare
+                                          : box_z_compare;
+            thrust::sort(thrust::device, hittables + current.start, hittables + current.end, comparator);
+
+            // **Split the objects into two halves**
+            size_t mid = current.start + object_span / 2;
+
+            // **Set start and end for child nodes**
+            nodes[left_child_index].start = current.start;
+            nodes[left_child_index].end = mid;
+            nodes[right_child_index].start = mid;
+            nodes[right_child_index].end = current.end;
+
+            // **Initialize child nodes' left and right child indices**
+            nodes[left_child_index].left_child_index = -1;
+            nodes[left_child_index].right_child_index = -1;
+            nodes[right_child_index].left_child_index = -1;
+            nodes[right_child_index].right_child_index = -1;
+
+            // **Push child nodes onto the stack**
+            // Right child
+            traversalStack[++top] = {mid, current.end, right_child_index, node_index, false, nodes[right_child_index].rope_index};
+            // Left child
+            traversalStack[++top] = {current.start, mid, left_child_index, node_index, true, nodes[left_child_index].rope_index};
+
+            // Update the parent's child index
+            if (current.parentIndex != -1) {
+                BVHNode& parent_node = nodes[current.parentIndex];
+                if (current.isLeftChild) {
+                    parent_node.left_child_index = node_index;
+                } else {
+                    parent_node.right_child_index = node_index;
+                }
+            }
+        }
+    }
+}
 
 
 
