@@ -32,7 +32,8 @@ int main(int arg, char** argv) {
         cam.samples_per_pixel = 100;
         cam.max_depth = 40;
         cam.isBvh = true;  // use bvh
-        printf("Usage:  ./raytracer <# samples per pixel> <max depth>\n");
+        printf("Using default values:  ./rayTracer 100 40 1\n");
+        printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <bvh?: 0-1>\n");
      }
 
     cam.aspect_ratio = win.getExtent().width / static_cast<float>(win.getExtent().height);

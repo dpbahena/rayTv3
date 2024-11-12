@@ -15,7 +15,7 @@
 // };
 
 
-struct StackNode {
+struct alignas(16) StackNode {
             size_t start, end;
             int nodeIndex; // indext of the node being processed
             int parentIndex;
@@ -1131,6 +1131,45 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
     }
 }
 
+__device__
+bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
+    // Use a small stack allocated in registers
+    int stack[14];
+    int stackPtr = -1;
+
+    // Start with the root node
+    int currentIndex = 0;
+    bool hit_anything = false;
+    hit_record temp_rec;
+
+    while (true) {
+        BVHNode* current = &nodes[currentIndex];
+
+        if (current->bbox.hit(r, ray_t)) {
+            if (current->is_leaf) {
+                // Process leaf node
+                for (size_t i = current->start; i < current->end; ++i) {
+                    hittable* obj = &hittables[i];
+                    if (obj->sphere.hit(r, ray_t, temp_rec)) {
+                        hit_anything = true;
+                        ray_t.max = temp_rec.t;
+                        rec = temp_rec;
+                    }
+                }
+                if (stackPtr < 0) break;
+                currentIndex = stack[stackPtr--];
+            } else {
+                // Push right child to stack and proceed to left child
+                stack[++stackPtr] = current->right_child_index;
+                currentIndex = current->left_child_index;
+            }
+        } else {
+            if (stackPtr < 0) break;
+            currentIndex = stack[stackPtr--];
+        }
+    }
+    return hit_anything;
+}
 
 
 __device__
@@ -1142,6 +1181,7 @@ bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable
     
     // if(hit3(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
     if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
+    // if(hit_optimized(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
         
         hit_anything = true;
         closest_so_far = temp_rec.t;

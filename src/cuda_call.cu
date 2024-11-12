@@ -484,8 +484,8 @@ void init_objects(Camera& cam, std::vector<material*> device_materials, std::vec
     h_sphere_list.push_back(hittable_obj);
 
     // Create random spheres 
-    for (int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
+    for (int a = -31; a < 31; a++) {
+        for (int b = -31; b < 31; b++) {
             auto choose_material = random_double();
             glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             
