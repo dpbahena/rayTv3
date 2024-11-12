@@ -1108,7 +1108,10 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
             nodes[left_child_index].right_child_index = -1;
             nodes[right_child_index].left_child_index = -1;
             nodes[right_child_index].right_child_index = -1;
-
+            if (top >= MAX){
+                printf("Stack Overflow\n");
+                return;
+            }
             // **Push child nodes onto the stack**
             // Right child
             traversalStack[++top] = {mid, current.end, right_child_index, node_index, false, nodes[right_child_index].rope_index};

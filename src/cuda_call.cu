@@ -374,6 +374,7 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     for (int sample = 0; sample < samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
         color  += ray_color(states, i, j, depth, r, *world, nodes, hittables);
+        // color  += ray_color(states, i, j, depth, r, *world);
     }
     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
     color *= pixel_sample_scale;
@@ -415,8 +416,7 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
                     auto sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
                     h_sphere_list.push_back(sphere);
 
-                }
-                else if(choose_material < 0.95f) {
+                }else if(choose_material < 0.95f) {
                     // metal
                     glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
                     float fuzz = random_double(0.0f, 0.5f);
