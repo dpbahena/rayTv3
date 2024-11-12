@@ -1,6 +1,7 @@
 #include "window.hpp"
 #include "renderer.hpp"
 #include "camera.h"
+#include "cuda_call.h"
 
 
 
@@ -17,14 +18,20 @@ int main(int arg, char** argv) {
     // Window win{"Dario", 1440, 720};
     Window win{"Dario", 300, 200};
     Renderer myRender{win};
-    Camera cam{myRender.colorBuffer};
+    // Camera cam{myRender.colorBuffer};
+    Camera cam;
+    // uint32_t* colorBuffer;
+    RayTracer gpuOperations;
 
-     if (arg == 3) {
+     if (arg == 4) {
         cam.samples_per_pixel = atoi(argv[1]);
         cam.max_depth = atoi(argv[2]);
+        cam.isBvh = atoi(argv[3]);
+
      } else {
-        cam.samples_per_pixel = 500;
-        cam.max_depth = 100;
+        cam.samples_per_pixel = 100;
+        cam.max_depth = 40;
+        cam.isBvh = true;  // use bvh
         printf("Usage:  ./raytracer <# samples per pixel> <max depth>\n");
      }
 
@@ -46,7 +53,11 @@ int main(int arg, char** argv) {
     while(win.windowIsOpen()) {
 
         if(!rendered) {
-            cam.render();  // calculate the raytracing
+            // cam.render();  // calculate the raytracing
+            cam.initialize();
+            gpuOperations.cudaCall(cam, myRender.colorBuffer);
+
+
             myRender.render();
             rendered = true;
         }

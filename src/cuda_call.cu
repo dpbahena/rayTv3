@@ -277,7 +277,7 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
     return a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
 }
 
-
+// YES BVH
 __device__
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
@@ -290,10 +290,8 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        // if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
         if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables)){
         
-        // if(hit(world, cur_ray, interval(0.001f, FLT_MAX), rec)){
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
             glm::vec3 attenuation;
@@ -330,7 +328,54 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     return final_color;
 }
 
+// NO BVH
+__device__
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
+    ray cur_ray = r;
+    glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
+    glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
+    
+    
+    for (int k = 0; k < depth; k++){
+        hit_record rec;
+        
+        if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        
+            auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
+            ray scattered;
+            glm::vec3 attenuation;
 
+            bool did_scatter = false;
+
+            if (rec.mat->type == Type::METAL){
+                did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+                // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
+
+            } else if (rec.mat->type == Type::LAMBERTIAN){
+                did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+                // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
+
+            } else if (rec.mat->type == Type::DIELECTRIC){
+                did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+            }
+
+            if (did_scatter){
+                cur_ray = scattered;
+                cur_attenuation *= attenuation;
+            } else {
+                final_color = glm::vec3(0.0f, 0.0f, 0.0f);  // if no scattering, no contribution
+            }
+        } else {  // color background
+            glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
+            float a = 0.5f * (unitDirection.y + 1.0f);
+            glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
+            final_color =  cur_attenuation * background;
+            break;
+        }
+    }
+    
+    return final_color;
+}
 
 __device__
 ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
@@ -381,7 +426,48 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
-void init_objects(std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
+
+// YES BVH
+__global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, flat_node_list* world, BVHNode* nodes, hittable* hittables) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i >= cam->image_width || j >= cam->image_height) return;
+    // if(i == 0 && j == 0){
+    //     printf("min: %f, max: %f\n", world->list[2].sphere.bbox->axis_interval(2).min, world->list[2].sphere.bbox->axis_interval(2).max );    
+    // }
+    glm::vec3 color = {0.0f, 0.0f, 0.0f};
+    for (int sample = 0; sample < cam->samples_per_pixel; sample++){
+        ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
+        color  += ray_color(states, i, j, cam->max_depth, r, *world, nodes, hittables);
+        // color  += ray_color(states, i, j, depth, r, *world);
+    }
+    // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
+    color *= cam->pixel_sample_scale;
+    image[cam->image_width * j + i] = colorToUint32_t(color);  
+}
+
+// NO BVH 
+__global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable_list* world) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i >= cam->image_width || j >= cam->image_height) return;
+    
+    glm::vec3 color = {0.0f, 0.0f, 0.0f};
+    for (int sample = 0; sample < cam->samples_per_pixel; sample++){
+        ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
+        color  += ray_color(states, i, j, cam->max_depth, r, *world);
+    }
+    
+    color *= cam->pixel_sample_scale;
+    image[cam->image_width * j + i] = colorToUint32_t(color);  
+}
+
+
+
+
+void init_objects(Camera& cam, std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
 
     // std::vector<hittable> h_spheres;
     hittable_list h_world;
@@ -484,10 +570,20 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
 
     h_world.hittables = d_sphere_list;
     h_world.objects_size = number_of_hittables;
-
-    /* Allocate memory for hittable list on the device */
-    // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
-    // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    if (!cam.isBvh){
+        /* Allocate memory for hittable list on the device */
+        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
+        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    } else {
+        /** Implementing ROPE based BHV nodes ind cuda */
+        int number_of_nodes = (2 * number_of_hittables -1);
+        checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+        flat_node_list fworld;
+        fworld.addCudaNode(bvh_nodes, d_sphere_list);
+        checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+        checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+    }
     
 
     /* AaBb implementation RECURSIVE NODE CREATION */
@@ -516,28 +612,31 @@ void init_objects(std::vector<material*> device_materials, std::vector<BVH*> all
     // checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
     // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
 
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
-    flat_node_list fworld;
-    fworld.addCudaNode(bvh_nodes, d_sphere_list);
-    checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
-    checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // /** Implementing ROPE based BHV nodes ind cuda */
+    // int number_of_nodes = (2 * number_of_hittables -1);
+    // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    // build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+    // flat_node_list fworld;
+    // fworld.addCudaNode(bvh_nodes, d_sphere_list);
+    // checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+    // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
 
 
 
 }
 
 
-void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm::vec3 center, glm::vec3 pixel00_loc, glm::vec3 pixel_delta_u, glm::vec3 pixel_delta_v, int samples_per_pixel, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v, uint32_t* colorBuffer)
-{  
 
+
+void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
+{
     std::vector<material*>  device_materials;  
     std::vector<BVH*>       allocated_nodes;
     std::vector<BVHNode*>   allocated_flat_nodes; 
     hittable*               d_spheres_list;
     // std::vector<AaBb*> device_boxes;  
+
+    Camera* d_cam;
 
     /* device variables */
     uint32_t*   d_image;    // for display buffer
@@ -550,18 +649,24 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
    
       
     
-    init_objects(device_materials, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
+    init_objects(cam, device_materials, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
     
-    checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
+    checkCuda(cudaMalloc((void**)&d_image, cam.image_width * cam.image_height * sizeof(uint32_t)));
+    checkCuda(cudaMalloc((void**)&d_cam,  sizeof(Camera)));
+    checkCuda(cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice));
+
+
     
     clock_t start, stop;
     start = clock();
 
     int threads = 16;
     dim3 blockSize(threads, threads);
-    int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
-    int blocks_y = (image_height + blockSize.y - 1) / blockSize.y;
+    int blocks_x = (cam.image_width + blockSize.x - 1) / blockSize.x;
+    int blocks_y = (cam.image_height + blockSize.y - 1) / blockSize.y;
     dim3 gridSize(blocks_x, blocks_y);
+
+
 
     //generate random seed to be used in rayTracer kernel
     int num_threads = threads * threads * blocks_x * blocks_y;
@@ -572,15 +677,19 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
 
     // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world);
     // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dB_world);
-    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dBF_world, bvh_nodes, d_spheres_list);
-    // checkCuda(cudaPeekAtLastError() );
+    
+    if(cam.isBvh)
+        rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, dBF_world, bvh_nodes, d_spheres_list);
+    else
+        rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
+    
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
     stop = clock();
     double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
-    printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, samples_per_pixel, max_depth);
+    printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
 
-    checkCuda(cudaMemcpy(colorBuffer, d_image, image_width * image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    checkCuda(cudaMemcpy(colorBuffer, d_image, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
     // delete all device pointers of the materials and AaBb boxes
     for (auto nodes : allocated_nodes)
@@ -593,11 +702,12 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     
     cudaFree(d_spheres_list);
     cudaFree(d_image);
-    // cudaFree(d_world);
+    cudaFree(d_cam);
+    // if(!cam.isBvh)
+        cudaFree(d_world);
     // cudaFree(dB_world);
     cudaFree(dBF_world);
     cudaFree(d_states);
     cudaFree(bvh_nodes);
-    
     
 }

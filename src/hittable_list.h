@@ -25,7 +25,6 @@ struct hittable_list {
             auto closest_so_far = ray_t.max;
             
             for (int i = 0; i < objects_size; i++){
-                // printf("min: %f", hittables[i].sphere.bbox->axis_interval(1).min);
                 if (hittables[i].sphere.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
                     
                     hit_anything = true;

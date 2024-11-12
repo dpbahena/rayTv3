@@ -1,11 +1,12 @@
 #include "camera.h"
 
-Camera::Camera(uint32_t* colorBuffer) : colorBuffer(colorBuffer) {}
+Camera::Camera(){}
+// Camera::Camera(uint32_t* colorBuffer) : colorBuffer(colorBuffer) {}
 
 
 void Camera::render() {
-    initialize();
-    gpuOperations.cudaCall(image_width, image_height, max_depth, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocus_angle, defocus_disk_u, defocus_disk_v, colorBuffer);
+    // initialize();
+    // gpuOperations.cudaCall(image_width, image_height, max_depth, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocus_angle, defocus_disk_u, defocus_disk_v, colorBuffer);
 }
 
 
@@ -50,6 +51,7 @@ void Camera::initialize() {
     float defocus_radius = focus_dist * tan(glm::radians(defocus_angle / 2.0f));
     defocus_disk_u = u * defocus_radius;
     defocus_disk_v = v * defocus_radius;
+    pixel_sample_scale = 1.0 / samples_per_pixel;
     
 
 

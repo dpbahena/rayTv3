@@ -1000,7 +1000,7 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
                     }
                 }
                 // Move to the next node via the rope
-                if (current->rope_index != -1 && current->rope_index != (current - nodes)) {
+                if (current->rope_index != -1/*  && current->rope_index != (current - nodes) */) {
                     current = nodes + current->rope_index;
                 } else {
                     current = nullptr;  // End of traversal
@@ -1011,7 +1011,7 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
             }
         } else {
             // No intersection; follow the rope
-            if (current->rope_index != -1 && current->rope_index != (current - nodes)) {
+            if (current->rope_index != -1 /* && current->rope_index != (current - nodes) */) {
                 current = nodes + current->rope_index;
             } else {
                 current = nullptr;  // End of traversal
@@ -1134,7 +1134,7 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
 
 
 __device__
-bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNode* &nodes, hittable* &hittables )  {
+bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables )  {
     hit_record temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
