@@ -982,7 +982,7 @@ __global__ void build_bvh_NR_ROPE7(BVHNode* nodes, hittable* hittables, size_t N
 
 
 __device__
-bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
+bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables) {
     const BVHNode* current = nodes;  // Start at the root node
     bool hit_anything = false;
     hit_record temp_rec;
@@ -992,7 +992,7 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hi
             if (current->is_leaf) {
                 // Loop over objects in the leaf node
                 for (size_t i = current->start; i < current->end; ++i) {
-                    hittable* obj = hittables + i;
+                    const hittable* obj = hittables + i;
                     if (obj->sphere.hit(r, ray_t, temp_rec)) {
                         hit_anything = true;
                         ray_t.max = temp_rec.t;
@@ -1132,9 +1132,9 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
 }
 
 __device__
-bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables) {
+bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
     // Use a small stack allocated in registers
-    int stack[14];
+    // int stack1[14];
     int stackPtr = -1;
 
     // Start with the root node
@@ -1143,13 +1143,13 @@ bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes
     hit_record temp_rec;
 
     while (true) {
-        BVHNode* current = &nodes[currentIndex];
+        const BVHNode* current = &nodes[currentIndex];
 
         if (current->bbox.hit(r, ray_t)) {
             if (current->is_leaf) {
                 // Process leaf node
                 for (size_t i = current->start; i < current->end; ++i) {
-                    hittable* obj = &hittables[i];
+                    const hittable* obj = &hittables[i];
                     if (obj->sphere.hit(r, ray_t, temp_rec)) {
                         hit_anything = true;
                         ray_t.max = temp_rec.t;
@@ -1173,15 +1173,15 @@ bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes
 
 
 __device__
-bool hit(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* hittables )  {
+bool hit(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack)  {
     hit_record temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
     // bool gotHit;
     
     // if(hit3(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
-    if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
-    // if(hit_optimized(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
+    // if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
+    if(hit_optimized(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, stack)){
         
         hit_anything = true;
         closest_so_far = temp_rec.t;

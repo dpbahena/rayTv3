@@ -15,7 +15,7 @@
 #include <chrono>
 #include <curand_kernel.h>
 
-
+#define MAX_STACK_SIZE 20
 
 
 __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
@@ -281,7 +281,7 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 __device__
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const flat_node_list& world, BVHNode* nodes, hittable* hittables) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const flat_node_list& world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -290,7 +290,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables)){
+        if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )){
         
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;
@@ -407,39 +407,42 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 
 // __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world) {
 // __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, node_list* world) {
-__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, flat_node_list* world, BVHNode* nodes, hittable* hittables) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, flat_node_list* world, BVHNode* nodes, hittable* hittables) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i >= width || j >= height) return;
-    // if(i == 0 && j == 0){
-    //     printf("min: %f, max: %f\n", world->list[2].sphere.bbox->axis_interval(2).min, world->list[2].sphere.bbox->axis_interval(2).max );    
-    // }
-    glm::vec3 color = {0.0f, 0.0f, 0.0f};
-    for (int sample = 0; sample < samples_per_pixel; sample++){
-        ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
-        color  += ray_color(states, i, j, depth, r, *world, nodes, hittables);
-        // color  += ray_color(states, i, j, depth, r, *world);
-    }
-    float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
-    color *= pixel_sample_scale;
-    image[width * j + i] = colorToUint32_t(color);  
-}
+//     if (i >= width || j >= height) return;
+//     // if(i == 0 && j == 0){
+//     //     printf("min: %f, max: %f\n", world->list[2].sphere.bbox->axis_interval(2).min, world->list[2].sphere.bbox->axis_interval(2).max );    
+//     // }
+//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
+//     for (int sample = 0; sample < samples_per_pixel; sample++){
+//         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
+//         color  += ray_color(states, i, j, depth, r, *world, nodes, hittables);
+//         // color  += ray_color(states, i, j, depth, r, *world);
+//     }
+//     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
+//     color *= pixel_sample_scale;
+//     image[width * j + i] = colorToUint32_t(color);  
+// }
 
 
 // YES BVH
-__global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, flat_node_list* world, BVHNode* nodes, hittable* hittables) {
+__global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, flat_node_list* world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (i >= cam->image_width || j >= cam->image_height) return;
-    // if(i == 0 && j == 0){
-    //     printf("min: %f, max: %f\n", world->list[2].sphere.bbox->axis_interval(2).min, world->list[2].sphere.bbox->axis_interval(2).max );    
-    // }
+    // compute a unique thread ID within the block
+    int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
+
+    extern __shared__ int shared_memory[];
+    int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
+
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-        color  += ray_color(states, i, j, cam->max_depth, r, *world, nodes, hittables);
+        color  += ray_color(states, i, j, cam->max_depth, r, *world, nodes, hittables, stack);
         // color  += ray_color(states, i, j, depth, r, *world);
     }
     // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
@@ -484,8 +487,8 @@ void init_objects(Camera& cam, std::vector<material*> device_materials, std::vec
     h_sphere_list.push_back(hittable_obj);
 
     // Create random spheres 
-    for (int a = -31; a < 31; a++) {
-        for (int b = -31; b < 31; b++) {
+    for (int a = -11; a < 11; a++) {
+        for (int b = -11; b < 11; b++) {
             auto choose_material = random_double();
             glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             
@@ -677,9 +680,10 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 
     // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world);
     // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, dB_world);
-    
+    size_t shared_memory_size =  blockSize.x * blockSize.y * MAX_STACK_SIZE * sizeof(int);
     if(cam.isBvh)
-        rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, dBF_world, bvh_nodes, d_spheres_list);
+        
+        rayTracer_kernel<<<gridSize, blockSize, shared_memory_size>>>(d_states, d_cam, d_image, dBF_world, bvh_nodes, d_spheres_list);
     else
         rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
     
