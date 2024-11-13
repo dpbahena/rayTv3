@@ -3,6 +3,7 @@
 #pragma once
 
 #include "hittable.h"
+#include "texture.h"
 
 
 
@@ -38,4 +39,17 @@ bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     return true;
     
 }
+
+
+glm::vec3 checkerTexture_data::value(float u, float v, const glm::vec3& p) const {
+    auto xInteger = int(floor(inv_scale * p.x));
+    auto yInteger = int(floor(inv_scale * p.y));
+    auto zInteger = int(floor(inv_scale * p.z));
+
+    bool isEven = (xInteger + yInteger + zInteger) % 2 == 0;
+    // return isEven ? even->checkerTexture.value(u, v, p) : odd->checkerTexture.value(u, v, p);
+    return isEven ? even->value(u, v, p) : odd->value(u, v, p);
+}
+
+
 

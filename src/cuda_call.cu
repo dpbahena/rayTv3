@@ -8,6 +8,7 @@
 #include "node_list.h"
 #include "bvh_node.h"
 #include "cuda_bvh_node.h"
+#include "texture.h"
 
 #include <cstdio>
 #include <vector>
@@ -78,7 +79,8 @@ static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3
         scatter_direction = rec.normal;
 
     scatter = ray(rec.p, scatter_direction, r_in.time());
-    attenuation = lambertian.albedo;
+    // attenuation = lambertian.albedo;
+    attenuation = lambertian.tex->value(rec.u, rec.v, rec.p);
     
     return true;
 }

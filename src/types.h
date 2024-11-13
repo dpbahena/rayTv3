@@ -1,0 +1,3 @@
+#pragma once
+
+enum class Type {NONE, SPHERE, BBOX, LAMBERTIAN, METAL, DIELECTRIC, SOLID, CHECKER};

@@ -1,11 +1,14 @@
 #pragma once
+// #include "types.h"
+#include "texture.h"
 
-enum class Type {NONE, SPHERE, BBOX, LAMBERTIAN, METAL, DIELECTRIC};
+// enum class Type {NONE, SPHERE, BBOX, LAMBERTIAN, METAL, DIELECTRIC};
 
 
 // Define a struct for lambertian material
 struct lambertian_data {
     glm::vec3 albedo;
+    texture* tex;
 };
 
 struct metal_data {
@@ -38,6 +41,14 @@ struct material {
         material obj;
         obj.type = Type::LAMBERTIAN;
         obj.lambertian.albedo = albedo;
+        obj.lambertian.tex = new texture(texture::solid_texture(albedo));
+        return obj;
+    }
+
+    static material lambertian_material(texture* tex) {
+        material obj;
+        obj.type = Type::LAMBERTIAN;
+        obj.lambertian.tex = tex;
         return obj;
     }
     // constructor for type metal

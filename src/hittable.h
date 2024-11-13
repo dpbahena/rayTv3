@@ -2,6 +2,7 @@
 
 
 #include "material.h"
+#include "texture.h"
 #include "aabb.h"
 #include <vector>
 
@@ -12,6 +13,8 @@ class hit_record {
         glm::vec3 normal;
         material* mat;
         double t;
+        float u;
+        float v;
         Type type;
         bool front_face;
         __device__ __host__
