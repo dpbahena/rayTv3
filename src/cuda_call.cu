@@ -472,19 +472,26 @@ __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* i
 
 
 
-void init_objects(Camera& cam, std::vector<material*> device_materials, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
+void init_objects(Camera& cam, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
 
     // std::vector<hittable> h_spheres;
     hittable_list h_world;
     std::vector<hittable> h_sphere_list;
     material* d_ground;
+    texture* d_ground_tex;
     
     // ground 
     /* material */
-    material h_ground = material::lambertian_material((glm::vec3(0.5, 0.5, 0.5)));
+    texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
+    checkCuda(cudaMalloc((void**)&d_ground_tex, sizeof(texture)) );
+    checkCuda(cudaMemcpy(d_ground_tex, &h_ground_tex, sizeof(texture), cudaMemcpyHostToDevice) );
+    device_textures.push_back(d_ground_tex);
+    material h_ground = material::lambertian_material(d_ground_tex);
+    // material h_ground = material::lambertian_material((glm::vec3(0.5, 0.5, 0.5)));
     checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
     checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_ground);
+    
     auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, d_ground);
     h_sphere_list.push_back(hittable_obj);
 
@@ -636,6 +643,7 @@ void init_objects(Camera& cam, std::vector<material*> device_materials, std::vec
 void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 {
     std::vector<material*>  device_materials;  
+    std::vector<texture*>   device_textures;
     std::vector<BVH*>       allocated_nodes;
     std::vector<BVHNode*>   allocated_flat_nodes; 
     hittable*               d_spheres_list;
@@ -654,13 +662,13 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
    
       
     
-    init_objects(cam, device_materials, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
+    init_objects(cam, device_materials, device_textures, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
     
     checkCuda(cudaMalloc((void**)&d_image, cam.image_width * cam.image_height * sizeof(uint32_t)));
     checkCuda(cudaMalloc((void**)&d_cam,  sizeof(Camera)));
     checkCuda(cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice));
 
-
+    checkCuda(cudaDeviceSetLimit(cudaLimitStackSize, 2048 * 2048));
     
     clock_t start, stop;
     start = clock();
@@ -704,6 +712,8 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         delete nodes;
     
     for(auto& device : device_materials) 
+        cudaFree(device);
+    for(auto& device : device_textures) 
         cudaFree(device);
     
     cudaFree(d_spheres_list);
