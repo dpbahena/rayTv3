@@ -1,7 +1,7 @@
 #include "camera.h"
 
 Camera::Camera(){}
-// Camera::Camera(uint32_t* colorBuffer) : colorBuffer(colorBuffer) {}
+
 
 
 void Camera::render() {

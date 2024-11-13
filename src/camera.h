@@ -29,9 +29,10 @@ class Camera {
         float defocus_angle = 0;  // Variation angle of rays through each pixel
         float focus_dist = 10;    // Distance from camera lookfrom point to plane of perfect focus
         bool isBvh = false;
+        int scene = 1;
 
         Camera();
-        Camera(uint32_t* colorBuffer);
+        
         void render();
         void initialize();
         

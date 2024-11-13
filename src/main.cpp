@@ -23,17 +23,19 @@ int main(int arg, char** argv) {
     // uint32_t* colorBuffer;
     RayTracer gpuOperations;
 
-     if (arg == 4) {
+     if (arg == 5) {
         cam.samples_per_pixel = atoi(argv[1]);
         cam.max_depth = atoi(argv[2]);
-        cam.isBvh = atoi(argv[3]);
+        cam.isBvh = atoi(argv[3]); // method to use (with bvh bbox or no brute method)
+        cam.scene = atoi(argv[4]); // scene to view
 
      } else {
         cam.samples_per_pixel = 100;
         cam.max_depth = 40;
         cam.isBvh = true;  // use bvh
-        printf("Using default values:  ./rayTracer 100 40 1\n");
-        printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <bvh?: 0-1>\n");
+        cam.scene = 1;
+        printf("Using default values:  ./rayTracer 100 40 1 2\n");
+        printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <bvh?: 0-1> <scene: 1-5\n");
      }
 
     cam.aspect_ratio = win.getExtent().width / static_cast<float>(win.getExtent().height);
@@ -55,7 +57,7 @@ int main(int arg, char** argv) {
 
         if(!rendered) {
             // cam.render();  // calculate the raytracing
-            cam.initialize();
+            // cam.initialize();
             gpuOperations.cudaCall(cam, myRender.colorBuffer);
 
 
