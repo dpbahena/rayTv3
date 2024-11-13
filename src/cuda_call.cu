@@ -642,6 +642,16 @@ void init_objects(Camera& cam, std::vector<material*> device_materials, std::vec
 
 void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 {
+
+
+    cudaSetDevice(0);
+    // Get the current stack size limit
+    size_t currentSize;
+    checkCuda(cudaDeviceGetLimit(&currentSize, cudaLimitStackSize));
+    printf("Current Stack Size: %d bytes\n", (int)currentSize);
+
+    size_t newSize = currentSize + 1024;
+    checkCuda(cudaDeviceSetLimit(cudaLimitStackSize, newSize));
     std::vector<material*>  device_materials;  
     std::vector<texture*>   device_textures;
     std::vector<BVH*>       allocated_nodes;
@@ -659,7 +669,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     node_list* dB_world;
     flat_node_list* dBF_world;
     BVHNode* bvh_nodes;
-   
+    
       
     
     init_objects(cam, device_materials, device_textures, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
@@ -667,8 +677,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     checkCuda(cudaMalloc((void**)&d_image, cam.image_width * cam.image_height * sizeof(uint32_t)));
     checkCuda(cudaMalloc((void**)&d_cam,  sizeof(Camera)));
     checkCuda(cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice));
-
-    checkCuda(cudaDeviceSetLimit(cudaLimitStackSize, 2048 * 2048));
+    
     
     clock_t start, stop;
     start = clock();
