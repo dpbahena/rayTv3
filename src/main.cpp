@@ -29,11 +29,11 @@ int main(int arg, char** argv) {
         cam.isBvh = atoi(argv[3]); // method to use (with bvh bbox or no brute method)
         cam.scene = atoi(argv[4]); // scene to view
 
-     } else {
-        cam.samples_per_pixel = 100;
-        cam.max_depth = 40;
+     } else {  // default valules
+        cam.samples_per_pixel = 5;
+        cam.max_depth = 2;
         cam.isBvh = true;  // use bvh
-        cam.scene = 1;
+        cam.scene = 3;
         printf("Using default values:  ./rayTracer 100 40 1 2\n");
         printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <bvh?: 0-1> <scene: 1-5\n");
      }
