@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "rtw_stb_image.h"
 
 struct texture;
 
@@ -21,6 +22,12 @@ struct solidColor_data {
     glm::vec3 value(float u, float v, const glm::vec3& p) const { return albedo;};
 };
 
+struct imageTexture_data {
+    rtw_image* image;
+    __device__ __host__
+    glm::vec3 value(float u, float v, const glm::vec3& p) const;
+};
+
 
 
 
@@ -30,6 +37,7 @@ struct texture {
     union {
         solidColor_data solidColor;
         checkerTexture_data checkerTexture;
+        imageTexture_data imageTexture;
     };
 
     /* Default Constructor */
@@ -72,6 +80,14 @@ struct texture {
         return obj;
         
     }
+    // *Constructors for type IMAGE
+    static texture image_texture(rtw_image* image) {
+        texture obj;
+        obj.type = Type::IMAGE;
+        obj.imageTexture.image = image;    
+
+        return obj; 
+    }
 
     //* Value function to dispatch based on texture type
     __device__ __host__
@@ -81,6 +97,8 @@ struct texture {
                 return solidColor.value(u, v, p);
             case Type::CHECKER:
                 return checkerTexture.value(u, v, p);
+            case Type::IMAGE:
+                return imageTexture.value(u, v, p);
             default: 
                 return glm::vec3(0.0f);   // default value if none
             

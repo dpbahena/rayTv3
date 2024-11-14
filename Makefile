@@ -1,18 +1,18 @@
 
 # TINYOBJ_INCLUDE_PATH = libraries/tinyobjloader
-# STB_INCLUDE_PATH = libraries/stb
+STB_INCLUDE_PATH = libraries/stb
 # NLOHMANN_JSON_PATH = libraries/json
 
 # Compiler flags
 # CFLAGS = -std=c++17 -Wall -g -I$(TINYOBJ_INCLUDE_PATH) -I$(STB_INCLUDE_PATH) -I$(NLOHMANN_JSON_PATH)
-CFLAGS = -std=c++17 -Wall -g 
+CFLAGS = -std=c++17 -Wall -g  -I$(STB_INCLUDE_PATH)
 # LDFLAGS = -lSDL2 -lcurl
 LDFLAGS = -lSDL2
 
 # CUDA compiler and flags
 NVCC = nvcc
 # NVCCFLAGS = -std=c++17 -g  -I$(TINYOBJ_INCLUDE_PATH) -I$(STB_INCLUDE_PATH) -I$(NLOHMANN_JSON_PATH)
-NVCCFLAGS = -std=c++17 -G -g -diag-suppress=20012
+NVCCFLAGS = -std=c++17 -G -g -diag-suppress=20012 -I$(STB_INCLUDE_PATH)
 
 # Source files
 CPP_SOURCES = $(wildcard src/*.cpp)

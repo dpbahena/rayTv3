@@ -32,6 +32,7 @@ bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     rec.p = r.at(rec.t);
     glm::vec3 outward_normal = (rec.p - current_center) / radius;
     rec.set_face_normal(r, outward_normal);
+    get_sphere_uv(outward_normal, rec.u, rec.v);
     rec.type = Type::SPHERE;
     rec.mat = mat;
    
@@ -40,7 +41,24 @@ bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     
 }
 
+__device__ __host__
+void sphere_data::get_sphere_uv(const glm::vec3& p, float& u, float& v) const {
+    /**
+     * @p: a given point on the sphere of radius one, centered at the origin
+     * @u: returned value [0,1] of angle around the Y axis from X = -1
+     * @v: returned value [0,1] of angle form Y = -1 to Y= +1
+     * @<1 0 0> yields <0.50 0.50>  <-1 0 0> yields <0.00 0.50> 
+     * @<0 1 0> yields <0.50 1.00>  <0 -1 0> yields <0.50 0.00> 
+     * @<0 0 1> yields <0.25 0.50>  <0 0 -1> yields <0.75 0.50> 
+     * */ 
 
+    float theta = acosf(-p.y);
+    float phi = atan2f(-p.z, p.x + M_PI);
+    u = phi / (2 * M_PI);
+    v = theta / M_PI;
+}
+
+__device__ __host__
 glm::vec3 checkerTexture_data::value(float u, float v, const glm::vec3& p) const {
     auto xInteger = int(floor(inv_scale * p.x));
     auto yInteger = int(floor(inv_scale * p.y));
@@ -51,5 +69,22 @@ glm::vec3 checkerTexture_data::value(float u, float v, const glm::vec3& p) const
     return isEven ? even->value(u, v, p) : odd->value(u, v, p);
 }
 
+/**
+ * @return solid cyan if there is no texture 
+ */
+__device__ __host__
+glm::vec3 imageTexture_data::value(float u, float v, const glm::vec3& p) const {
+    if (image->height() <= 0 ) return glm::vec3(0.0f, 1.0f, 1.0f);
+    //* Clamp input texture coordinates to [0,1] x [1,0]
+    u = interval(0,1).clamp(u);
+    v = 1.0 - interval(0,1).clamp(v);  //* Flip V to image coordinates
+
+    auto i = int(u * image->width());
+    auto j = int(v * image->height());
+    auto pixel = image->pixel_data(i, j);
+    auto color_scale = 1.0f / 255.0;
+    return glm::vec3(color_scale * pixel[0], color_scale * pixel[1], color_scale * pixel[2]);
+
+}
 
 

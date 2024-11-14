@@ -36,7 +36,9 @@ struct sphere_data {
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
     __device__ __host__
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const ;
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    __device__ __host__
+    void get_sphere_uv(const glm::vec3& p, float& u, float& v) const;
 };
 
 
