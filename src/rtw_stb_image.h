@@ -8,9 +8,7 @@
 
 class rtw_image {
     public:
-        __device__ __host__ 
         rtw_image(){}
-        __device__ __host__ 
         rtw_image(const char* image_filename){
             // // auto filename = std::string(image_filename);
             // // auto imagedir = getenv("RTW_IMAGES");
@@ -22,13 +20,11 @@ class rtw_image {
             printf("ERROR: Could not load image file '%s'\n",image_filename );
 
         }
-        __device__ __host__ 
         ~rtw_image() {
             delete[] bdata;
             STBI_FREE(fdata);
         }
 
-        __device__ __host__ 
         bool load(const char* filepath) {
             /**
              * *Loads the linear (gamma=1) image data.
@@ -49,24 +45,27 @@ class rtw_image {
 
         }
 
-        __device__ __host__ int width() const {return (fdata == nullptr) ? 0 : image_width; }
-        __device__ __host__ int height() const {return (fdata == nullptr) ? 0 : image_height; }
+        int width() const {return (fdata == nullptr) ? 0 : image_width; }
+        int height() const {return (fdata == nullptr) ? 0 : image_height; }
+        int pixelSize() const { return bytes_per_pixel; }
+        int scanLineSize() const { return bytes_per_scanline; }
+        unsigned char* imageData() const { return  bdata; }
 
-        /**
-         * @return the address of the three RGB bytes of the pixel at x, y.
-         * @return magenta if there is no image data
-         */
-        __device__ __host__
-        const unsigned char* pixel_data(int x, int y) const {
-            static unsigned char magenta[] = {255, 0, 255};
-            if (bdata == nullptr) {
-                return magenta;
-            }
-            x = clamp(x, 0, image_width);
-            y = clamp(y, 0, image_height);
+        // /**
+        //  * @return the address of the three RGB bytes of the pixel at x, y.
+        //  * @return magenta if there is no image data
+        //  */
+        // __device__ __host__
+        // const unsigned char* pixel_data(int x, int y) const {
+        //     static unsigned char magenta[] = {255, 0, 255};
+        //     if (bdata == nullptr) {
+        //         return magenta;
+        //     }
+        //     x = clamp(x, 0, image_width);
+        //     y = clamp(y, 0, image_height);
 
-            return bdata + y * bytes_per_scanline + x * bytes_per_pixel;
-        }
+        //     return bdata + y * bytes_per_scanline + x * bytes_per_pixel;
+        // }
 
     private:
         const int       bytes_per_pixel = 3;
@@ -76,15 +75,15 @@ class rtw_image {
         int             image_height = 0;
         int             bytes_per_scanline = 0;
 
-        /**
-         * @return the value clamped to the range [low, high]
-         */
-        __device__ __host__ 
-        static int clamp(int x, int low, int high) {
-            if (x < low) return low;
-            if (x < high) return x;
-            return high - 1;
-        }
+        // /**
+        //  * @return the value clamped to the range [low, high]
+        //  */
+        // __device__ __host__ 
+        // static int clamp(int x, int low, int high) {
+        //     if (x < low) return low;
+        //     if (x < high) return x;
+        //     return high - 1;
+        // }
         __device__ __host__ 
         static unsigned char float_to_byte(float value) {
             if (value <= 0.0) return 0;

@@ -74,17 +74,42 @@ glm::vec3 checkerTexture_data::value(float u, float v, const glm::vec3& p) const
  */
 __device__ __host__
 glm::vec3 imageTexture_data::value(float u, float v, const glm::vec3& p) const {
-    if (image->height() <= 0 ) return glm::vec3(0.0f, 1.0f, 1.0f);
+    if (image_height <= 0 ) return glm::vec3(0.0f, 1.0f, 1.0f);
     //* Clamp input texture coordinates to [0,1] x [1,0]
     u = interval(0,1).clamp(u);
     v = 1.0 - interval(0,1).clamp(v);  //* Flip V to image coordinates
 
-    auto i = int(u * image->width());
-    auto j = int(v * image->height());
-    auto pixel = image->pixel_data(i, j);
+    auto i = int(u * image_width);
+    auto j = int(v * image_height);
+    auto pixel = pixel_data(i, j);
     auto color_scale = 1.0f / 255.0;
     return glm::vec3(color_scale * pixel[0], color_scale * pixel[1], color_scale * pixel[2]);
 
 }
 
+/**
+ * @return the address of the three RGB bytes of the pixel at x, y.
+    * @return magenta if there is no image data
+    */
+__device__ __host__
+const unsigned char* imageTexture_data::pixel_data(int x, int y) const {
+    static unsigned char magenta[] = {255, 0, 255};
+    if (bdata == nullptr) {
+        return magenta;
+    }
+    x = clamp(x, 0, image_width);
+    y = clamp(y, 0, image_height);
 
+    return bdata + y * bytes_per_scanline + x * bytes_per_pixel;
+}
+
+
+/**
+ * @return the value clamped to the range [low, high]
+    */
+__device__ __host__ 
+int imageTexture_data::clamp(int x, int low, int high) const {
+    if (x < low) return low;
+    if (x < high) return x;
+    return high - 1;
+}

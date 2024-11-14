@@ -606,43 +606,6 @@ void bouncing_spheres(Camera& cam, std::vector<material*> device_materials, std:
     }
     
 
-    /* AaBb implementation RECURSIVE NODE CREATION */
-       
-    // auto node = new BVH(h_world, allocated_nodes);   
-    // allocated_nodes.push_back(node);    // keep track of all allocated bvh_nodes and clean later
-    // node_list aworld;
-    // aworld.add(node);
-    // checkCuda(cudaMalloc((void**)&dB_world, sizeof(node_list)) );
-    // checkCuda(cudaMemcpy(dB_world, &aworld, sizeof(node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
-
-    
-    /* AaBb implementation NON-Recursive FLAT NODE CREATION */
-    
-    // auto tree = new BVH2(h_world, allocated_flat_nodes);   // CPU 
-    // flat_node_list fworld;
-    // fworld.add(tree); 
-    // checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
-    // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
-
-    /* Implement BVH nodes in Cuda by allocating 2n+log2(n) space */
-    // checkCuda(cudaMalloc((void**)&bvh_nodes, (2 * number_of_hittables + log2(number_of_hittables)) * sizeof(BVHNode)) );
-    // build_bvh_NR<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
-    // flat_node_list fworld;
-    // fworld.addCudaNode(bvh_nodes, d_sphere_list);
-    // checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
-    // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
-
-    // /** Implementing ROPE based BHV nodes ind cuda */
-    // int number_of_nodes = (2 * number_of_hittables -1);
-    // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    // build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
-    // flat_node_list fworld;
-    // fworld.addCudaNode(bvh_nodes, d_sphere_list);
-    // checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
-    // checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
-
-
-
 }
 
 void checkered_spheres(Camera& cam, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
@@ -710,59 +673,60 @@ void checkered_spheres(Camera& cam, std::vector<material*> device_materials, std
 
 void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
 
-    // std::vector<hittable> h_spheres;
-    hittable_list h_world;
-    std::vector<hittable> h_sphere_list;
-    material* d_ground;
-    texture* d_ground_tex;
-    texture* d_image_tex;
+    // // std::vector<hittable> h_spheres;
+    // hittable_list h_world;
+    // std::vector<hittable> h_sphere_list;
+    // material* d_ground;
+    // // texture* d_ground_tex;
+    // texture* d_image_tex;
     
-    // ground 
-    //* Texture
+    // // ground 
+    // //* Texture
 
-    auto image = new rtw_image("images/earth_map.jpg");
-    texture h_image_tex = texture::image_texture(image);
+    // auto image = rtw_image("images/earth_map.jpg");
+    
+    // texture h_image_tex = texture::image_texture(image.imageData(), image.width(), image.height(), image.scanLineSize(), image.pixelSize());
 
-    // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
-    checkCuda(cudaMalloc((void**)&d_image_tex, sizeof(texture)) );
-    checkCuda(cudaMemcpy(d_image_tex, &h_image_tex, sizeof(texture), cudaMemcpyHostToDevice) );
-    device_textures.push_back(d_image_tex);
-    //* material
-    material h_ground = material::lambertian_material(d_image_tex);
-    checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_ground);
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-10.0, 0.0), 10, d_ground);
-    h_sphere_list.push_back(hittable_obj);
+    // // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
+    // checkCuda(cudaMalloc((void**)&d_image_tex, sizeof(texture)) );
+    // checkCuda(cudaMemcpy(d_image_tex, &h_image_tex, sizeof(texture), cudaMemcpyHostToDevice) );
+    // device_textures.push_back(d_image_tex);
+    // //* material
+    // material h_ground = material::lambertian_material(d_image_tex);
+    // checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_ground);
+    // auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-10.0, 0.0), 10, d_ground);
+    // h_sphere_list.push_back(hittable_obj);
 
     
 
     
     
-    size_t number_of_hittables = h_sphere_list.size();
+    // size_t number_of_hittables = h_sphere_list.size();
   
-    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
-    checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+    // checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    // checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    /* no AABB */  
+    // /* no AABB */  
 
-    h_world.hittables = d_sphere_list;
-    h_world.objects_size = number_of_hittables;
-    if (!cam.isBvh){
-        /* Allocate memory for hittable list on the device */
-        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
-        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
-        flat_node_list fworld;
-        fworld.addCudaNode(bvh_nodes, d_sphere_list);
-        checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
-        checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
+    // h_world.hittables = d_sphere_list;
+    // h_world.objects_size = number_of_hittables;
+    // if (!cam.isBvh){
+    //     /* Allocate memory for hittable list on the device */
+    //     checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
+    //     checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+    //     flat_node_list fworld;
+    //     fworld.addCudaNode(bvh_nodes, d_sphere_list);
+    //     checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+    //     checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
    
 
 }

@@ -10,8 +10,6 @@ struct checkerTexture_data {
     texture* odd;
     __device__ __host__
     glm::vec3 value(float u, float v, const glm::vec3& p) const;
-    
-
 };
 
 
@@ -23,9 +21,18 @@ struct solidColor_data {
 };
 
 struct imageTexture_data {
-    rtw_image* image;
+    unsigned char* bdata;
+    int image_width;
+    int image_height;
+    int bytes_per_scanline;
+    int bytes_per_pixel;
     __device__ __host__
     glm::vec3 value(float u, float v, const glm::vec3& p) const;
+    __device__ __host__
+    const unsigned char* pixel_data(int x, int y) const;
+    __device__ __host__
+    int clamp(int x, int low, int high) const;
+
 };
 
 
@@ -81,10 +88,14 @@ struct texture {
         
     }
     // *Constructors for type IMAGE
-    static texture image_texture(rtw_image* image) {
+    static texture image_texture(unsigned char* bdata, int width, int height, int vScan, int bytes_per_pixel) {
         texture obj;
         obj.type = Type::IMAGE;
-        obj.imageTexture.image = image;    
+        obj.imageTexture.bdata = bdata;
+        obj.imageTexture.image_width = width;
+        obj.imageTexture.bytes_per_scanline = vScan;
+        obj.imageTexture.bytes_per_pixel = bytes_per_pixel;
+
 
         return obj; 
     }
@@ -102,7 +113,6 @@ struct texture {
             default: 
                 return glm::vec3(0.0f);   // default value if none
             
-
         }
     }
 
