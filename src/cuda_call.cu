@@ -661,6 +661,12 @@ void checkered_spheres(Camera& cam, std::vector<material*> device_materials, std
     device_materials.push_back(d_ground);
     auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-10.0, 0.0), 10, d_ground);
     h_sphere_list.push_back(hittable_obj);
+    //* material #2
+    // material h_ground2 = material::metal_material(d_ground_tex, 1.0);
+    material h_ground2 = material::metal_material(glm::vec3(.0f, .1f, 0.9f), 0.0);
+    checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_ground, &h_ground2, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_ground);
 
     hittable_obj = hittable::make_sphere(glm::vec3(0.0, 10.0, 0.0), 10, d_ground);
     h_sphere_list.push_back(hittable_obj);
@@ -716,7 +722,7 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     // ground 
     //* Texture
 
-    auto image = rtw_image("images/image.png");
+    auto image = rtw_image("images/earth_map.jpg");
     unsigned char* d_bdata;
     printf(" texture width: %d, height: %d\n", image.width(), image.height());
     
