@@ -59,6 +59,12 @@ inline int random_int(int min, int max) {
     return int(random_double(min, max+1));
 }
 
+inline glm::vec3 unit_vector(const glm::vec3& v){
+    // auto a = glm::length(v);
+    // return glm::vec3(v/a);
+    return glm::normalize(v);
+}
+
 
 
 #define checkCuda(result) { gpuAssert((result), __FILE__, __LINE__); }
