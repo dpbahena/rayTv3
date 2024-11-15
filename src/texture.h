@@ -93,9 +93,10 @@ struct texture {
         obj.type = Type::IMAGE;
         obj.imageTexture.bdata = bdata;
         obj.imageTexture.image_width = width;
+        obj.imageTexture.image_height = height;
         obj.imageTexture.bytes_per_scanline = vScan;
         obj.imageTexture.bytes_per_pixel = bytes_per_pixel;
-
+        
 
         return obj; 
     }

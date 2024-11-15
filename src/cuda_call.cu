@@ -673,6 +673,15 @@ void checkered_spheres(Camera& cam, std::vector<material*> device_materials, std
 
 void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
 
+    cam.vfov = 20.0f;
+    cam.lookfrom = glm::vec3(0.0f, 0.0f,  12.0f);
+    cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
+    cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+    cam.defocus_angle = 0.0f;
+    cam.focus_dist = 10.0f;
+    cam.initialize();
+    
+    
     // std::vector<hittable> h_spheres;
     hittable_list h_world;
     std::vector<hittable> h_sphere_list;
@@ -683,20 +692,33 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     // ground 
     //* Texture
 
-    auto image = rtw_image("images/earth_map.jpg");
+    auto image = rtw_image("images/image.png");
+    unsigned char* d_bdata;
+    printf(" texture width: %d, height: %d\n", image.width(), image.height());
     
-    texture h_image_tex = texture::image_texture(image.imageData(), image.width(), image.height(), image.scanLineSize(), image.pixelSize());
+    checkCuda(cudaMalloc((void**)&d_bdata, image.width() * image.height() * image.pixelSize() * sizeof(unsigned char)) );
+
+    checkCuda(cudaMemcpy(d_bdata, image.imageData(), image.width() * image.height() * image.pixelSize() * sizeof(unsigned char), cudaMemcpyHostToDevice) );
+
+    
+    texture h_image_tex = texture::image_texture(d_bdata, image.width(), image.height(), image.scanLineSize(), image.pixelSize());
 
     // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
+    // checkCuda(cudaMalloc((void**)&d_ground_tex, sizeof(texture)) );
+    // checkCuda(cudaMemcpy(d_ground_tex, &h_ground_tex, sizeof(texture), cudaMemcpyHostToDevice) );
+    // device_textures.push_back(d_ground_tex);
+
     checkCuda(cudaMalloc((void**)&d_image_tex, sizeof(texture)) );
     checkCuda(cudaMemcpy(d_image_tex, &h_image_tex, sizeof(texture), cudaMemcpyHostToDevice) );
     device_textures.push_back(d_image_tex);
+
     //* material
+    // material h_ground = material::lambertian_material(d_ground_tex);
     material h_ground = material::lambertian_material(d_image_tex);
     checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
     checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_ground);
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-10.0, 0.0), 10, d_ground);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,0.0, 0.0), 2, d_ground);
     h_sphere_list.push_back(hittable_obj);
 
     
@@ -791,10 +813,10 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     clock_t start, stop;
     start = clock();
 
-    int threads = 16;
+    int threads = 8;
     dim3 blockSize(threads, threads);
-    int blocks_x = (cam.image_width + blockSize.x - 1) / blockSize.x;
-    int blocks_y = (cam.image_height + blockSize.y - 1) / blockSize.y;
+    int blocks_x = (cam.image_width  + blockSize.x - 1) / blockSize.x;
+    int blocks_y = (cam.image_height  + blockSize.y - 1) / blockSize.y;
     dim3 gridSize(blocks_x, blocks_y);
 
 

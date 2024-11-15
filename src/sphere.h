@@ -53,7 +53,7 @@ void sphere_data::get_sphere_uv(const glm::vec3& p, float& u, float& v) const {
      * */ 
 
     float theta = acosf(-p.y);
-    float phi = atan2f(-p.z, p.x + M_PI);
+    float phi = atan2f(-p.z, p.x) + M_PI;
     u = phi / (2 * M_PI);
     v = theta / M_PI;
 }
@@ -74,6 +74,7 @@ glm::vec3 checkerTexture_data::value(float u, float v, const glm::vec3& p) const
  */
 __device__ __host__
 glm::vec3 imageTexture_data::value(float u, float v, const glm::vec3& p) const {
+    
     if (image_height <= 0 ) return glm::vec3(0.0f, 1.0f, 1.0f);
     //* Clamp input texture coordinates to [0,1] x [1,0]
     u = interval(0,1).clamp(u);
