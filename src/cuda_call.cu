@@ -122,6 +122,19 @@ static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3
 }
 
 
+__device__ __host__
+static glm::vec3 checkeredTexture_value(float u, float v, const glm::vec3& p, checkerTexture_data& checkered) {
+    auto xInteger = int(floor(checkered.inv_scale * p.x));
+    auto yInteger = int(floor(checkered.inv_scale * p.y));
+    auto zInteger = int(floor(checkered.inv_scale * p.z));
+
+    bool isEven = (xInteger + yInteger + zInteger) % 2 == 0;
+    // return isEven ? even->checkerTexture.value(u, v, p) : odd->checkerTexture.value(u, v, p);
+    return isEven ? checkered.even->value(u, v, p) : checkered.odd->value(u, v, p);
+}
+
+
+
 __device__
 inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n){
     return v - 2 * glm::dot(v, n) * n;
@@ -147,6 +160,9 @@ __device__
 inline float random_float(curandState_t* state){
     return curand_uniform_double(state);
 }
+
+
+
 
 __device__ 
 glm::vec3 random_unit_vector(curandState_t* states, int i, int j){
@@ -278,6 +294,14 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
     // return a + (b - a) * curand_uniform_float(state);  // this does not include b  e.g -1 to 1.0  it does not include 1.0
     return a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
 }
+
+/**
+ * @return a random integer in [min, max] including the upper limit
+ */
+__device__ int random_int(curandState_t* state, int a, int b) {
+    return static_cast<int>(a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0);  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
+}
+
 
 // YES BVH
 __device__
@@ -753,6 +777,75 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
 
 }
 
+void perlin_spheres(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
+
+    cam.vfov = 20.0f;
+    cam.lookfrom = glm::vec3(13.0f, 2.0f,  3.0f);
+    cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
+    cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+    cam.defocus_angle = 0.0f;
+    cam.focus_dist = 10.0f;
+    cam.initialize();
+    
+    
+    hittable_list h_world;
+    std::vector<hittable> h_sphere_list;
+    material* d_noise_mat;
+    texture* d_noise_tex;
+    
+    //* Texture
+
+
+    Perlin noise;
+    texture h_noise_tex = texture::noise_texture(noise);
+
+    checkCuda(cudaMalloc((void**)&d_noise_tex, sizeof(texture)) );
+    checkCuda(cudaMemcpy(d_noise_tex, &h_noise_tex, sizeof(texture), cudaMemcpyHostToDevice) );
+    device_textures.push_back(d_noise_tex);
+
+    //* material
+    material h_ground = material::lambertian_material(d_noise_tex);
+    checkCuda(cudaMalloc((void**)&d_noise_mat, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_noise_mat, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_noise_mat);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, d_noise_mat);
+    h_sphere_list.push_back(hittable_obj);
+    hittable_obj = hittable::make_sphere(glm::vec3(0.0,2.0, 0.0), 2, d_noise_mat);
+    h_sphere_list.push_back(hittable_obj);
+
+
+    
+
+    
+    
+    size_t number_of_hittables = h_sphere_list.size();
+  
+    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMemcpy(d_sphere_list, h_sphere_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+     
+
+    /* no AABB */  
+
+    h_world.hittables = d_sphere_list;
+    h_world.objects_size = number_of_hittables;
+    if (!cam.isBvh){
+        /* Allocate memory for hittable list on the device */
+        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
+        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    } else {
+        /** Implementing ROPE based BHV nodes ind cuda */
+        int number_of_nodes = (2 * number_of_hittables -1);
+        checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+        flat_node_list fworld;
+        fworld.addCudaNode(bvh_nodes, d_sphere_list);
+        checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+        checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+    }
+   
+
+}
+
 
 void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 {
@@ -799,6 +892,9 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         break;
     case 3:
         earth(cam, d_rtw_image, device_materials, device_textures, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
+        break;
+    case 4:
+        perlin_spheres(cam, d_rtw_image, device_materials, device_textures, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
         break;
     default:
         break;

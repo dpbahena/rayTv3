@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "rtw_stb_image.h"
+#include "perlin.h"
 
 struct texture;
 
@@ -32,11 +33,20 @@ struct imageTexture_data {
     const unsigned char* pixel_data(int x, int y) const;
     __device__ __host__
     int clamp(int x, int low, int high) const;
+};
+
+struct noiseTexture_data {
+    Perlin noisy;
+    __device__ __host__
+    glm::vec3 value(float u, float v, const glm::vec3& p);
 
 };
 
 
-
+__device__ __host__
+static glm::vec3 checkeredTexture_value(float u, float v, const glm::vec3& p, checkerTexture_data& checkered);
+__device__ __host__
+static glm::vec3 noiseTexture_value(float u, float v, const glm::vec3& p, noiseTexture_data& noise);
 
 struct texture {
     Type type;
@@ -45,6 +55,7 @@ struct texture {
         solidColor_data solidColor;
         checkerTexture_data checkerTexture;
         imageTexture_data imageTexture;
+        noiseTexture_data noiseTexture;
     };
 
     /* Default Constructor */
@@ -101,6 +112,20 @@ struct texture {
         return obj; 
     }
 
+    // *Constructors for type NOISE
+    static texture noise_texture(Perlin &noisy) {
+        texture obj;
+        obj.type = Type::NOISE;
+        obj.noiseTexture.noisy = noisy;
+        
+
+
+        return obj;
+    }
+
+
+    
+
     //* Value function to dispatch based on texture type
     __device__ __host__
     glm::vec3 value (float u, float v, const glm::vec3& p) {
@@ -108,9 +133,12 @@ struct texture {
             case Type::SOLID:
                 return solidColor.value(u, v, p);
             case Type::CHECKER:
-                return checkerTexture.value(u, v, p);
+                return checkeredTexture_value(u, v, p, checkerTexture);
+                // return checkerTexture.value(u, v, p);
             case Type::IMAGE:
                 return imageTexture.value(u, v, p);
+            case Type::NOISE:
+                return noiseTexture.value(u, v, p);
             default: 
                 return glm::vec3(0.0f);   // default value if none
             

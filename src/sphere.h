@@ -88,6 +88,12 @@ glm::vec3 imageTexture_data::value(float u, float v, const glm::vec3& p) const {
 
 }
 
+__device__ __host__
+    glm::vec3 noiseTexture_data::value(float u, float v, const glm::vec3& p) {
+       
+        return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.noise(p);
+    }
+
 /**
  * @return the address of the three RGB bytes of the pixel at x, y.
     * @return magenta if there is no image data
