@@ -851,18 +851,21 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         delete nodes;
     
     for(auto& device : device_materials) 
-        cudaFree(device);
+        checkCuda(cudaFree(device) );
     for(auto& device : device_textures) 
-        cudaFree(device);
+        checkCuda(cudaFree(device) );
     
-    cudaFree(d_spheres_list);
-    cudaFree(d_image);
-    cudaFree(d_cam);
-    // if(!cam.isBvh)
-        cudaFree(d_world);
-    // cudaFree(dB_world);
-    cudaFree(dBF_world);
-    cudaFree(d_states);
-    cudaFree(bvh_nodes);
+    checkCuda(cudaFree(d_spheres_list) );
+    checkCuda(cudaFree(d_image) );
+    checkCuda(cudaFree(d_cam) );
+    if(cam.isBvh) {
+        checkCuda(cudaFree(dBF_world) );
+        checkCuda(cudaFree(bvh_nodes) );
+    }else {
+        checkCuda(cudaFree(d_world) );
+    }
+    
+    checkCuda(cudaFree(d_states) );
+    
     
 }
