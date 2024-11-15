@@ -94,7 +94,12 @@ __device__ __host__
         // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.noise(scale * p);
         // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.trilinear_noise_smoothing(p);
         // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.hermitian_noise_smoothing(scale * p);
-        return glm::vec3(1.0f, 1.0f, 1.0f) * 0.5f * (1.0f + noisy.perlin_noise_smoothing(scale * p) );
+        //* 5.5 Random vectors Lattice points         
+        // return glm::vec3(1.0f, 1.0f, 1.0f) * 0.5f * (1.0f + noisy.perlin_noise_smoothing(scale * p) );
+        //* 5.6 Turbolence introduction
+        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.turbolence(p, 7);
+        //* 5.7 Marble texture
+        return glm::vec3(0.5f, .5f, 0.5f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
 
         
     }

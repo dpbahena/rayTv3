@@ -102,6 +102,21 @@ class Perlin {
                 
         }
 
+        __device__ __host__
+        float turbolence(const glm::vec3& p, int depth) {
+            auto accum = 0.0f;
+            auto temp_p = p;
+            auto weight = 1.0f;
+
+            for (int i = 0; i < depth; i++) {
+                accum += weight * perlin_noise_smoothing(temp_p);
+                weight *= 0.5f;
+                temp_p *= 2.0f;
+            }
+
+            return fabsf(accum);
+        }
+
 
 
 
