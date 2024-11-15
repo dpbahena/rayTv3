@@ -91,8 +91,9 @@ glm::vec3 imageTexture_data::value(float u, float v, const glm::vec3& p) const {
 __device__ __host__
     glm::vec3 noiseTexture_data::value(float u, float v, const glm::vec3& p) {
        
-        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.noise(p);
-        return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.trilinear_noise_interpolation(p);
+        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.noise(scale * p);
+        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.trilinear_noise_smoothing(p);
+        return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.hermitian_noise_smoothing(scale * p);
 
         
     }

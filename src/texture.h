@@ -37,6 +37,7 @@ struct imageTexture_data {
 
 struct noiseTexture_data {
     Perlin noisy;
+    float scale;
     __device__ __host__
     glm::vec3 value(float u, float v, const glm::vec3& p);
 
@@ -113,9 +114,10 @@ struct texture {
     }
 
     // *Constructors for type NOISE
-    static texture noise_texture(Perlin &noisy) {
+    static texture noise_texture(Perlin &noisy, float scale = 1.0f) {
         texture obj;
         obj.type = Type::NOISE;
+        obj.noiseTexture.scale = scale;
         obj.noiseTexture.noisy = noisy;
         
 

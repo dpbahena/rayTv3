@@ -25,7 +25,7 @@ class Perlin {
         }
 
         __device__ __host__
-        float trilinear_noise_interpolation(const glm::vec3& p) {
+        float trilinear_noise_smoothing(const glm::vec3& p) {
             auto u = p.x - floorf(p.x);
             auto v = p.y - floorf(p.y);
             auto w = p.z - floorf(p.z);
@@ -43,6 +43,32 @@ class Perlin {
             return trilinear_interpolation(c, u, v, w);
                 
         }
+
+        __device__ __host__
+        float hermitian_noise_smoothing(const glm::vec3& p) {
+            auto u = p.x - floorf(p.x);
+            auto v = p.y - floorf(p.y);
+            auto w = p.z - floorf(p.z);
+
+            u = u * u * (3 - 2 * u);
+            v = v * v * (3 - 2 * v);
+            w = w * w * (3 - 2 * w);
+
+            auto i = static_cast<int>(floorf(p.x));
+            auto j = static_cast<int>(floorf(p.y));
+            auto k = static_cast<int>(floorf(p.z));
+            float c[2][2][2];
+
+            for (int di = 0; di < 2; di++)
+                for(int dj = 0; dj < 2; dj++)
+                    for(int dk = 0; dk < 2; dk++)
+                        c[di][dj][dk] = randFloat[perm_x[(i + di) & 255] ^ perm_y[(j + dj) & 255] ^ perm_z[(k + dk) & 255] ];
+
+            return trilinear_interpolation(c, u, v, w);
+                
+        }
+
+
 
 
     

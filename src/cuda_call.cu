@@ -797,7 +797,8 @@ void perlin_spheres(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*>
 
 
     Perlin noise;
-    texture h_noise_tex = texture::noise_texture(noise);
+    float scramble_frequency = 4.0f;  // default is 1.0f;
+    texture h_noise_tex = texture::noise_texture(noise, scramble_frequency);
 
     checkCuda(cudaMalloc((void**)&d_noise_tex, sizeof(texture)) );
     checkCuda(cudaMemcpy(d_noise_tex, &h_noise_tex, sizeof(texture), cudaMemcpyHostToDevice) );
