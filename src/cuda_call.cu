@@ -961,8 +961,15 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     checkCuda(cudaDeviceGetLimit(&currentSize, cudaLimitStackSize));
     printf("Current Stack Size: %d bytes\n", (int)currentSize);
 
-    size_t newSize = currentSize + 1024;
-    checkCuda(cudaDeviceSetLimit(cudaLimitStackSize, newSize));
+    size_t newSize;
+    if (currentSize <= 1024) { 
+        newSize = currentSize + 1024;
+        checkCuda(cudaDeviceSetLimit(cudaLimitStackSize, newSize));
+         printf("New Stack Size: %d bytes\n", (int)newSize);
+    }
+
+
+    
 
 
     std::vector<material*>  device_materials;  
