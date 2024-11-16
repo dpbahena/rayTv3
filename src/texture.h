@@ -46,8 +46,8 @@ struct noiseTexture_data {
 
 __device__ __host__
 static glm::vec3 checkeredTexture_value(float u, float v, const glm::vec3& p, checkerTexture_data& checkered);
-__device__ __host__
-static glm::vec3 noiseTexture_value(float u, float v, const glm::vec3& p, noiseTexture_data& noise);
+// __device__ __host__
+// static glm::vec3 noiseTexture_value(float u, float v, const glm::vec3& p, noiseTexture_data& noise);
 
 struct texture {
     Type type;

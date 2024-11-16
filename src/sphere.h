@@ -59,6 +59,58 @@ void sphere_data::get_sphere_uv(const glm::vec3& p, float& u, float& v) const {
 }
 
 __device__ __host__
+bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
+    auto denom = glm::dot(normal, r.direction);
+
+    //* No hit if the ray is parallel to the plane
+    if (fabsf(denom) < 1e-8 ) return false;
+    //* Return false if th ehit point parameter t is outside the ray interval
+    auto t = (D - glm::dot(normal, r.origin)) / denom;
+    if (!ray_t.contains(t)) return false;
+
+    //* Determine if the hit point lies within the planar shape using its plane coordinates
+    auto intersection = r.at(t);
+    glm::vec3 planar_hitpt_vector = intersection - Q;
+    auto alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v));
+    auto beta = glm::dot(w, glm::cross(u, planar_hitpt_vector));
+    if (!is_interior(alpha, beta, rec)) return false;
+  
+    //* Ray hits the 2D shape, set the rest of the hit record and return true
+    rec.t = t;
+    rec.p = intersection;
+    rec.mat = mat;
+    rec.set_face_normal(r, normal);
+    rec.type = Type::QUAD;
+
+    return true;
+
+}
+
+/**
+ * * Given the hit point in plane coordinates,
+ * @return false if it is outside the primitive.
+ * @return true and set the hit record UV coordinates
+ */
+__device__ __host__
+bool quad_data::is_interior(float a, float b, hit_record& rec) const {
+    interval unit_interval = interval(0, 1);
+    if (!unit_interval.contains(a) || !unit_interval.contains(b)) return false;
+    rec.u = a;
+    rec.v = b;
+    return true;
+}
+
+//* Compute the bounding box of all four vertices
+__device__ __host__
+void quad_data::set_boundig_box() {
+    auto bbox_diagonal1 = AaBb(Q, Q + u + v);
+    auto bbox_diagonal2 = AaBb(Q + u, Q + v);
+    bbox = AaBb(bbox_diagonal1, bbox_diagonal2);
+}
+
+
+
+__device__ __host__
 glm::vec3 checkerTexture_data::value(float u, float v, const glm::vec3& p) const {
     auto xInteger = int(floor(inv_scale * p.x));
     auto yInteger = int(floor(inv_scale * p.y));

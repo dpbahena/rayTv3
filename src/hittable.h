@@ -41,6 +41,27 @@ struct sphere_data {
     void get_sphere_uv(const glm::vec3& p, float& u, float& v) const;
 };
 
+//* Quadrilateral struct
+struct quad_data {
+    glm::vec3 Q;
+    glm::vec3 u, v, w;
+    glm::vec3 normal;
+    float D;
+    
+    material* mat;
+    AaBb bbox;
+    
+    __device__ __host__
+    AaBb bounding_box() const {return bbox;}
+    __device__ __host__
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    __device__ __host__
+    bool is_interior(float a, float b, hit_record& rec) const;
+    __device__ __host__
+    void set_boundig_box();
+    
+};
+
 
 struct hittable {
 
@@ -49,6 +70,7 @@ struct hittable {
     // Use the define struct in the union
     union {
         sphere_data sphere;
+        quad_data quad;
        
     };
 
@@ -84,6 +106,23 @@ struct hittable {
         AaBb box1(obj.sphere.center.at(0) - rvec, obj.sphere.center.at(0) + rvec);
         AaBb box2(obj.sphere.center.at(1) - rvec, obj.sphere.center.at(1) + rvec);
         obj.sphere.bbox = AaBb(box1, box2);
+        return obj;
+    }
+
+    //* Quad Constructor
+    static hittable make_quad(const glm::vec3& Q, const glm::vec3& u, const glm::vec3& v, material* mat){
+        hittable obj;
+        obj.type = Type::QUAD;
+        obj.quad.Q = Q;
+        obj.quad.u = u;
+        obj.quad.v = v;
+        obj.quad.mat = mat;
+        auto n = glm::cross(u, v);
+        obj.quad.normal = glm::normalize(n);
+        obj.quad.D = glm::dot(obj.quad.normal, obj.quad.Q);
+        obj.quad.w = n / glm::dot(n, n);
+        obj.quad.set_boundig_box();
+
         return obj;
     }
 

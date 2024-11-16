@@ -27,7 +27,7 @@ class BVH {
 
         BVH(hittable_list list, std::vector<BVH*> &allocated_nodes) : BVH(list.hittables, 0, list.objects_size, allocated_nodes) 
         {
-            type = Type::BBOX;
+            // type = Type::BBOX;
         }
         BVH(hittable* &objects, size_t start, size_t end, std::vector<BVH*> &allocated_nodes) 
         {

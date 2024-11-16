@@ -993,10 +993,20 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __
                 // Loop over objects in the leaf node
                 for (size_t i = current->start; i < current->end; ++i) {
                     const hittable* obj = hittables + i;
-                    if (obj->sphere.hit(r, ray_t, temp_rec)) {
-                        hit_anything = true;
-                        ray_t.max = temp_rec.t;
-                        rec = temp_rec;
+                    
+                    if (obj->type == Type::QUAD){
+                        if (obj->quad.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    
+                    } else if (obj->type == Type::SPHERE){
+                        if (obj->sphere.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
                     }
                 }
                 // Move to the next node via the rope
@@ -1048,7 +1058,12 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
         // Compute the bounding box for the current node
         AaBb bbox = AaBb::empty();
         for (size_t i = current.start; i < current.end; ++i) {
-            bbox = AaBb(bbox, (hittables + i)->sphere.bounding_box());
+            if(hittables[i].type == Type::SPHERE) {
+                bbox = AaBb(bbox, (hittables + i)->sphere.bounding_box());
+            } else if (hittables[i].type == Type::QUAD) {
+                bbox = AaBb(bbox, (hittables + i)->quad.bounding_box());
+            }
+            
         }
         node.bbox = bbox;
 
@@ -1150,11 +1165,21 @@ bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, const  BVHNode
                 // Process leaf node
                 for (size_t i = current->start; i < current->end; ++i) {
                     const hittable* obj = &hittables[i];
-                    if (obj->sphere.hit(r, ray_t, temp_rec)) {
-                        hit_anything = true;
-                        ray_t.max = temp_rec.t;
-                        rec = temp_rec;
+                    if (obj->type == Type::QUAD){
+                        if (obj->quad.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    
+                    } else if (obj->type == Type::SPHERE){
+                        if (obj->sphere.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
                     }
+                    
                 }
                 if (stackPtr < 0) break;
                 currentIndex = stack[stackPtr--];
@@ -1180,8 +1205,8 @@ bool hit(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restri
     // bool gotHit;
     
     // if(hit3(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
-    // if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
-    if(hit_optimized(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, stack)){
+    if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
+    // if(hit_optimized(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, stack)){
         
         hit_anything = true;
         closest_so_far = temp_rec.t;

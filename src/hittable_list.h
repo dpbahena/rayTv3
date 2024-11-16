@@ -24,14 +24,29 @@ struct hittable_list {
             bool hit_anything = false;
             auto closest_so_far = ray_t.max;
             
+            
             for (int i = 0; i < objects_size; i++){
-                if (hittables[i].sphere.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
-                    
-                    hit_anything = true;
-                    closest_so_far = temp_rec.t;
-                    rec = temp_rec;
-                    
+                if (hittables[i].type == Type::SPHERE) {
+                    if (hittables[i].sphere.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+                        
+                        hit_anything = true;
+                        closest_so_far = temp_rec.t;
+                        rec = temp_rec;
+                        
+                    }
                 }
+                if (hittables[i].type == Type::QUAD) {
+                    if (hittables[i].quad.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+
+                        hit_anything = true;
+                        closest_so_far = temp_rec.t;
+                        rec = temp_rec;
+
+                    }
+                }
+                
+
+
             }
             
             return hit_anything;
@@ -39,11 +54,6 @@ struct hittable_list {
 
         AaBb bounding_box() const { return bbox; }    
 };
-
-
-
-
-
 
 
 
