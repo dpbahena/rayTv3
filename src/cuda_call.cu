@@ -722,7 +722,7 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     // ground 
     //* Texture
 
-    auto image = rtw_image("images/image.png");
+    auto image = rtw_image("images/earth_map.jpg");
     unsigned char* d_bdata;
     printf(" texture width: %d, height: %d\n", image.width(), image.height());
     
