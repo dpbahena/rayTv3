@@ -909,6 +909,16 @@ void quads(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     h_quad_list.push_back(hittable_obj);
     hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -3.0f, 5.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f, -4.0f), d_lower_teal);
     h_quad_list.push_back(hittable_obj);
+
+    /* sphere */
+    // material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
+    // material h_mat3 = material::dielectric_material(0.5f);
+    // material* d_mat3;
+    // checkCuda(cudaMalloc((void**)&d_mat3, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_mat3, &h_mat3, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_mat3);
+    // hittable_obj = hittable::make_sphere(glm::vec3(0.0, 0.0, 2.0), 2, d_mat3);
+    // h_quad_list.push_back(hittable_obj);
     
    
     
