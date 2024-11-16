@@ -23,6 +23,7 @@ struct dielectric_data {
 
 struct diffuseLight_data {
     texture* tex;
+    
 };
 
 

@@ -127,6 +127,11 @@ static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3
     return true;
 }
 
+__device__ __host__
+static glm::vec3 emitted(float u, float v, const glm::vec3& p, diffuseLight_data& diffuse){
+    return diffuse.tex->value(u, v, p);
+}
+
 
 
 
@@ -315,7 +320,7 @@ __device__ int random_int(curandState_t* state, int a, int b) {
 __device__
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const flat_node_list& world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, glm::vec3 background, const ray &r, const flat_node_list& world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -324,42 +329,46 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        if(!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )) {
+        if(!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )) 
+            return background;
         
-            auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
-            ray scattered;
-            glm::vec3 attenuation;
+        auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
+        ray scattered;
+        glm::vec3 attenuation;
+        glm::vec3 color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
 
-            bool did_scatter = false;
+        bool did_scatter = false;
 
-            if (rec.mat->type == Type::METAL){
-                did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-                // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
+        if (rec.mat->type == Type::METAL){
+            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+            // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
-            } else if (rec.mat->type == Type::LAMBERTIAN){
-                did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-                // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
+        } else if (rec.mat->type == Type::LAMBERTIAN){
+            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+            // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
-            } else if (rec.mat->type == Type::DIELECTRIC){
-                did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
-            }
+        } else if (rec.mat->type == Type::DIELECTRIC){
+            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+        } 
 
-            if (did_scatter){
-                cur_ray = scattered;
-                cur_attenuation *= attenuation;
-            } else {
-                final_color = glm::vec3(0.0f, 0.0f, 0.0f);  // if no scattering, no contribution
-            }
-        } else {  // color background
-            glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
-            float a = 0.5f * (unitDirection.y + 1.0f);
-            glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
-            final_color =  cur_attenuation * background;
-            break;
+        if (did_scatter){
+            cur_ray = scattered;
+            cur_attenuation *= attenuation;
+        } else {
+            return color_from_emission;
+            // final_color = glm::vec3(0.0f, 0.0f, 0.0f);  // if no scattering, no contribution
         }
+        // } else {  // color background
+        //     glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
+        //     float a = 0.5f * (unitDirection.y + 1.0f);
+        //     glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
+        //     final_color =  cur_attenuation * background;
+        //     break;
+        // }
     }
     
     return final_color;
+    // return color_from_emission;
 }
 
 // NO BVH
@@ -476,7 +485,7 @@ __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* i
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-        color  += ray_color(states, i, j, cam->max_depth, r, *world, nodes, hittables, stack);
+        color  += ray_color(states, i, j, cam->max_depth, cam->background, r, *world, nodes, hittables, stack);
         // color  += ray_color(states, i, j, depth, r, *world);
     }
     // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
@@ -512,6 +521,7 @@ void bouncing_spheres(Camera& cam, std::vector<material*> device_materials, std:
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.6f;
     cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
 
     // std::vector<hittable> h_spheres;
@@ -648,6 +658,7 @@ void checkered_spheres(Camera& cam, std::vector<material*> device_materials, std
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.0f;
     cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
 
     // std::vector<hittable> h_spheres;
@@ -711,6 +722,7 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.0f;
     cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
     
     
@@ -793,6 +805,7 @@ void perlin_spheres(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*>
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.0f;
     cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
     
     
@@ -863,6 +876,7 @@ void quads(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.0f;
     cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
    
     hittable_list h_world;
@@ -921,6 +935,138 @@ void quads(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     // device_materials.push_back(d_mat3);
     // hittable_obj = hittable::make_sphere(glm::vec3(0.0, 0.0, 2.0), 2, d_mat3);
     // h_quad_list.push_back(hittable_obj);
+    
+   
+    
+    size_t number_of_hittables = h_quad_list.size();
+  
+    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMemcpy(d_sphere_list, h_quad_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+     
+
+    /* no AABB */  
+
+    h_world.hittables = d_sphere_list;
+    h_world.objects_size = number_of_hittables;
+    if (!cam.isBvh){
+        /* Allocate memory for hittable list on the device */
+        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
+        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+    } else {
+        /** Implementing ROPE based BHV nodes ind cuda */
+        int number_of_nodes = (2 * number_of_hittables -1);
+        checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+        flat_node_list fworld;
+        fworld.addCudaNode(bvh_nodes, d_sphere_list);
+        checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+        checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+    }
+    
+
+}
+
+void simple_light(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<BVH*> allocated_nodes,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, node_list* &dB_world, flat_node_list* &dBF_world){
+
+    cam.vfov = 20.0f;
+    cam.lookfrom = glm::vec3( 26.0f, 3.0f,  6.0f);
+    cam.lookat   = glm::vec3( 0.0f, 2.0f,  0.0f);
+    cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+    cam.defocus_angle = 0.0f;
+    cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.0f, 0.0f, 0.0f);
+    cam.initialize();
+   
+    hittable_list h_world;
+    std::vector<hittable> h_quad_list;
+
+    hittable hittable_obj;  // holds any hittable temporarily
+
+    /* texture */
+    texture* d_noise_tex;
+    Perlin noise;
+    float scramble_frequency = 4.0f;  // default is 1.0f;
+    texture h_noise_tex = texture::noise_texture(noise, scramble_frequency);
+    checkCuda(cudaMalloc((void**)&d_noise_tex, sizeof(texture)) );
+    checkCuda(cudaMemcpy(d_noise_tex, &h_noise_tex, sizeof(texture), cudaMemcpyHostToDevice) );
+    device_textures.push_back(d_noise_tex);
+
+    /* materials */
+    material h_mat = material::lambertian_material(d_noise_tex);
+    material* d_mat;
+    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat, &h_mat, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat);
+
+    
+
+
+    /* Spheres */
+    hittable_obj = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, d_mat);
+    h_quad_list.push_back(hittable_obj);
+
+    hittable_obj = hittable::make_sphere(glm::vec3(0.0, 2.0, 0.0), 2, d_mat);
+    h_quad_list.push_back(hittable_obj);
+
+    /* Quads */
+
+    h_mat = material::diffuseLight_material(glm::vec3(4.0, 4.0, 4.0));
+    // checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat, &h_mat, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat);
+
+    hittable_obj = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), d_mat);
+    h_quad_list.push_back(hittable_obj);
+
+
+
+
+    
+    // /* material */
+    // material h_left_red = material::lambertian_material(glm::vec3(1.0, 0.2, 0.2));
+    // material* d_left_red;
+    // checkCuda(cudaMalloc((void**)&d_left_red, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_left_red, &h_left_red, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_left_red);
+
+    // material h_back_green = material::lambertian_material(glm::vec3(0.2, 1.0, 0.2));
+    // material* d_back_green;
+    // checkCuda(cudaMalloc((void**)&d_back_green, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_back_green, &h_back_green, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_back_green);
+
+    // material h_right_blue = material::lambertian_material(glm::vec3(0.2, 0.2, 1.0));
+    // material* d_right_blue;
+    // checkCuda(cudaMalloc((void**)&d_right_blue, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_right_blue, &h_right_blue, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_right_blue);
+
+    // material h_upper_orange = material::lambertian_material(glm::vec3(1.0, 0.5, 0.0));
+    // material* d_upper_orange;
+    // checkCuda(cudaMalloc((void**)&d_upper_orange, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_upper_orange, &h_upper_orange, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_upper_orange);
+
+    // material h_lower_teal = material::lambertian_material(glm::vec3(0.2, 0.8, 0.8));
+    // material* d_lower_teal;
+    // checkCuda(cudaMalloc((void**)&d_lower_teal, sizeof(material)) );
+    // checkCuda(cudaMemcpy(d_lower_teal, &h_lower_teal, sizeof(material), cudaMemcpyHostToDevice) );
+    // device_materials.push_back(d_lower_teal);
+
+    // /* Quads */
+    // hittable hittable_obj;
+    // hittable_obj = hittable::make_quad(glm::vec3(-3.0f, -2.0f, 5.0f), glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_left_red);
+    // h_quad_list.push_back(hittable_obj);
+    // hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -2.0f, 0.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_back_green);
+    // h_quad_list.push_back(hittable_obj);
+    // hittable_obj = hittable::make_quad(glm::vec3( 3.0f, -2.0f, 1.0f), glm::vec3(0.0f, 0.0f,  4.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_right_blue);
+    // h_quad_list.push_back(hittable_obj);
+    // hittable_obj = hittable::make_quad(glm::vec3(-2.0f,  3.0f, 1.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f,  4.0f), d_upper_orange);
+    // h_quad_list.push_back(hittable_obj);
+    // hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -3.0f, 5.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f, -4.0f), d_lower_teal);
+    // h_quad_list.push_back(hittable_obj);
+
+    
     
    
     
@@ -1011,6 +1157,9 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         break;
     case 5:
         quads(cam, d_rtw_image, device_materials, device_textures, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
+        break;
+    case 6:
+        simple_light(cam, d_rtw_image, device_materials, device_textures, allocated_nodes, allocated_flat_nodes, bvh_nodes, d_spheres_list, d_world, dB_world, dBF_world);
         break;
     default:
         break;
