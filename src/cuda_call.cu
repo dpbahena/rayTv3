@@ -128,6 +128,8 @@ static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3
 }
 
 
+
+
 __device__ __host__
 static glm::vec3 checkeredTexture_value(float u, float v, const glm::vec3& p, checkerTexture_data& checkered) {
     auto xInteger = int(floor(checkered.inv_scale * p.x));
@@ -322,7 +324,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )){
+        if(!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )) {
         
             auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
             ray scattered;

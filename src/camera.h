@@ -8,15 +8,16 @@
 class Camera {
     public:
 
-        double  aspect_ratio        = 1.0;
-        int     image_width         = 100;
-        int     image_height;   // Rendered image height
-        int     samples_per_pixel   = 10;
-        int     max_depth           = 10;
-        double  vfov                = 90;   // vertical field of view
+        double      aspect_ratio        = 1.0;
+        int         image_width         = 100;
+        int         image_height;   // Rendered image height
+        int         samples_per_pixel   = 10;
+        int         max_depth           = 10;
+        glm::vec3   background;     // scene background color
+        double  vfov       = 90;   // vertical field of view
         glm::vec3 lookfrom = glm::vec3(0,0,0);   // Point camera is looking from
         glm::vec3 lookat   = glm::vec3(0,0,-1);  // Point camera is looking at
-        glm::vec3   vup      = glm::vec3(0,1,0);     // Camera-relative "up" direction
+        glm::vec3   vup    = glm::vec3(0,1,0);     // Camera-relative "up" direction
 
         glm::vec3  center;         // camera center
         glm::vec3  pixel00_loc;    // Location of pixel 0,0

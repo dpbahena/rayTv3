@@ -21,6 +21,10 @@ struct dielectric_data {
     double refraction_index;
 };
 
+struct diffuseLight_data {
+    texture* tex;
+};
+
 
 
 struct material {
@@ -30,6 +34,8 @@ struct material {
         lambertian_data lambertian;
         metal_data metal;
         dielectric_data dielectric;
+        diffuseLight_data diffuseLight;
+        
     };
 
 
@@ -64,6 +70,23 @@ struct material {
         material obj;
         obj.type = Type::DIELECTRIC;
         obj.dielectric.refraction_index = refraction_index;
+        return obj;
+    }
+
+    // constructor for diffuseLight
+    static material diffuseLight_material(texture* tex) {
+        material obj;
+        obj.type = Type::DIFFUSE;
+        obj.diffuseLight.tex = tex;
+
+        return obj;
+    }
+
+    static material diffuseLight_material(const glm::vec3& emit) {
+        material obj;
+        obj.type = Type::DIFFUSE;
+        obj.diffuseLight.tex = new texture(texture::solid_texture(emit));
+
         return obj;
     }
 
