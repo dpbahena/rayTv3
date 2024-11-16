@@ -320,55 +320,66 @@ __device__ int random_int(curandState_t* state, int a, int b) {
 __device__
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
 // glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, glm::vec3 background, const ray &r, const flat_node_list& world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, glm::vec3& background, const ray &r, const flat_node_list& world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-    glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
-    
+    // glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
     
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        if(!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )) 
-            return background;
+        if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )){ 
         
-        auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
-        ray scattered;
-        glm::vec3 attenuation;
-        glm::vec3 color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+            auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
+            ray scattered;
+            glm::vec3 attenuation;
+           
 
-        bool did_scatter = false;
+            bool did_scatter = false;
 
-        if (rec.mat->type == Type::METAL){
-            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-            // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
+            if (rec.mat->type == Type::METAL){
+                did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+                // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
-        } else if (rec.mat->type == Type::LAMBERTIAN){
-            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-            // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
+            } else if (rec.mat->type == Type::LAMBERTIAN){
+                did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+                // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
 
-        } else if (rec.mat->type == Type::DIELECTRIC){
-            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
-        } 
+            } else if (rec.mat->type == Type::DIELECTRIC){
+                did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+            }
 
-        if (did_scatter){
-            cur_ray = scattered;
-            cur_attenuation *= attenuation;
-        } else {
-            return color_from_emission;
-            // final_color = glm::vec3(0.0f, 0.0f, 0.0f);  // if no scattering, no contribution
+            else if (rec.mat->type == Type::DIFFUSE){
+
+                    color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+                    did_scatter = true;
+
+                } //else
+                    // color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
+            
+            if (did_scatter){
+                cur_ray = scattered;
+                cur_attenuation *= attenuation;
+                
+            }
+             else {
+                return color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
+                
+            }
+        } else {  // color background
+            // glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
+            // float a = 0.5f * (unitDirection.y + 1.0f);
+            // glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
+            // final_color =  cur_attenuation * background;
+            return background * (cur_attenuation + color_from_emission);
+            // return (background + color_from_emission) * cur_attenuation;
+            break;
         }
-        // } else {  // color background
-        //     glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
-        //     float a = 0.5f * (unitDirection.y + 1.0f);
-        //     glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
-        //     final_color =  cur_attenuation * background;
-        //     break;
-        // }
     }
     
-    return final_color;
-    // return color_from_emission;
+    // return final_color;
+    return color_from_emission;
 }
 
 // NO BVH
@@ -1011,12 +1022,12 @@ void simple_light(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> d
     /* Quads */
 
     h_mat = material::diffuseLight_material(glm::vec3(4.0, 4.0, 4.0));
-    // checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
+    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
     checkCuda(cudaMemcpy(d_mat, &h_mat, sizeof(material), cudaMemcpyHostToDevice) );
     device_materials.push_back(d_mat);
 
-    hittable_obj = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), d_mat);
-    h_quad_list.push_back(hittable_obj);
+    auto hittable_obj1 = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), d_mat);
+    h_quad_list.push_back(hittable_obj1);
 
 
 
