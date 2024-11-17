@@ -62,6 +62,27 @@ struct quad_data {
     
 };
 
+//* translate struct
+struct translate_data {
+    hittable* object;
+    glm::vec3 offset;
+    AaBb bbox;
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    AaBb bounding_box() const {return bbox;}
+};
+
+//* Rotate struc
+struct rotateY_data {
+    hittable* object;
+    float sin_theta;
+    float cos_theta;
+    AaBb bbox;
+
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    AaBb bounding_box() const {return bbox;}
+
+};
+
 
 struct hittable {
 
@@ -71,7 +92,8 @@ struct hittable {
     union {
         sphere_data sphere;
         quad_data quad;
-       
+        translate_data translate;
+        rotateY_data rotateY;
     };
 
     // default constructor
@@ -124,6 +146,70 @@ struct hittable {
         obj.quad.set_boundig_box();
 
         return obj;
+    }
+
+    //* Translate object constructor
+    static hittable make_translate(hittable* object, const glm::vec3& offset) {
+        hittable obj;
+        obj.type = Type::TRANSLATE;
+        obj.translate.object = object;
+        obj.translate.offset = offset;
+        switch (obj.translate.object->type){
+            case Type::SPHERE:
+                obj.translate.bbox = obj.translate.object->sphere.bounding_box() + offset;
+            break;
+            case Type::QUAD:
+                obj.translate.bbox = obj.translate.object->quad.bounding_box() + offset;
+            break;
+            default:
+        }
+
+    }
+
+    //* RotateY object constructor
+    static hittable make_rotateY(hittable* object, float angle) {
+        hittable obj;
+        obj.type = Type::ROTATE_Y;
+        auto radians = glm::radians(angle);
+        obj.rotateY.sin_theta = sin(radians);
+        obj.rotateY.cos_theta = cos(radians);
+        obj.rotateY.object = object;
+        switch (obj.translate.object->type){
+            case Type::SPHERE:
+                obj.rotateY.bbox = obj.rotateY.object->sphere.bounding_box();
+            break;
+            case Type::QUAD:
+                obj.rotateY.bbox = obj.rotateY.object->quad.bounding_box();
+            break;
+            default:
+        }
+
+        glm::vec3 min(MAXFLOAT, MAXFLOAT, MAXFLOAT);
+        glm::vec3 max(-MAXFLOAT, -MAXFLOAT, -MAXFLOAT);
+
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                for (int k = 0; k < 2; k++) {
+                    auto x = i * obj.rotateY.bbox.x.max + (1 - i) * obj.rotateY.bbox.x.min;
+                    auto y = j * obj.rotateY.bbox.y.max + (1 - j) * obj.rotateY.bbox.y.min;
+                    auto z = k * obj.rotateY.bbox.z.max + (1 - k) * obj.rotateY.bbox.z.min;
+
+                    auto newx =  obj.rotateY.cos_theta * x + obj.rotateY.sin_theta * z;
+                    auto newz = -obj.rotateY.sin_theta * x + obj.rotateY.cos_theta * z;
+
+                    glm::vec3 tester(newx, y, newz);
+
+                    for (int c = 0; c < 3; c++) {
+                        min[c] = fminf(min[c], tester[c]);
+                        max[c] = fmaxf(max[c], tester[c]);
+                    }
+
+                }
+            }
+        }
+        
+        obj.rotateY.bbox = AaBb(min, max);
+
     }
 
 

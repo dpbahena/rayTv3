@@ -61,5 +61,13 @@ class interval {
 
     };
 
+    interval operator+(const interval& ival, float displament) {
+        return interval(ival.min + displament, ival.max + displament);
+    }
+
+    interval operator+(float displament, const interval& ival) {
+        return interval(ival + displament);
+    }
+
    
     

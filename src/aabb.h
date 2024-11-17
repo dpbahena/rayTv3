@@ -92,7 +92,18 @@ class AaBb {
             if (y.size() < delta) y = y.expand(delta);
             if (z.size() < delta) z = z.expand(delta);
         }
+        
+        
 };
+
+AaBb operator+(const AaBb& bbox, const glm::vec3& offset) {
+
+    return AaBb(bbox.x + offset.x, bbox.y + offset.y, bbox.z + offset.z);
+}
+
+AaBb operator+(const glm::vec3& offset, const AaBb& bbox) {
+    return bbox + offset;
+}
 
 
 
