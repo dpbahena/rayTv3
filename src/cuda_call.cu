@@ -318,116 +318,110 @@ __device__ int random_int(curandState_t* state, int a, int b) {
 
 // YES BVH
 __device__
-// glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
-// glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const node_list& world) {
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, glm::vec3& background, const ray &r, const flat_node_list& world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
+glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::vec3& background, const ray& r, const flat_node_list& world, const BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-    // glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-    
-    for (int k = 0; k < depth; k++){
+    glm::vec3 final_color = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    // Loop through the ray bounces up to the specified depth
+    for (int k = 0; k < depth; k++) {
         hit_record rec;
-        
-        if(hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack )){ 
-        
-            auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
-            ray scattered;
-            glm::vec3 attenuation;
-           
 
-            bool did_scatter = false;
-
-            if (rec.mat->type == Type::METAL){
-                did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-                // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
-
-            } else if (rec.mat->type == Type::LAMBERTIAN){
-                did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-                // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
-
-            } else if (rec.mat->type == Type::DIELECTRIC){
-                did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
-            }
-
-            else if (rec.mat->type == Type::DIFFUSE){
-
-                    color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
-                    did_scatter = true;
-
-                } //else
-                    // color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-            
-            if (did_scatter){
-                cur_ray = scattered;
-                cur_attenuation *= attenuation;
-                
-            }
-             else {
-                return color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-                
-            }
-        } else {  // color background
-            // glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
-            // float a = 0.5f * (unitDirection.y + 1.0f);
-            // glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
-            // final_color =  cur_attenuation * background;
-            return background * (cur_attenuation + color_from_emission);
-            // return (background + color_from_emission) * cur_attenuation;
-            break;
+        // Check if the ray hits anything; if not, add the background color and return
+        if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack)) {
+            final_color += cur_attenuation * background;
+            return final_color;
         }
+
+        // Ensure that the material pointer is valid
+        // if (!rec.mat) return final_color;
+
+        // Handle emission from the material
+        glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
+        if (rec.mat->type == Type::DIFFUSE) {
+            color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+        }
+
+        // Add the emitted light to the final color
+        final_color += cur_attenuation * color_from_emission;
+
+        // Prepare to handle scattering
+        ray scattered;
+        glm::vec3 attenuation;
+        bool did_scatter = false;
+
+        // Scatter based on the material type
+        if (rec.mat->type == Type::METAL) {
+            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+        } else if (rec.mat->type == Type::LAMBERTIAN) {
+            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+        } else if (rec.mat->type == Type::DIELECTRIC) {
+            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);
+        }
+
+        // If scattering did not occur, return the accumulated color
+        if (!did_scatter) {
+            return final_color;
+        }
+
+        // Update the current ray and attenuation for the next bounce
+        cur_ray = scattered;
+        cur_attenuation *= attenuation;
     }
-    
-    // return final_color;
-    return color_from_emission;
+
+    // Return the accumulated color after all bounces
+    return final_color;
 }
+
 
 // NO BVH
 __device__
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world) {
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::vec3& background, const ray &r, const hittable_list& world) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
     
-    
+    // Loop through the ray bounces up to the specified depth
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
-        if(world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
-        
-            auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
-            ray scattered;
-            glm::vec3 attenuation;
-
-            bool did_scatter = false;
-
-            if (rec.mat->type == Type::METAL){
-                did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-                // did_scattter =  metal::scatter(metal_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
-
-            } else if (rec.mat->type == Type::LAMBERTIAN){
-                did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-                // did_scattter = lambertian::scatter(lamberian_ptr, cur_ray, rec, attenuation, scattered, state, i, j);
-
-            } else if (rec.mat->type == Type::DIELECTRIC){
-                did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
-            }
-
-            if (did_scatter){
-                cur_ray = scattered;
-                cur_attenuation *= attenuation;
-            } else {
-                final_color = glm::vec3(0.0f, 0.0f, 0.0f);  // if no scattering, no contribution
-            }
-        } else {  // color background
-            glm::vec3 unitDirection = glm::normalize(cur_ray.direction );
-            float a = 0.5f * (unitDirection.y + 1.0f);
-            glm::vec3 background =  glm::vec3(1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + glm::vec3(a) * glm::vec3(0.5f, 0.7f, 1.0f);
-            final_color =  cur_attenuation * background;
-            break;
+        //* Check if the ray hits anything; if not, add the background color and return;
+        if(!world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+            final_color += cur_attenuation * background;
+            return final_color;
         }
+        //* Handle emitted light fromt he material
+        glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
+        if (rec.mat->type == Type::DIFFUSE){
+            color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+        }
+        //* Add the emitted light to the final color
+        final_color += cur_attenuation * color_from_emission;
+
+        //* Prepare to handle scattering
+            // auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
+        ray scattered;
+        glm::vec3 attenuation;
+        bool did_scatter = false;
+        //* Scatter based on material type
+        if (rec.mat->type == Type::METAL){
+            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+        } else if (rec.mat->type == Type::LAMBERTIAN){
+            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+        } else if (rec.mat->type == Type::DIELECTRIC){
+            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+        }
+        //* If scattering did not occur, return the accumulated color
+        if(!did_scatter) {
+            return final_color;
+        }
+        
+        //* Update the current ray and attenuation for the next bounce
+        cur_ray = scattered;
+        cur_attenuation *= attenuation;
     }
     
+    // Return the accumulated color after all bounces
     return final_color;
 }
 
@@ -457,28 +451,6 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     curand_init(seed, idx, 0, &states[idx]);
 }
-
-
-// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world) {
-// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, node_list* world) {
-// __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, flat_node_list* world, BVHNode* nodes, hittable* hittables) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= width || j >= height) return;
-//     // if(i == 0 && j == 0){
-//     //     printf("min: %f, max: %f\n", world->list[2].sphere.bbox->axis_interval(2).min, world->list[2].sphere.bbox->axis_interval(2).max );    
-//     // }
-//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
-//     for (int sample = 0; sample < samples_per_pixel; sample++){
-//         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
-//         color  += ray_color(states, i, j, depth, r, *world, nodes, hittables);
-//         // color  += ray_color(states, i, j, depth, r, *world);
-//     }
-//     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
-//     color *= pixel_sample_scale;
-//     image[width * j + i] = colorToUint32_t(color);  
-// }
 
 
 // YES BVH
@@ -514,7 +486,7 @@ __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* i
     glm::vec3 color = {0.0f, 0.0f, 0.0f};
     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-        color  += ray_color(states, i, j, cam->max_depth, r, *world);
+        color  += ray_color(states, i, j, cam->max_depth, cam->background, r, *world);
     }
     
     color *= cam->pixel_sample_scale;
@@ -1013,21 +985,21 @@ void simple_light(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> d
 
 
     /* Spheres */
-    hittable_obj = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, d_mat);
-    h_quad_list.push_back(hittable_obj);
+    auto hittable_obj2 = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, d_mat);
+    h_quad_list.push_back(hittable_obj2);
 
-    hittable_obj = hittable::make_sphere(glm::vec3(0.0, 2.0, 0.0), 2, d_mat);
-    h_quad_list.push_back(hittable_obj);
+    auto hittable_obj3 = hittable::make_sphere(glm::vec3(0.0, 2.0, 0.0), 2, d_mat);
+    h_quad_list.push_back(hittable_obj3);
 
     /* Quads */
+    material* d_mat1;
+    auto h_mat1 = material::diffuseLight_material(glm::vec3(4.0f, 4.0f, 4.0f));
+    checkCuda(cudaMalloc((void**)&d_mat1, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat1, &h_mat1, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat1);
 
-    h_mat = material::diffuseLight_material(glm::vec3(4.0, 4.0, 4.0));
-    checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_mat, &h_mat, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_mat);
-
-    auto hittable_obj1 = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), d_mat);
-    h_quad_list.push_back(hittable_obj1);
+    auto hittable_obj4 = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), d_mat1);
+    h_quad_list.push_back(hittable_obj4);
 
 
 

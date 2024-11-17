@@ -152,6 +152,8 @@ __device__ __host__
         // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.turbolence(p, 7);
         //* 5.7 Marble texture
         return glm::vec3(0.5f, .5f, 0.5f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
+        // return glm::vec3(0.7f, .7, 0.7f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
+
 
         
     }
