@@ -1001,6 +1001,15 @@ void simple_light(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> d
     auto hittable_obj4 = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), d_mat1);
     h_quad_list.push_back(hittable_obj4);
 
+    material* d_mat2;
+    auto h_mat2 = material::diffuseLight_material(glm::vec3(6.0f, 0.0f, 0.2f));
+    checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_mat2);
+
+    hittable_obj4 = hittable::make_sphere(glm::vec3(-5.0f, 3.0f, 3.0f), .5, d_mat2);
+    h_quad_list.push_back(hittable_obj4);
+
 
 
 
