@@ -49,3 +49,46 @@ I started with Chapter 13 defocus Blur
    or
 
 (354.97 - 198.91) / 354.97 = NO BOXES just like cha2 Motion Blur CUDA = 43.9 % FASTER
+
+
+# BVH sample times and NON-BVH samples
+## Observation: CUDA BVH samples are best and faster when number of hittables is really big (1500+ hittables). Otherwise, stick with direct hit (no bvh boxes)
+
+
+# NEXT WEEK CHAP 4:  TEXTURE MAPPING
+## Samples - 200 samples and 50 depth 1920 X 1080 portable display -  NIC-intel  rxt3060 
+### Chap 4.1 "Bouncing spheres"  
+### BVH OFF:  36.3 sec  BVH ON:  72.9 sec
+![Screenshot of the project](output_samples/bouncingspheres.png)
+### Chap 4.3 "Checkered spheres" 
+### BVH OFF:  24.2 sec  BVH ON: 26.2 sec
+![Screenshot of the project](output_samples/checkeredspheres.png)
+### Chap 4.5  Image textures:  "Earth" 
+### BVH OFF:  2.2 sec  BVH ON: 2.5 sec
+![Screenshot of the project](output_samples/earth.png)
+# NEXT WEEK CHAP 5:  PERLIN NOISE
+### Chap 5.7 "Perlin spheres" 
+### BVH OFF:  15.9 sec  BVH ON: 17.6 sec
+![Screenshot of the project](output_samples/perlinspheres.png)
+# NEXT WEEK CHAP 6: QUADRILATERALS
+### Chap 6.6 "quads" 
+### BVH OFF:  4.2 sec  BVH ON: 5.5 sec
+![Screenshot of the project](output_samples/quads.png)
+# NEXT WEEK CHAP 7: LIGTHS
+### Chap 7.3 "Simplelights" 
+### BVH OFF:  7.3 sec  BVH ON: 9.2 sec
+![Screenshot of the project](output_samples/simplelight.png)
+### Chap 7.4 "Cornellbox" 
+### BVH OFF:  26.4 sec  BVH ON: 36.8 sec
+![Screenshot of the project](output_samples/cornellbox.png)
+
+
+
+
+
+
+
+
+
+
+
