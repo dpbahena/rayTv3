@@ -183,4 +183,40 @@ int imageTexture_data::clamp(int x, int low, int high) const {
     if (x < low) return low;
     if (x < high) return x;
     return high - 1;
+    
+}
+
+/**
+ * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
+ * 
+ * @param sides 
+ * @param a 
+ * @param b 
+ * @param mat 
+ */
+inline void box(std::vector<hittable>& sides, const glm::vec3& a, const glm::vec3& b, material* mat) {
+    
+    
+    // construct the two opposite vertices with the minimum and maximum coordinates
+    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+
+    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+    auto dz = glm::vec3(0, 0, max.z - min.z);
+
+    auto side1 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
+    auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
+    auto side3 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
+    auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
+    auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
+    auto side6 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+
+    sides.push_back(side1);
+    sides.push_back(side2);
+    sides.push_back(side3);
+    sides.push_back(side4);
+    sides.push_back(side5);
+    sides.push_back(side6);
+    
 }

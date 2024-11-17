@@ -1074,6 +1074,13 @@ void cornell_box(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> de
     h_hittables_list.push_back(obj5);
     h_hittables_list.push_back(obj6);
     
+    //* Create two boxes
+    box(h_hittables_list, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), d_white);
+    box(h_hittables_list, glm::vec3(265.0f, 0.0f, 295.0f), glm::vec3(430.0f, 330.0f, 460.0f), d_white);
+
+
+
+    
     size_t number_of_hittables = h_hittables_list.size();
   
     checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
