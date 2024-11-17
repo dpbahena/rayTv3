@@ -722,7 +722,7 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
 
     auto image = rtw_image("images/earth_map.jpg");
     unsigned char* d_bdata;
-    printf(" texture width: %d, height: %d\n", image.width(), image.height());
+    // printf(" texture width: %d, height: %d\n", image.width(), image.height());
     
     checkCuda(cudaMalloc((void**)&d_bdata, image.width() * image.height() * image.pixelSize() * sizeof(unsigned char)) );
 
@@ -731,17 +731,10 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     
     texture h_image_tex = texture::image_texture(d_bdata, image.width(), image.height(), image.scanLineSize(), image.pixelSize());
 
-    // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
-    // checkCuda(cudaMalloc((void**)&d_ground_tex, sizeof(texture)) );
-    // checkCuda(cudaMemcpy(d_ground_tex, &h_ground_tex, sizeof(texture), cudaMemcpyHostToDevice) );
-    // device_textures.push_back(d_ground_tex);
-
     checkCuda(cudaMalloc((void**)&d_image_tex, sizeof(texture)) );
     checkCuda(cudaMemcpy(d_image_tex, &h_image_tex, sizeof(texture), cudaMemcpyHostToDevice) );
     device_textures.push_back(d_image_tex);
 
-    //* material
-    // material h_ground = material::lambertian_material(d_ground_tex);
     material h_ground = material::lambertian_material(d_image_tex);
     checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
     checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
@@ -819,10 +812,6 @@ void perlin_spheres(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*>
     hittable_obj = hittable::make_sphere(glm::vec3(0.0,2.0, 0.0), 2, d_noise_mat);
     h_sphere_list.push_back(hittable_obj);
 
-
-    
-
-    
     
     size_t number_of_hittables = h_sphere_list.size();
   
@@ -910,17 +899,6 @@ void quads(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -3.0f, 5.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f, -4.0f), d_lower_teal);
     h_quad_list.push_back(hittable_obj);
 
-    /* sphere */
-    // material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
-    // material h_mat3 = material::dielectric_material(0.5f);
-    // material* d_mat3;
-    // checkCuda(cudaMalloc((void**)&d_mat3, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_mat3, &h_mat3, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_mat3);
-    // hittable_obj = hittable::make_sphere(glm::vec3(0.0, 0.0, 2.0), 2, d_mat3);
-    // h_quad_list.push_back(hittable_obj);
-    
-   
     
     size_t number_of_hittables = h_quad_list.size();
   
@@ -1011,57 +989,6 @@ void simple_light(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> d
     hittable_obj4 = hittable::make_sphere(glm::vec3(-5.0f, 3.0f, 3.0f), .5, d_mat2);
     h_quad_list.push_back(hittable_obj4);
 
-
-
-
-    
-    // /* material */
-    // material h_left_red = material::lambertian_material(glm::vec3(1.0, 0.2, 0.2));
-    // material* d_left_red;
-    // checkCuda(cudaMalloc((void**)&d_left_red, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_left_red, &h_left_red, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_left_red);
-
-    // material h_back_green = material::lambertian_material(glm::vec3(0.2, 1.0, 0.2));
-    // material* d_back_green;
-    // checkCuda(cudaMalloc((void**)&d_back_green, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_back_green, &h_back_green, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_back_green);
-
-    // material h_right_blue = material::lambertian_material(glm::vec3(0.2, 0.2, 1.0));
-    // material* d_right_blue;
-    // checkCuda(cudaMalloc((void**)&d_right_blue, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_right_blue, &h_right_blue, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_right_blue);
-
-    // material h_upper_orange = material::lambertian_material(glm::vec3(1.0, 0.5, 0.0));
-    // material* d_upper_orange;
-    // checkCuda(cudaMalloc((void**)&d_upper_orange, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_upper_orange, &h_upper_orange, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_upper_orange);
-
-    // material h_lower_teal = material::lambertian_material(glm::vec3(0.2, 0.8, 0.8));
-    // material* d_lower_teal;
-    // checkCuda(cudaMalloc((void**)&d_lower_teal, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_lower_teal, &h_lower_teal, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_lower_teal);
-
-    // /* Quads */
-    // hittable hittable_obj;
-    // hittable_obj = hittable::make_quad(glm::vec3(-3.0f, -2.0f, 5.0f), glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_left_red);
-    // h_quad_list.push_back(hittable_obj);
-    // hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -2.0f, 0.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_back_green);
-    // h_quad_list.push_back(hittable_obj);
-    // hittable_obj = hittable::make_quad(glm::vec3( 3.0f, -2.0f, 1.0f), glm::vec3(0.0f, 0.0f,  4.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_right_blue);
-    // h_quad_list.push_back(hittable_obj);
-    // hittable_obj = hittable::make_quad(glm::vec3(-2.0f,  3.0f, 1.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f,  4.0f), d_upper_orange);
-    // h_quad_list.push_back(hittable_obj);
-    // hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -3.0f, 5.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f, -4.0f), d_lower_teal);
-    // h_quad_list.push_back(hittable_obj);
-
-    
-    
-   
     
     size_t number_of_hittables = h_quad_list.size();
   

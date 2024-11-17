@@ -56,30 +56,37 @@ I started with Chapter 13 defocus Blur
 
 
 # NEXT WEEK CHAP 4:  TEXTURE MAPPING
-## Samples - 200 samples and 50 depth 1920 X 1080 portable display -  NIC-intel  rxt3060 
+## Samples - 200 samples and 50 depth 1920 X 1080 portable display -  NIC-intel  RTX-3060 
 ### Chap 4.1 "Bouncing spheres"  
-### BVH OFF:  36.3 sec  BVH ON:  72.9 sec
+### BVH OFF:  RTX-3060 36.3 sec  RTX4090: 7.5 sec  
+### BVH ON:   RTX-3060 72.9 sec  RTX4090: 11.5 sec  
 ![Screenshot of the project](output_samples/bouncingspheres.png)
 ### Chap 4.3 "Checkered spheres" 
-### BVH OFF:  24.2 sec  BVH ON: 26.2 sec
+### BVH OFF:  RTX-3060 24.2 sec RTX4090: 3.9 sec
+### BVH ON:   RTX-3060 26.2 sec RTX4090: 4.2 sec
 ![Screenshot of the project](output_samples/checkeredspheres.png)
 ### Chap 4.5  Image textures:  "Earth" 
-### BVH OFF:  2.2 sec  BVH ON: 2.5 sec
+### BVH OFF:  RTX-3060 2.2 sec RTX4090: 0.37 sec 
+### BVH ON:   RTX-3060 2.5 sec RTX4090: 0.4 sec
 ![Screenshot of the project](output_samples/earth.png)
 # NEXT WEEK CHAP 5:  PERLIN NOISE
 ### Chap 5.7 "Perlin spheres" 
-### BVH OFF:  15.9 sec  BVH ON: 17.6 sec
+### BVH OFF:  RTX-3060 15.9 sec RTX4090: 2.6 sec
+### BVH ON:   RTX-3060 17.6 sec RTX4090: 2.9 sec
 ![Screenshot of the project](output_samples/perlinspheres.png)
 # NEXT WEEK CHAP 6: QUADRILATERALS
 ### Chap 6.6 "quads" 
-### BVH OFF:  4.2 sec  BVH ON: 5.5 sec
+### BVH OFF:  RTX-3060 4.2 sec RTX4090: 0.7 sec
+### BVH ON:   RTX-3060 5.5 sec RTX4090: 0.9 sec
 ![Screenshot of the project](output_samples/quads.png)
 # NEXT WEEK CHAP 7: LIGTHS
 ### Chap 7.3 "Simplelights" 
-### BVH OFF:  7.3 sec  BVH ON: 9.2 sec
+### BVH OFF:  RTX-3060 7.3 sec RTX4090: 1.3 sec
+### BVH ON:   RTX-3060 9.2 sec RTX4090: 1.6 sec
 ![Screenshot of the project](output_samples/simplelight.png)
 ### Chap 7.4 "Cornellbox" 
-### BVH OFF:  26.4 sec  BVH ON: 36.8 sec
+### BVH OFF:  RTX-3060 26.4 sec RTX4090: 4.3 sec
+### BVH ON:   RTX-3060 36.8 sec RTX4090: 5.9 sec
 ![Screenshot of the project](output_samples/cornellbox.png)
 
 
