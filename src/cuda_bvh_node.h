@@ -1007,7 +1007,19 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;
                         }
-                    }
+                    } else if (obj->type == Type::ROTATE_Y){
+                        if (obj->rotateY.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } else if (obj->type == Type::TRANSLATE){
+                        if (obj->translate.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } 
                 }
                 // Move to the next node via the rope
                 if (current->rope_index != -1/*  && current->rope_index != (current - nodes) */) {
@@ -1062,6 +1074,10 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
                 bbox = AaBb(bbox, (hittables + i)->sphere.bounding_box());
             } else if (hittables[i].type == Type::QUAD) {
                 bbox = AaBb(bbox, (hittables + i)->quad.bounding_box());
+            } else if (hittables[i].type == Type::ROTATE_Y) {
+                bbox = AaBb(bbox, (hittables + i)->rotateY.bounding_box());
+            } else if (hittables[i].type == Type::TRANSLATE) {
+                bbox = AaBb(bbox, (hittables + i)->translate.bounding_box());
             }
             
         }

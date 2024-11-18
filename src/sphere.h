@@ -85,26 +85,35 @@ bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     return true;
 
 }
-
+__device__ __host__
 bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     //* Move the ray backwards by the offset
     ray offset_r(r.origin - offset, r.direction, r.time());
 
-    //* Determine whether an intersection exist along the offset ray (and if so, where)
-    switch (object->type) {
-        case Type::SPHERE:
-            if(!object->sphere.hit(offset_r, ray_t, rec)) return false;
-        case Type::QUAD:
-            if(!object->quad.hit(offset_r, ray_t, rec)) return false;
-        default:
-            return false;
-    }
-    //* Move the intersection point forward by the offset
-    rec.p += offset;
-    
-    return true;
-}
+    bool hit_anything = false;
 
+    //* Determine whether an intersection exist along the offset ray (and if so, where)
+    if (object->type == Type::SPHERE) {
+            hit_anything = object->sphere.hit(offset_r, ray_t, rec);
+    } else if (object->type == Type::QUAD) {
+        hit_anything = object->quad.hit(offset_r, ray_t, rec);
+    } else if (object->type == Type::ROTATE_Y) {
+        hit_anything = object->rotateY.hit(offset_r, ray_t, rec);
+    } 
+    
+    if (hit_anything) {
+    
+        //* Move the intersection point forward by the offset
+        rec.p += offset;
+        return true;
+    
+    } else {
+        
+        return false;
+    }
+    
+}
+__device__ __host__
 bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
     //* Transform the ray from world space to object space
     auto origin     = glm::vec3(cos_theta * r.origin.x - sin_theta * r.origin.z, r.origin.y, sin_theta * r.origin.x + cos_theta * r.origin.z);
@@ -112,22 +121,27 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
 
     ray rotated_r(origin, direction, r.time());
 
+    bool hit_anything = false;
+
     //* Determine whether an intersection exists in object space (and if so, where)
-    switch (object->type) {
-        case Type::SPHERE:
-            if(!object->sphere.hit(rotated_r, ray_t, rec)) return false;
-        case Type::QUAD:
-            if(!object->quad.hit(rotated_r, ray_t, rec)) return false;
-        default:
-            return false;
+    if (object->type == Type::QUAD) {
+        hit_anything = object->quad.hit(rotated_r, ray_t, rec);
+    } else if (object->type == Type::SPHERE) {
+        hit_anything = object->sphere.hit(rotated_r, ray_t, rec);
+    } else if (object->type == Type::TRANSLATE) {
+        hit_anything = object->translate.hit(rotated_r, ray_t, rec);
     }
-    //* Transform the intersection from object space back to world space
-    rec.p       = glm::vec3(cos_theta * rec.p.x + sin_theta * rec.p.z, rec.p.y, -sin_theta * rec.p.x + cos_theta * rec.p.z);
-    rec.normal  = glm::vec3(cos_theta * rec.normal.x + sin_theta * rec.normal.z, rec.normal.y, -sin_theta * rec.normal.x + cos_theta * rec.normal.z);
 
-    return true;
+    if (hit_anything){
+        //* Transform the intersection from object space back to world space
+        rec.p       = glm::vec3(cos_theta * rec.p.x + sin_theta * rec.p.z, rec.p.y, -sin_theta * rec.p.x + cos_theta * rec.p.z);
+        rec.normal  = glm::vec3(cos_theta * rec.normal.x + sin_theta * rec.normal.z, rec.normal.y, -sin_theta * rec.normal.x + cos_theta * rec.normal.z);
+        return true;
 
-    
+    } else {
+
+        return false;
+    }
 }
 
 

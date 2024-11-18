@@ -68,7 +68,9 @@ struct translate_data {
     hittable* object;
     glm::vec3 offset;
     AaBb bbox;
+    __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    __device__ __host__
     AaBb bounding_box() const {return bbox;}
 };
 
@@ -78,8 +80,9 @@ struct rotateY_data {
     float sin_theta;
     float cos_theta;
     AaBb bbox;
-
+    __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    __device__ __host__
     AaBb bounding_box() const {return bbox;}
 
 };
@@ -153,18 +156,23 @@ struct hittable {
     static hittable make_translate(hittable* object, const glm::vec3& offset) {
         hittable obj;
         obj.type = Type::TRANSLATE;
-        obj.translate.object = object;
+        
         obj.translate.offset = offset;
-        switch (obj.translate.object->type){
-            case Type::SPHERE:
-                obj.translate.bbox = obj.translate.object->sphere.bounding_box() + offset;
-                break;
-            case Type::QUAD:
-                obj.translate.bbox = obj.translate.object->quad.bounding_box() + offset;
-                break;
-            default:
-                break;
-        }
+        // switch (object->type){
+        //     case Type::SPHERE:
+        //         obj.translate.bbox = object->sphere.bounding_box() + offset;
+        //         break;
+        //     case Type::QUAD:
+        //         obj.translate.bbox = object->quad.bounding_box() + offset;
+        //         break;
+        //     case Type::ROTATE_Y:
+                obj.translate.bbox = object->rotateY.bounding_box() + offset;
+        //         break;
+        //     default:
+        //         break;
+        // }
+
+        obj.translate.object = object;
 
         return obj;
 
@@ -177,17 +185,21 @@ struct hittable {
         auto radians = glm::radians(angle);
         obj.rotateY.sin_theta = sin(radians);
         obj.rotateY.cos_theta = cos(radians);
-        obj.rotateY.object = object;
-        switch (obj.translate.object->type){
+        
+        switch (object->type){
             case Type::SPHERE:
-                obj.rotateY.bbox = obj.rotateY.object->sphere.bounding_box();
+                obj.rotateY.bbox = object->sphere.bounding_box();
                 break;
             case Type::QUAD:
-                obj.rotateY.bbox = obj.rotateY.object->quad.bounding_box();
+                obj.rotateY.bbox = object->quad.bounding_box();
+                break;
+            case Type::TRANSLATE:
+                obj.rotateY.bbox = object->translate.bounding_box();
                 break;
             default:
                 break;
         }
+        obj.rotateY.object = object;
 
         glm::vec3 min(MAXFLOAT, MAXFLOAT, MAXFLOAT);
         glm::vec3 max(-MAXFLOAT, -MAXFLOAT, -MAXFLOAT);

@@ -1110,7 +1110,7 @@ void cornell_box(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> de
 }
 
 
-void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, flat_node_list* &dBF_world){
+void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable_list* &d_world, flat_node_list* &dBF_world){
 
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 278.0f, 278.0f, -800.0f);
@@ -1171,22 +1171,54 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
     h_hittables_list.push_back(obj6);
     
     //* Create two boxes
-    box(h_hittables_list, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), d_white);
-    box(h_hittables_list, glm::vec3(265.0f, 0.0f, 295.0f), glm::vec3(430.0f, 330.0f, 460.0f), d_white);
+    std::vector<hittable> box1, box2, process_box1, process_box2;
+    
+    box(box1, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
+    box(box2, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+
+    //* rotate box1
+    for (auto& side : box1){
+        auto rside = hittable(hittable::make_rotateY(&side, 15));
+        process_box1.push_back(rside); 
+    }
+    //* then translate box1
+    for (auto& side : process_box1) {
+        auto tside = hittable(hittable::make_translate(&side, glm::vec3(265.0f, 0.0f, 295.0f)));
+        h_hittables_list.push_back(tside);
+    }
+
+    //* rotate box2
+    for (auto& side : box2){
+        auto rside = hittable(hittable::make_rotateY(&side, -18));
+        process_box2.push_back(rside); 
+    }
+    //* then translate box2
+    for (auto& side : process_box2) {
+        auto tside = hittable(hittable::make_translate(&side, glm::vec3(130.0f, 0.0f, 65.0f)));
+        h_hittables_list.push_back(tside);
+    }
+
+    
+
+
+
+    
+
 
 
 
     
     size_t number_of_hittables = h_hittables_list.size();
   
-    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
-    checkCuda(cudaMemcpy(d_sphere_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+    checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
     /* no AABB */  
 
-    h_world.hittables = d_sphere_list;
+    h_world.hittables = d_hittable_list;
     h_world.objects_size = number_of_hittables;
+    
     if (!cam.isBvh){
         /* Allocate memory for hittable list on the device */
         checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
@@ -1195,9 +1227,9 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
         /** Implementing ROPE based BHV nodes ind cuda */
         int number_of_nodes = (2 * number_of_hittables -1);
         checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
         flat_node_list fworld;
-        fworld.addCudaNode(bvh_nodes, d_sphere_list);
+        fworld.addCudaNode(bvh_nodes, d_hittable_list);
         checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
         checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
     }

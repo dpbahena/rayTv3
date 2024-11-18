@@ -30,10 +30,10 @@ int main(int arg, char** argv) {
         cam.scene = atoi(argv[4]); // scene to view
 
      } else {  // default valules
-        cam.samples_per_pixel = 5;
-        cam.max_depth = 2;
+        cam.samples_per_pixel = 10;
+        cam.max_depth = 5;
         cam.isBvh = true;  // use bvh
-        cam.scene = 3;
+        cam.scene = 8;
         printf("Using default values:  ./rayTracer 100 40 1 2\n");
         printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <bvh?: 0-1> <scene: 1-5\n");
      }
