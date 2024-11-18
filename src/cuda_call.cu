@@ -1197,16 +1197,6 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
         auto tside = hittable(hittable::make_translate(&side, glm::vec3(130.0f, 0.0f, 65.0f)));
         h_hittables_list.push_back(tside);
     }
-
-    
-
-
-
-    
-
-
-
-
     
     size_t number_of_hittables = h_hittables_list.size();
   
@@ -1224,7 +1214,7 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
         checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
         checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
     } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
+        /** Implementing ROPE based BHV nodes in cuda */
         int number_of_nodes = (2 * number_of_hittables -1);
         checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
         build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
