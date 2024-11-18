@@ -97,6 +97,7 @@ bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
         case Type::QUAD:
             if(!object->quad.hit(offset_r, ray_t, rec)) return false;
         default:
+            return false;
     }
     //* Move the intersection point forward by the offset
     rec.p += offset;
@@ -118,6 +119,7 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
         case Type::QUAD:
             if(!object->quad.hit(rotated_r, ray_t, rec)) return false;
         default:
+            return false;
     }
     //* Transform the intersection from object space back to world space
     rec.p       = glm::vec3(cos_theta * rec.p.x + sin_theta * rec.p.z, rec.p.y, -sin_theta * rec.p.x + cos_theta * rec.p.z);

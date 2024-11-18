@@ -62,6 +62,7 @@ struct quad_data {
     
 };
 
+struct hittable;  // predeclare the existance of a hittable struct
 //* translate struct
 struct translate_data {
     hittable* object;
@@ -157,12 +158,15 @@ struct hittable {
         switch (obj.translate.object->type){
             case Type::SPHERE:
                 obj.translate.bbox = obj.translate.object->sphere.bounding_box() + offset;
-            break;
+                break;
             case Type::QUAD:
                 obj.translate.bbox = obj.translate.object->quad.bounding_box() + offset;
-            break;
+                break;
             default:
+                break;
         }
+
+        return obj;
 
     }
 
@@ -177,11 +181,12 @@ struct hittable {
         switch (obj.translate.object->type){
             case Type::SPHERE:
                 obj.rotateY.bbox = obj.rotateY.object->sphere.bounding_box();
-            break;
+                break;
             case Type::QUAD:
                 obj.rotateY.bbox = obj.rotateY.object->quad.bounding_box();
-            break;
+                break;
             default:
+                break;
         }
 
         glm::vec3 min(MAXFLOAT, MAXFLOAT, MAXFLOAT);
@@ -209,6 +214,8 @@ struct hittable {
         }
         
         obj.rotateY.bbox = AaBb(min, max);
+        
+        return obj;
 
     }
 
