@@ -30,10 +30,10 @@ class hit_record {
 struct hittableList_data {
     hittable* objects;
     int objects_size;
-    
 
 
-}
+
+};
 
 
 
