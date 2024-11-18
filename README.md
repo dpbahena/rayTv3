@@ -94,8 +94,8 @@ I started with Chapter 13 defocus Blur
 ### BVH ON:   RTX-3060 71.1 sec RTX4090: 11.3 sec
 ![Screenshot of the project](output_samples/cornellbox2.png)
 
-### Chap 8  Intances "CornellboxInstances" 
-### BVH OFF:  RTX-3060      sec RTX4090:  sec
+### Chap 8 ROTATION & TRANSLATION Intances "CornellboxInstances" 
+### BVH OFF:  RTX-3060 60.0 sec RTX4090:  sec
 ### BVH ON:   RTX-3060 84.1 sec RTX4090:  sec
 ![Screenshot of the project](output_samples/cornellboxinstances.png)
 

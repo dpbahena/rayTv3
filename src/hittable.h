@@ -158,19 +158,19 @@ struct hittable {
         obj.type = Type::TRANSLATE;
         
         obj.translate.offset = offset;
-        // switch (object->type){
-        //     case Type::SPHERE:
-        //         obj.translate.bbox = object->sphere.bounding_box() + offset;
-        //         break;
-        //     case Type::QUAD:
-        //         obj.translate.bbox = object->quad.bounding_box() + offset;
-        //         break;
-        //     case Type::ROTATE_Y:
+        switch (object->type){
+            case Type::SPHERE:
+                obj.translate.bbox = object->sphere.bounding_box() + offset;
+                break;
+            case Type::QUAD:
+                obj.translate.bbox = object->quad.bounding_box() + offset;
+                break;
+            case Type::ROTATE_Y:
                 obj.translate.bbox = object->rotateY.bounding_box() + offset;
-        //         break;
-        //     default:
-        //         break;
-        // }
+                break;
+            default:
+                break;
+        }
 
         obj.translate.object = object;
 
