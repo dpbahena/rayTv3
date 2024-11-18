@@ -26,6 +26,17 @@ class hit_record {
 };
 
 
+// Define a struct of a list of hittables
+struct hittableList_data {
+    hittable* objects;
+    int objects_size;
+    
+
+
+}
+
+
+
 
 // Define a struct for sphere data
 struct sphere_data {
