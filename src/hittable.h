@@ -70,7 +70,7 @@ struct hittableList_data {
     __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec) const;
     __device__ __host__
-    void setList(hittable* hittables, int list_size);
+    void setList(hittable* hittables, size_t list_size);
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
 };

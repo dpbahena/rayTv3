@@ -32,7 +32,7 @@ int main(int arg, char** argv) {
      } else {  // default valules
         cam.samples_per_pixel = 5;
         cam.max_depth = 2;
-        cam.isBvh = true;  // use bvh
+        cam.isBvh = false; //true;  // use bvh
         cam.scene = 3;
         printf("Using default values:  ./rayTracer 100 40 1 2\n");
         printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <bvh?: 0-1> <scene: 1-5\n");

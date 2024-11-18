@@ -93,9 +93,9 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec)  cons
 }
 
 __device__ __host__
-void hittableList_data::setList(hittable* hittables, int list_size) {
+void hittableList_data::setList(hittable* hittables, size_t list_size) {
     objects = hittables;
-    objects_size = (size_t)list_size;
+    objects_size = list_size;
 }
 
 
