@@ -426,6 +426,59 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::v
     return final_color;
 }
 
+// NO BVH HITTABLE
+__device__
+glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::vec3& background, const ray &r, const hittable* world) {
+    ray cur_ray = r;
+    glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
+    glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
+    
+    // Loop through the ray bounces up to the specified depth
+    for (int k = 0; k < depth; k++){
+        hit_record rec;
+        
+        //* Check if the ray hits anything; if not, add the background color and return;
+        // if(!world->hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        if(!world->hittableList.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+            final_color += cur_attenuation * background;
+            return final_color;
+        }
+        //* Handle emitted light fromt he material
+        glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
+        if (rec.mat->type == Type::DIFFUSE){
+            color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+        }
+        //* Add the emitted light to the final color
+        final_color += cur_attenuation * color_from_emission;
+
+        //* Prepare to handle scattering
+            // auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
+        ray scattered;
+        glm::vec3 attenuation;
+        bool did_scatter = false;
+        //* Scatter based on material type
+        if (rec.mat->type == Type::METAL){
+            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+        } else if (rec.mat->type == Type::LAMBERTIAN){
+            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+        } else if (rec.mat->type == Type::DIELECTRIC){
+            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+        }
+        //* If scattering did not occur, return the accumulated color
+        if(!did_scatter) {
+            return final_color;
+        }
+        
+        //* Update the current ray and attenuation for the next bounce
+        cur_ray = scattered;
+        cur_attenuation *= attenuation;
+    }
+    
+    // Return the accumulated color after all bounces
+    return final_color;
+}
+
+
 __device__
 ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
     /* Construct a camara ray originating from the defocus disk and directed at a randdomly sampled point around the pixel locations i, j */
@@ -488,6 +541,23 @@ __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* i
     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
         color  += ray_color(states, i, j, cam->max_depth, cam->background, r, *world);
+    }
+    
+    color *= cam->pixel_sample_scale;
+    image[cam->image_width * j + i] = colorToUint32_t(color);  
+}
+
+// NO BVH HITTABLE*
+__global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i >= cam->image_width || j >= cam->image_height) return;
+    
+    glm::vec3 color = {0.0f, 0.0f, 0.0f};
+    for (int sample = 0; sample < cam->samples_per_pixel; sample++){
+        ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
+        color  += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
     }
     
     color *= cam->pixel_sample_scale;
@@ -695,7 +765,81 @@ void checkered_spheres(Camera& cam, std::vector<material*> device_materials, std
 
 }
 
-void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, flat_node_list* &dBF_world){
+// void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable_list* &d_world, flat_node_list* &dBF_world){
+
+//     cam.vfov = 20.0f;
+//     cam.lookfrom = glm::vec3(0.0f, 0.0f,  12.0f);
+//     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
+//     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+//     cam.defocus_angle = 0.0f;
+//     cam.focus_dist = 10.0f;
+//     cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
+//     cam.initialize();
+    
+    
+//     hittable_list h_world;
+//     std::vector<hittable> h_hittables_list;
+//     material* d_ground;
+//     texture* d_image_tex;
+    
+//     // ground 
+//     //* Texture
+
+//     auto image = rtw_image("images/earth_map.jpg");
+//     unsigned char* d_bdata;
+//     // printf(" texture width: %d, height: %d\n", image.width(), image.height());
+    
+//     checkCuda(cudaMalloc((void**)&d_bdata, image.width() * image.height() * image.pixelSize() * sizeof(unsigned char)) );
+
+//     checkCuda(cudaMemcpy(d_bdata, image.imageData(), image.width() * image.height() * image.pixelSize() * sizeof(unsigned char), cudaMemcpyHostToDevice) );
+
+    
+//     texture h_image_tex = texture::image_texture(d_bdata, image.width(), image.height(), image.scanLineSize(), image.pixelSize());
+
+//     checkCuda(cudaMalloc((void**)&d_image_tex, sizeof(texture)) );
+//     checkCuda(cudaMemcpy(d_image_tex, &h_image_tex, sizeof(texture), cudaMemcpyHostToDevice) );
+//     device_textures.push_back(d_image_tex);
+
+//     material h_ground = material::lambertian_material(d_image_tex);
+//     checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
+//     checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
+//     device_materials.push_back(d_ground);
+//     auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,0.0, 0.0), 2, d_ground);
+//     h_hittables_list.push_back(hittable_obj);
+
+    
+
+    
+    
+//     size_t number_of_hittables = h_hittables_list.size();
+  
+//     checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+//     checkCuda(cudaMemcpy(d_sphere_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+     
+
+//     /* no AABB */  
+
+//     h_world.hittables = d_sphere_list;
+//     h_world.objects_size = number_of_hittables;
+//     if (!cam.isBvh){
+//         /* Allocate memory for hittable list on the device */
+//         checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
+//         checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+//     } else {
+//         /** Implementing ROPE based BHV nodes ind cuda */
+//         int number_of_nodes = (2 * number_of_hittables -1);
+//         checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+//         build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+//         flat_node_list fworld;
+//         fworld.addCudaNode(bvh_nodes, d_sphere_list);
+//         checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+//         checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+//     }
+   
+
+// }
+
+void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures,  std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable* &d_world, flat_node_list* &dBF_world){
 
     cam.vfov = 20.0f;
     cam.lookfrom = glm::vec3(0.0f, 0.0f,  12.0f);
@@ -707,7 +851,9 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
     cam.initialize();
     
     
-    hittable_list h_world;
+    // hittable_list h_world;
+
+    auto h_world = hittable::make_hittableList();
     std::vector<hittable> h_hittables_list;
     material* d_ground;
     texture* d_image_tex;
@@ -749,12 +895,14 @@ void earth(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_m
 
     /* no AABB */  
 
-    h_world.hittables = d_sphere_list;
-    h_world.objects_size = number_of_hittables;
+    // h_world.hittables = d_sphere_list;
+    h_world.hittableList.setList(d_sphere_list, number_of_hittables);
+    
+    // h_world.objects_size = number_of_hittables;
     if (!cam.isBvh){
         /* Allocate memory for hittable list on the device */
-        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable_list)) );
-        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable_list), cudaMemcpyHostToDevice) );
+        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
     } else {
         /** Implementing ROPE based BHV nodes ind cuda */
         int number_of_nodes = (2 * number_of_hittables -1);
@@ -1144,6 +1292,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     curandState_t* d_states;  // random calculations in GPU
     
     hittable_list* d_world;
+    hittable* d_world2;
     flat_node_list* dBF_world;
     BVHNode* bvh_nodes;
     
@@ -1158,7 +1307,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         checkered_spheres(cam, device_materials, device_textures, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world, dBF_world);
         break;
     case 3:
-        earth(cam, d_rtw_image, device_materials, device_textures, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world, dBF_world);
+        earth(cam, d_rtw_image, device_materials, device_textures, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world2, dBF_world);
         break;
     case 4:
         perlin_spheres(cam, d_rtw_image, device_materials, device_textures, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world, dBF_world);

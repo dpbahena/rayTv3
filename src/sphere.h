@@ -59,6 +59,47 @@ void sphere_data::get_sphere_uv(const glm::vec3& p, float& u, float& v) const {
 }
 
 __device__ __host__
+bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
+    hit_record temp_rec;
+    bool hit_anything = false;
+    auto closest_so_far = ray_t.max;
+    
+    
+    for (int i = 0; i < objects_size; i++){
+        if (objects[i].type == Type::SPHERE) {
+            if (objects[i].sphere.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+                
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+                
+            }
+        }
+        if (objects[i].type == Type::QUAD) {
+            if (objects[i].quad.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+
+            }
+        }
+        
+
+
+    }
+    
+    return hit_anything;
+}
+
+__device__ __host__
+void hittableList_data::setList(hittable* hittables, int list_size) {
+    objects = hittables;
+    objects_size = (size_t)list_size;
+}
+
+
+__device__ __host__
 bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     auto denom = glm::dot(normal, r.direction);
 

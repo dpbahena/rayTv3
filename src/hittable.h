@@ -26,18 +26,6 @@ class hit_record {
 };
 
 
-// Define a struct of a list of hittables
-struct hittableList_data {
-    hittable* objects;
-    int objects_size;
-
-
-
-};
-
-
-
-
 // Define a struct for sphere data
 struct sphere_data {
     ray center;
@@ -74,6 +62,20 @@ struct quad_data {
 };
 
 struct hittable;  // predeclare the existance of a hittable struct
+// Define a struct of a list of hittables
+struct hittableList_data {
+    hittable* objects;
+    int objects_size;
+    AaBb bbox;
+    __device__ __host__
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    __device__ __host__
+    void setList(hittable* hittables, int list_size);
+    __device__ __host__
+    AaBb bounding_box() const {return bbox;}
+};
+
+
 //* translate struct
 struct translate_data {
     hittable* object;
@@ -104,6 +106,7 @@ struct hittable {
     union {
         sphere_data sphere;
         quad_data quad;
+        hittableList_data hittableList;
         translate_data translate;
         rotateY_data rotateY;
     };
@@ -157,6 +160,14 @@ struct hittable {
         obj.quad.w = n / glm::dot(n, n);
         obj.quad.set_boundig_box();
 
+        return obj;
+    }
+
+    //* hittable list constructor
+    static hittable make_hittableList() {
+        hittable obj;
+        obj.type = Type::LIST;
+         
         return obj;
     }
 
