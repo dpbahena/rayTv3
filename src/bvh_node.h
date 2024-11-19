@@ -8,17 +8,17 @@
 
 inline int random_int(int min, int max);
 
-struct alignas(16) BVHNode {
-    AaBb bbox;
-    int left_child_index;     // Index of left child in the BVH array (-1 if it's a leaf)
-    int right_child_index;    // Index of right child in the BVH array (-1 if it's a leaf)
-    int rope_index;
-    bool is_leaf;             // Is this node a leaf?
-    size_t start;
-    size_t end;
-    int object_index;         // Index of the object (used if it's a leaf)
+// struct alignas(16) BVHNode {
+//     AaBb bbox;
+//     int left_child_index;     // Index of left child in the BVH array (-1 if it's a leaf)
+//     int right_child_index;    // Index of right child in the BVH array (-1 if it's a leaf)
+//     int rope_index;
+//     bool is_leaf;             // Is this node a leaf?
+//     size_t start;
+//     size_t end;
+//     int object_index;         // Index of the object (used if it's a leaf)
     
-};
+// };
 
 
 // class BVH {

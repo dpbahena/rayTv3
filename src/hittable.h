@@ -8,6 +8,8 @@
 #include <memory>
 
 
+struct BVHNode;
+
 class hit_record {
     public:
         glm::vec3 p;
@@ -66,12 +68,15 @@ struct hittable;  // predeclare the existance of a hittable struct
 // Define a struct of a list of hittables
 struct hittableList_data {
     hittable* objects;
+    BVHNode* nodeObjects;
     int objects_size;
     AaBb bbox;
     __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec) const;
     __device__ __host__
     void setList(hittable* hittables, size_t list_size);
+    
+    void setNodes(BVHNode* nodes, hittable* hittables);
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
 };

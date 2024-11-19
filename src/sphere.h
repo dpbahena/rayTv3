@@ -119,6 +119,12 @@ void hittableList_data::setList(hittable* hittables, size_t list_size) {
 }
 
 
+void hittableList_data::setNodes(BVHNode* nodes, hittable* hittables)
+{
+    nodeObjects = nodes;
+    objects = hittables;
+}
+
 __device__ __host__
 bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     auto denom = glm::dot(normal, r.direction);
