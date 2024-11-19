@@ -4,6 +4,8 @@
 
 #include "hittable.h"
 #include "texture.h"
+#include <memory>
+
 
 
 
@@ -84,6 +86,24 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec)  cons
 
             }
         }
+        if (objects[i].type == Type::ROTATE_Y) {
+            if (objects[i].rotateY.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+
+            }
+        }
+        if (objects[i].type == Type::TRANSLATE) {
+            if (objects[i].translate.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+
+            }
+        }
         
 
 
@@ -127,25 +147,38 @@ bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
 
 }
 
+__device__ __host__
 bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     //* Move the ray backwards by the offset
     ray offset_r(r.origin - offset, r.direction, r.time());
 
+    bool hit_anything = false;
+
     //* Determine whether an intersection exist along the offset ray (and if so, where)
-    switch (object->type) {
-        case Type::SPHERE:
-            if(!object->sphere.hit(offset_r, ray_t, rec)) return false;
-        case Type::QUAD:
-            if(!object->quad.hit(offset_r, ray_t, rec)) return false;
-        default:
-            return false;
-    }
-    //* Move the intersection point forward by the offset
-    rec.p += offset;
+    if (object->type == Type::SPHERE) {
+            hit_anything = object->sphere.hit(offset_r, ray_t, rec);
+    } else if (object->type == Type::QUAD) {
+        hit_anything = object->quad.hit(offset_r, ray_t, rec);
+    } else if (object->type == Type::ROTATE_Y) {
+        hit_anything = object->rotateY.hit(offset_r, ray_t, rec);
+    } //else if (object->type == Type::LIST) {
+    //     hit_anything = object->hittableList.hit(offset_r, ray_t, rec);
+    // } 
     
-    return true;
+    if (hit_anything) {
+    
+        //* Move the intersection point forward by the offset
+        rec.p += offset;
+        return true;
+    
+    } else {
+        
+        return false;
+    }
+    
 }
 
+__device__ __host__
 bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
     //* Transform the ray from world space to object space
     auto origin     = glm::vec3(cos_theta * r.origin.x - sin_theta * r.origin.z, r.origin.y, sin_theta * r.origin.x + cos_theta * r.origin.z);
@@ -153,22 +186,29 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
 
     ray rotated_r(origin, direction, r.time());
 
+    bool hit_anything = false;
+
     //* Determine whether an intersection exists in object space (and if so, where)
-    switch (object->type) {
-        case Type::SPHERE:
-            if(!object->sphere.hit(rotated_r, ray_t, rec)) return false;
-        case Type::QUAD:
-            if(!object->quad.hit(rotated_r, ray_t, rec)) return false;
-        default:
-            return false;
+    if (object->type == Type::QUAD) {
+        hit_anything = object->quad.hit(rotated_r, ray_t, rec);
+    } else if (object->type == Type::SPHERE) {
+        hit_anything = object->sphere.hit(rotated_r, ray_t, rec);
+    } else if (object->type == Type::TRANSLATE) {
+        hit_anything = object->translate.hit(rotated_r, ray_t, rec);
+    } //else if (object->type == Type::LIST) {
+    //     hit_anything = object->hittableList.hit(rotated_r, ray_t, rec);
+    // } 
+
+    if (hit_anything){
+        //* Transform the intersection from object space back to world space
+        rec.p       = glm::vec3(cos_theta * rec.p.x + sin_theta * rec.p.z, rec.p.y, -sin_theta * rec.p.x + cos_theta * rec.p.z);
+        rec.normal  = glm::vec3(cos_theta * rec.normal.x + sin_theta * rec.normal.z, rec.normal.y, -sin_theta * rec.normal.x + cos_theta * rec.normal.z);
+        return true;
+
+    } else {
+
+        return false;
     }
-    //* Transform the intersection from object space back to world space
-    rec.p       = glm::vec3(cos_theta * rec.p.x + sin_theta * rec.p.z, rec.p.y, -sin_theta * rec.p.x + cos_theta * rec.p.z);
-    rec.normal  = glm::vec3(cos_theta * rec.normal.x + sin_theta * rec.normal.z, rec.normal.y, -sin_theta * rec.normal.x + cos_theta * rec.normal.z);
-
-    return true;
-
-    
 }
 
 
@@ -304,5 +344,38 @@ inline void box(std::vector<hittable>& sides, const glm::vec3& a, const glm::vec
     sides.push_back(side4);
     sides.push_back(side5);
     sides.push_back(side6);
+    
+}
+
+std::shared_ptr<hittableList_data> box(const glm::vec3& a, const glm::vec3& b, material* mat) {
+    
+    auto sides = std::make_shared<hittableList_data>();
+    std::vector<hittable> fig;
+    // construct the two opposite vertices with the minimum and maximum coordinates
+    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+
+    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+    auto dz = glm::vec3(0, 0, max.z - min.z);
+
+    auto side1 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
+    auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
+    auto side3 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
+    auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
+    auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
+    auto side6 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+
+    fig.push_back(side1);
+    fig.push_back(side2);
+    fig.push_back(side3);
+    fig.push_back(side4);
+    fig.push_back(side5);
+    fig.push_back(side6);
+     
+    sides.get()->setList(fig.data(), fig.size());
+
+    return sides;
+
     
 }

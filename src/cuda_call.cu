@@ -1195,6 +1195,156 @@ void cornell_box(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> de
 
 }
 
+void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<hittable*>  allocated_hittables, std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_sphere_list, hittable* &d_world, flat_node_list* &dBF_world){
+
+    cam.vfov = 40.0f;
+    cam.lookfrom = glm::vec3( 278.0f, 278.0f, -800.0f);
+    cam.lookat   = glm::vec3( 278.0f, 278.0f,  0.0f);
+    cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+    cam.defocus_angle = 0.0f;
+    cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.0f, 0.0f, 0.0f);
+    cam.initialize();
+   
+    // hittable_list h_world;
+    hittable h_world = hittable::make_hittableList();
+    std::vector<hittable> h_hittables_list;
+    
+
+    hittable hittable_obj;  // holds any hittable temporarily
+
+    
+
+    auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
+    auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
+    auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
+    auto light = material::diffuseLight_material(glm::vec3(15, 15, 15));
+
+    material* d_red;  
+    material* d_white;
+    material* d_green;
+    material* d_light;
+
+    checkCuda(cudaMalloc((void**)&d_red, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_red, &red, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_red);
+
+    checkCuda(cudaMalloc((void**)&d_white, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_white, &white, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_white);
+
+    checkCuda(cudaMalloc((void**)&d_green, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_green, &green, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_green);
+
+    checkCuda(cudaMalloc((void**)&d_light, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_light, &light, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_light);
+
+
+
+    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
+    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
+    auto obj3 = hittable(hittable::make_quad(glm::vec3(343, 554, 332), glm::vec3(-130,0,0), glm::vec3(0,0,-105), d_light));
+    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
+    auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), d_white));
+    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
+   
+    h_hittables_list.push_back(obj1);
+    h_hittables_list.push_back(obj2);
+    h_hittables_list.push_back(obj3);
+    h_hittables_list.push_back(obj4);
+    h_hittables_list.push_back(obj5);
+    h_hittables_list.push_back(obj6);
+
+    
+    std::vector<hittable> box1, box2, transform_box1, transform_box2;
+    
+
+    //* Create two boxes
+    box(box1, glm::vec3(.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
+    box(box2, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+
+    // // transform_box.clear();
+    // for (auto& side : box1){
+    //     auto s = hittable(hittable::make_rotateY(&side, 15));
+    //     transform_box1.push_back(s);
+    //     // h_hittables_list.push_back(s);
+    // }
+    // for (auto& side : transform_box1){
+    //     auto s = hittable(hittable::make_translate(&side, glm::vec3(265.0f, 0.0f, 295.0f)));
+    //     h_hittables_list.push_back(s);
+    // }
+    // // transform_box.clear();
+    // for (auto& side : box2){
+    //     auto s = hittable(hittable::make_rotateY(&side, -18));
+    //     transform_box2.push_back(s);
+    //     // h_hittables_list.push_back(s);
+    // }
+    // for (auto& side : transform_box2){
+    //     auto s = hittable(hittable::make_translate(&side, glm::vec3(130.0f, 0.0f, 65.0f)));
+    //     h_hittables_list.push_back(s);
+    // }
+    
+
+    // transform_box.clear();
+    for (auto& side : box1){
+        auto rotated = new hittable(hittable::make_rotateY(&side, 15));
+        auto translated = new hittable(hittable::make_translate(rotated, glm::vec3(265.0f, 0.0f, 295.0f)));
+        h_hittables_list.push_back(*translated);  
+        allocated_hittables.push_back(rotated);
+        allocated_hittables.push_back(translated);
+    }
+    
+    // transform_box.clear();
+    for (auto& side : box2){
+        auto rotated = new hittable(hittable(hittable::make_rotateY(&side, -18)));
+        auto translated = new hittable(hittable(hittable::make_translate(rotated, glm::vec3(130.0f, 0.0f, 65.0f))));
+        h_hittables_list.push_back(*translated);
+        allocated_hittables.push_back(rotated);
+        allocated_hittables.push_back(translated);
+    }
+   
+
+    
+    
+    // h_hittables_list.push_back(box1_l);
+    // printf("type: %d\n", (int)box1_l.type);
+
+
+    
+    size_t number_of_hittables = h_hittables_list.size();
+    printf("size: %d\n", (int)number_of_hittables);
+  
+    checkCuda(cudaMalloc((void**)&d_sphere_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMemcpy(d_sphere_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+     
+
+    /* no AABB */  
+
+    // h_world.hittables = d_sphere_list;
+    h_world.hittableList.setList(d_sphere_list, number_of_hittables);
+    // h_world.objects_size = number_of_hittables;
+    if (!cam.isBvh){
+        /* Allocate memory for hittable list on the device */
+        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
+    } else {
+        /** Implementing ROPE based BHV nodes ind cuda */
+        int number_of_nodes = (2 * number_of_hittables -1);
+        checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_sphere_list, number_of_hittables);
+        flat_node_list fworld;
+        fworld.addCudaNode(bvh_nodes, d_sphere_list);
+        checkCuda(cudaMalloc((void**)&dBF_world, sizeof(flat_node_list)) );
+        checkCuda(cudaMemcpy(dBF_world, &fworld, sizeof(flat_node_list), cudaMemcpyHostToDevice) );  // copy host world to device world
+    }
+
+    
+    
+
+}
+
 
 void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 {
@@ -1220,6 +1370,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     std::vector<material*>  device_materials;  
     std::vector<texture*>   device_textures;
     std::vector<BVHNode*>   allocated_flat_nodes; 
+    std::vector<hittable*>  allocated_hittables;
     hittable*               d_hittables_list;
 
     Camera* d_cam;
@@ -1258,6 +1409,9 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         break;
     case 7:
         cornell_box(cam, d_rtw_image, device_materials, device_textures, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world, dBF_world);
+        break;
+    case 8:
+        cornell_box_instances(cam, d_rtw_image, device_materials, device_textures, allocated_hittables, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world, dBF_world);
         break;
     default:
         break;
@@ -1307,6 +1461,9 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     
     for (auto nodes : allocated_flat_nodes)
         delete nodes;
+
+    for (auto alloc : allocated_hittables) 
+        delete alloc;
     
     for(auto& device : device_materials) 
         checkCuda(cudaFree(device) );
