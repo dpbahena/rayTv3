@@ -1361,30 +1361,15 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
         allocated_hittables.push_back(translated);
     }
    
-
-    
-    
-    // h_hittables_list.push_back(box1_l);
-    // printf("type: %d\n", (int)box1_l.type);
-
-
-    
     size_t number_of_hittables = h_hittables_list.size();
     printf("size: %d\n", (int)number_of_hittables);
   
     checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
     checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
-     
 
     hittable h_world = hittable::make_hittableList();
-
-
-    /* no AABB */  
-
-    // h_world.hittables = d_hittable_list;
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    // h_world.objects_size = number_of_hittables;
-    if (!cam.isBvh){
+    
+    if (!cam.isBvh){ //* No bboxes
         h_world.hittableList.setList(d_hittable_list, number_of_hittables);
         /* Allocate memory for hittable list on the device */
         checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
@@ -1394,12 +1379,8 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
         int number_of_nodes = (2 * number_of_hittables -1);
         checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
         build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        // 
         h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
         checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
         checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
     }
 
