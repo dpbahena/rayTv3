@@ -2,8 +2,9 @@
 #include "ray.h"
 #include "interval.h"
 
-#include "bvh_node.h"
+// #include "bvh_node.h"
 #include "cuda_bvh_node.h"
+#include "mem_manager.h"
 #include "texture.h"
 
 #include <cstdio>
