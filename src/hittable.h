@@ -5,10 +5,12 @@
 #include "texture.h"
 #include "aabb.h"
 #include <vector>
-#include <memory>
+
+#include <curand_kernel.h>
 
 
 struct BVHNode;
+struct material;
 
 class hit_record {
     public:
@@ -72,7 +74,7 @@ struct hittableList_data {
     int objects_size;
     AaBb bbox;
     __device__ __host__
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    bool hit(const ray& r, interval ray_t, hit_record& rec, curandState_t* state,  int i, int j) const;
     __device__ __host__
     void setList(hittable* hittables, size_t list_size);
     
@@ -106,6 +108,21 @@ struct rotateY_data {
 
 };
 
+//* Constant_Medium struct
+struct constantMedium_data {
+    hittable* boundary;
+    float neg_inv_density;
+    material* phase_function;
+    
+
+    __device__
+    bool hit(const ray& r, interval ray_t, hit_record& rec, curandState_t* states,  int i, int j);
+    __device__ __host__
+    AaBb bounding_box() const;
+
+};
+
+
 
 struct hittable {
 
@@ -118,6 +135,7 @@ struct hittable {
         hittableList_data hittableList;
         translate_data translate;
         rotateY_data rotateY;
+        constantMedium_data constantMedium;
     };
 
     // default constructor
@@ -259,6 +277,30 @@ struct hittable {
 
     }
 
+
+    static hittable make_constantMedium(hittable* boundary, float density, const glm::vec3& albedo) {
+        hittable obj;
+        obj.type = Type::MEDIUM;
+        obj.constantMedium.boundary = boundary;
+        obj.constantMedium.neg_inv_density = -1.0f / density;
+        obj.constantMedium.phase_function = new material(material::isotropic_material(albedo));
+
+        return obj;
+    }
+
+    static hittable make_constantMedium(hittable* boundary, float density, texture* tex) {
+        hittable obj;
+        obj.type = Type::MEDIUM;
+        obj.constantMedium.boundary = boundary;
+        obj.constantMedium.neg_inv_density = -1.0f / density;
+        obj.constantMedium.phase_function = new material(material::isotropic_material(tex));
+
+        return obj;
+    }
+
+    
+
+    
 
 };
      

@@ -26,22 +26,41 @@ struct diffuseLight_data {
     
 };
 
+struct isotropic_data {
+    
+    texture* tex;
+};
+
 
 
 struct material {
     Type type;
-
+    
     union {
         lambertian_data lambertian;
         metal_data metal;
         dielectric_data dielectric;
         diffuseLight_data diffuseLight;
+        isotropic_data isotropic;
         
     };
 
 
     /* Default constructor */
     material(): type(Type::NONE) {}
+
+    // ~material() {
+    //     // Clean up dynamically allocated memory based on type
+    //     if (type == Type::LAMBERTIAN && lambertian.tex != nullptr){
+    //         delete lambertian.tex;
+    //         lambertian.tex = nullptr;   // set to nullptr to avoid dangling pointer
+    //     }
+    //     if (type == Type::DIFFUSE && diffuseLight.tex != nullptr){
+    //         delete diffuseLight.tex;
+    //         diffuseLight.tex = nullptr;   // set to nullptr to avoid dangling pointer
+    //     } 
+
+    // }
 
     // constructor for type lambertian
     static material lambertian_material(const glm::vec3& albedo) {
@@ -87,6 +106,22 @@ struct material {
         material obj;
         obj.type = Type::DIFFUSE;
         obj.diffuseLight.tex = new texture(texture::solid_texture(emit));
+
+        return obj;
+    }
+
+    static material isotropic_material(const glm::vec3& albedo) {
+        material obj;
+        obj.type = Type::ISOTROPIC;
+        obj.isotropic.tex = new texture(texture::solid_texture(albedo));
+
+        return obj;
+    }
+
+    static material isotropic_material(texture* tex) {
+        material obj;
+        obj.type = Type::ISOTROPIC;
+        obj.isotropic.tex = tex;
 
         return obj;
     }

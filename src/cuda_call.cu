@@ -11,7 +11,7 @@
 #include <vector>
 #include <random>
 #include <chrono>
-#include <curand_kernel.h>
+// #include <curand_kernel.h>
 
 #define MAX_STACK_SIZE 20
 
@@ -74,14 +74,14 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 
 __device__
-static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, lambertian_data& lambertian, curandState_t* states,  int i, int j) {
+static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, lambertian_data& lambertian, curandState_t* states,  int i, int j) {
     auto scatter_direction = rec.normal + random_unit_vector(states,  i, j);
 
     // Catch degenerate scatter direction
     if (near_zero(scatter_direction))
         scatter_direction = rec.normal;
 
-    scatter = ray(rec.p, scatter_direction, r_in.time());
+    scattered = ray(rec.p, scatter_direction, r_in.time());
     // attenuation = lambertian.albedo;
     attenuation = lambertian.tex->value(rec.u, rec.v, rec.p);
     
@@ -89,18 +89,18 @@ static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3
 }
 
 __device__
-static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, metal_data& metal, curandState_t* states,  int i, int j) {
+static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, metal_data& metal, curandState_t* states,  int i, int j) {
     glm::vec3 reflected = reflect(r_in.direction, rec.normal);
     reflected = glm::normalize(reflected) + (metal.fuzz * random_unit_vector(states,  i, j));
-    scatter = ray(rec.p, reflected, r_in.time());
+    scattered = ray(rec.p, reflected, r_in.time());
     attenuation = metal.albedo;
     
-    return (glm::dot(scatter.direction, rec.normal) > 0);
+    return (glm::dot(scattered.direction, rec.normal) > 0);
 }
 
 
 __device__
-static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scatter, dielectric_data& dielectric, curandState_t* states,  int i, int j) {
+static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, dielectric_data& dielectric, curandState_t* states,  int i, int j) {
     attenuation = glm::vec3(1.0, 1.0, 1.0);
     float ri = rec.front_face ? (1.0f / dielectric.refraction_index) : dielectric.refraction_index;
 
@@ -120,13 +120,29 @@ static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3
     
     states[i] = x; // save back value
 
-    scatter = ray(rec.p, direction, r_in.time());
+    scattered = ray(rec.p, direction, r_in.time());
     return true;
 }
 
 __device__ __host__
 static glm::vec3 emitted(float u, float v, const glm::vec3& p, diffuseLight_data& diffuse){
     return diffuse.tex->value(u, v, p);
+}
+
+__device__ 
+static bool isotropic_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, isotropic_data& isotropic, curandState_t* states,  int i, int j){
+    scattered = ray(rec.p, random_unit_vector(states,  i, j), r_in.time());
+    if(isotropic.tex->type == Type::CHECKER) {
+     attenuation = isotropic.tex->checkerTexture.value(rec.u, rec.v, rec.p);
+    } else if (isotropic.tex->type == Type::IMAGE) {
+     attenuation = isotropic.tex->imageTexture.value(rec.u, rec.v, rec.p);
+    } else if (isotropic.tex->type == Type::NOISE) {
+     attenuation = isotropic.tex->noiseTexture.value(rec.u, rec.v, rec.p);
+    } else if (isotropic.tex->type == Type::SOLID) {
+     attenuation = isotropic.tex->solidColor.value(rec.u, rec.v, rec.p);
+    }
+    return true;
+
 }
 
 
@@ -494,7 +510,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::v
         
         //* Check if the ray hits anything; if not, add the background color and return;
         // if(!world->hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
-        if(!world->hittableList.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
+        if(!world->hittableList.hit(cur_ray, interval(0.001f, FLT_MAX), rec, state, i, j)){
             final_color += cur_attenuation * background;
             return final_color;
         }
@@ -518,6 +534,8 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::v
             did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
         } else if (rec.mat->type == Type::DIELECTRIC){
             did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+        } else if (rec.mat->type == Type::ISOTROPIC){
+            did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, state, i, j);    
         }
         //* If scattering did not occur, return the accumulated color
         if(!did_scatter) {
@@ -1390,6 +1408,128 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
 
 }
 
+void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<hittable*>  allocated_hittables, std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+
+    cam.vfov = 40.0f;
+    cam.lookfrom = glm::vec3( 278.0f, 278.0f, -800.0f);
+    cam.lookat   = glm::vec3( 278.0f, 278.0f,  0.0f);
+    cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+    cam.defocus_angle = 0.0f;
+    cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.0f, 0.0f, 0.0f);
+    cam.initialize();
+   
+    
+    std::vector<hittable> h_hittables_list;
+    
+
+    hittable hittable_obj;  // holds any hittable temporarily
+
+    
+
+    auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
+    auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
+    auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
+    auto light = material::diffuseLight_material(glm::vec3(15, 15, 15));
+
+    material* d_red;  
+    material* d_white;
+    material* d_green;
+    material* d_light;
+
+    checkCuda(cudaMalloc((void**)&d_red, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_red, &red, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_red);
+
+    checkCuda(cudaMalloc((void**)&d_white, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_white, &white, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_white);
+
+    checkCuda(cudaMalloc((void**)&d_green, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_green, &green, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_green);
+
+    checkCuda(cudaMalloc((void**)&d_light, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_light, &light, sizeof(material), cudaMemcpyHostToDevice) );
+    device_materials.push_back(d_light);
+
+
+
+    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
+    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
+    auto obj3 = hittable(hittable::make_quad(glm::vec3(343, 554, 332), glm::vec3(-130,0,0), glm::vec3(0,0,-105), d_light));
+    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
+    auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), d_white));
+    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
+   
+    h_hittables_list.push_back(obj1);
+    h_hittables_list.push_back(obj2);
+    h_hittables_list.push_back(obj3);
+    h_hittables_list.push_back(obj4);
+    h_hittables_list.push_back(obj5);
+    h_hittables_list.push_back(obj6);
+
+    
+    std::vector<hittable> box1, box2;
+
+    
+
+    //* Create two boxes
+    box(box1, glm::vec3(.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
+    box(box2, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+
+  
+   
+    for (auto& side : box1){
+        auto rotated    = new hittable(hittable::make_rotateY(&side, 15));
+        auto translated = new hittable(hittable::make_translate(rotated, glm::vec3(265.0f, 0.0f, 295.0f)));
+        auto smoked     = new hittable(hittable::make_constantMedium(translated, 0.01f, glm::vec3(0.0f, 0.0f, 0.0f)));
+        h_hittables_list.push_back(*smoked);  
+        allocated_hittables.push_back(rotated);
+        allocated_hittables.push_back(translated);
+        allocated_hittables.push_back(smoked);
+    }
+    
+   
+    for (auto& side : box2){
+        auto rotated = new hittable(hittable(hittable::make_rotateY(&side, -18)));
+        auto translated = new hittable(hittable(hittable::make_translate(rotated, glm::vec3(130.0f, 0.0f, 65.0f))));
+        h_hittables_list.push_back(*translated);
+        allocated_hittables.push_back(rotated);
+        allocated_hittables.push_back(translated);
+    }
+
+
+
+
+   
+    size_t number_of_hittables = h_hittables_list.size();
+    printf("size: %d\n", (int)number_of_hittables);
+  
+    checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
+    checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
+
+    hittable h_world = hittable::make_hittableList();
+    
+    if (!cam.isBvh){ //* No bboxes
+        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+        /* Allocate memory for hittable list on the device */
+        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
+    } else {
+        /** Implementing ROPE based BHV nodes ind cuda */
+        int number_of_nodes = (2 * number_of_hittables -1);
+        checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+        checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+        checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    }
+
+    
+    
+
+}
 
 void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 {
@@ -1457,6 +1597,9 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         break;
     case 8:
         cornell_box_instances(cam, d_rtw_image, device_materials, device_textures, allocated_hittables, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world);
+        break;
+    case 9:
+        cornell_smoke(cam, d_rtw_image, device_materials, device_textures, allocated_hittables, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world);
         break;
     default:
         break;

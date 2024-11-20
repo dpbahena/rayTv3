@@ -7,7 +7,7 @@
 #include <memory>
 
 
-
+__device__ inline float     random_float(curandState_t* state);
 
 
 __device__ __host__
@@ -61,7 +61,7 @@ void sphere_data::get_sphere_uv(const glm::vec3& p, float& u, float& v) const {
 }
 
 __device__ __host__
-bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
+bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, curandState_t* states,  int i, int j)  const {
     hit_record temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
@@ -97,6 +97,15 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec)  cons
         }
         if (objects[i].type == Type::TRANSLATE) {
             if (objects[i].translate.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+
+            }
+        }
+        if (objects[i].type == Type::MEDIUM) {
+            if (objects[i].constantMedium.hit(r, interval(ray_t.min, closest_so_far), temp_rec, states, i, j )){
 
                 hit_anything = true;
                 closest_so_far = temp_rec.t;
@@ -215,6 +224,65 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
 
         return false;
     }
+}
+
+
+__device__ __host__
+bool constantMedium_data::hit(const ray& r, interval ray_t, hit_record& rec, curandState_t* states,  int i, int j) {
+    hit_record rec1, rec2;
+    bool hit_anything = false;
+
+    if (boundary->type == Type::QUAD) {
+        hit_anything = boundary->quad.hit(r, interval::universe(), rec1);
+    } else if (boundary->type == Type::SPHERE) {
+        hit_anything = boundary->sphere.hit(r, interval::universe(), rec1);
+    }
+
+    if (boundary->type == Type::QUAD) {
+        hit_anything = boundary->quad.hit(r, interval(rec1.t + 0.0001, MAXFLOAT), rec2);
+    } else if (boundary->type == Type::SPHERE) {
+        hit_anything = boundary->sphere.hit(r, interval(rec1.t + 0.0001, MAXFLOAT), rec2);
+    } 
+
+    if (hit_anything) {
+
+        if (rec1.t < ray_t.min) rec1.t = ray_t.min;
+        if (rec2.t > ray_t.max) rec2.t = ray_t.max;
+
+        if (rec1.t >= rec2.t) return false;
+        if (rec1.t < 0) return rec1.t = 0;
+
+        auto ray_length = r.direction.length();
+        auto distance_inside_boundary = (rec2.t -rec1.t) * ray_length;
+        curandState_t x = states[i];
+        auto hit_distance = neg_inv_density * logf(random_float(&x));
+        states[i] = x; // saces back the random value
+        
+        if (hit_distance > distance_inside_boundary) return false;
+
+        rec.t = rec1.t + hit_distance / ray_length;
+        rec.p = r.at(rec.t);  
+
+        rec.normal = glm::vec3(1.0f, 0.0f, 0.0f);    // arbitrary
+        rec.front_face = true;
+        rec.mat = phase_function;
+
+        return true;
+    } else {
+        return false;
+    }
+}
+
+__device__ __host__
+AaBb constantMedium_data::bounding_box() const {
+    AaBb bbox;
+    
+    if (boundary->type == Type::QUAD) {
+        bbox = boundary->quad.bounding_box();
+    } else if (boundary->type == Type::SPHERE) {
+        bbox = boundary->sphere.bounding_box();
+    }
+    return bbox;
 }
 
 
