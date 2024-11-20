@@ -132,15 +132,15 @@ static glm::vec3 emitted(float u, float v, const glm::vec3& p, diffuseLight_data
 __device__ 
 static bool isotropic_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, isotropic_data& isotropic, curandState_t* states,  int i, int j){
     scattered = ray(rec.p, random_unit_vector(states,  i, j), r_in.time());
-    if(isotropic.tex->type == Type::CHECKER) {
-     attenuation = isotropic.tex->checkerTexture.value(rec.u, rec.v, rec.p);
-    } else if (isotropic.tex->type == Type::IMAGE) {
-     attenuation = isotropic.tex->imageTexture.value(rec.u, rec.v, rec.p);
-    } else if (isotropic.tex->type == Type::NOISE) {
-     attenuation = isotropic.tex->noiseTexture.value(rec.u, rec.v, rec.p);
-    } else if (isotropic.tex->type == Type::SOLID) {
+    // if(isotropic.tex->type == Type::CHECKER) {
+    //  attenuation = isotropic.tex->checkerTexture.value(rec.u, rec.v, rec.p);
+    // } else if (isotropic.tex->type == Type::IMAGE) {
+    //  attenuation = isotropic.tex->imageTexture.value(rec.u, rec.v, rec.p);
+    // } else if (isotropic.tex->type == Type::NOISE) {
+    //  attenuation = isotropic.tex->noiseTexture.value(rec.u, rec.v, rec.p);
+    // } else if (isotropic.tex->type == Type::SOLID) {
      attenuation = isotropic.tex->solidColor.value(rec.u, rec.v, rec.p);
-    }
+    // }
     return true;
 
 }
@@ -1437,12 +1437,16 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
     checkCuda(cudaMalloc((void**)&d_negro, sizeof(material)) );
     checkCuda(cudaMemcpy(d_negro, &negro, sizeof(material), cudaMemcpyHostToDevice) );
 
+    auto adeffuLigt = texture::solid_texture(glm::vec3(7.0f, 7.0f, 7.0f));
+    texture* d_deffuLigt;
+    checkCuda(cudaMalloc(&d_deffuLigt, sizeof(texture)));
+    checkCuda(cudaMemcpy(d_deffuLigt, &adeffuLigt, sizeof(texture), cudaMemcpyHostToDevice));
 
 
     auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
     auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
     auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
-    auto light = material::diffuseLight_material(glm::vec3(7, 7, 7));
+    auto light = material::diffuseLight_material(d_deffuLigt);
 
     material* d_red;  
     material* d_white;
