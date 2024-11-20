@@ -29,7 +29,7 @@ __device__ inline glm::vec3 defocus_disk_sample(curandState_t* states,  int i, i
 __device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
 __device__ inline bool      near_zero(const glm::vec3 v);
 __device__ inline float     reflectance(float cosine, float refraction_index);
-__device__ inline float     random_float(curandState_t* state);
+__device__  inline float     random_float(curandState_t* state);
 
 
 
@@ -182,7 +182,7 @@ inline float reflectance(float cosine, float refraction_index){
     return r0 + (1.0f - r0) * pow( (1.0f - cosine), 5.0f);
 }
 
-__device__
+__device__ 
 inline float random_float(curandState_t* state){
     return curand_uniform_double(state);
 }
@@ -507,10 +507,12 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::v
     // Loop through the ray bounces up to the specified depth
     for (int k = 0; k < depth; k++){
         hit_record rec;
-        
+        curandState_t x = state[i];
+        float randNumber = random_float(&x);
+        state[i] = x;  // saves the random back
         //* Check if the ray hits anything; if not, add the background color and return;
         // if(!world->hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
-        if(!world->hittableList.hit(cur_ray, interval(0.001f, FLT_MAX), rec, state, i, j)){
+        if(!world->hittableList.hit(cur_ray, interval(0.001f, FLT_MAX), rec, randNumber )){
             final_color += cur_attenuation * background;
             return final_color;
         }
@@ -1425,12 +1427,22 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
 
     hittable hittable_obj;  // holds any hittable temporarily
 
-    
+    auto atex = texture::solid_texture(glm::vec3(0.0f, 0.0f, 0.0f));
+    texture* d_atex;
+    checkCuda(cudaMalloc(&d_atex, sizeof(texture)));
+    checkCuda(cudaMemcpy(d_atex, &atex, sizeof(texture), cudaMemcpyHostToDevice));
+    auto negro = material::isotropic_material(d_atex);
+    device_textures.push_back(d_atex);
+    material* d_negro;
+    checkCuda(cudaMalloc((void**)&d_negro, sizeof(material)) );
+    checkCuda(cudaMemcpy(d_negro, &negro, sizeof(material), cudaMemcpyHostToDevice) );
+
+
 
     auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
     auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
     auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
-    auto light = material::diffuseLight_material(glm::vec3(15, 15, 15));
+    auto light = material::diffuseLight_material(glm::vec3(7, 7, 7));
 
     material* d_red;  
     material* d_white;
@@ -1457,9 +1469,9 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
 
     auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
     auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
-    auto obj3 = hittable(hittable::make_quad(glm::vec3(343, 554, 332), glm::vec3(-130,0,0), glm::vec3(0,0,-105), d_light));
-    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
-    auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), d_white));
+    auto obj3 = hittable(hittable::make_quad(glm::vec3(113, 554, 127), glm::vec3(330,0,0), glm::vec3(0,0, 305), d_light));
+    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,555,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
+    auto obj5 = hittable(hittable::make_quad(glm::vec3(0 ,0 , 0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
     auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
    
     h_hittables_list.push_back(obj1);
@@ -1476,28 +1488,35 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
 
     //* Create two boxes
     box(box1, glm::vec3(.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
-    box(box2, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+    // box(box2, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), d_white);
 
   
    
     for (auto& side : box1){
-        auto rotated    = new hittable(hittable::make_rotateY(&side, 15));
-        auto translated = new hittable(hittable::make_translate(rotated, glm::vec3(265.0f, 0.0f, 295.0f)));
-        auto smoked     = new hittable(hittable::make_constantMedium(translated, 0.01f, glm::vec3(0.0f, 0.0f, 0.0f)));
-        h_hittables_list.push_back(*smoked);  
-        allocated_hittables.push_back(rotated);
-        allocated_hittables.push_back(translated);
+        // auto rotated    = new hittable(hittable::make_rotateY(&side, 15));
+        // auto translated = new hittable(hittable::make_translate(rotated, glm::vec3(265.0f, 0.0f, 295.0f)));
+        // auto smoked     = new hittable(hittable::make_constantMedium(translated, 0.01f, glm::vec3(0.0f, 0.0f, 0.0f)));
+        auto smoked     = new hittable(hittable::make_constantMedium(&side, 0.01f, d_negro));
+        box2.push_back(*smoked);  
+        // allocated_hittables.push_back(rotated);
+        // allocated_hittables.push_back(translated);
         allocated_hittables.push_back(smoked);
     }
+
+    h_hittables_list.insert(h_hittables_list.begin(), box2.begin(), box2.end());
+
+
+
     
    
-    for (auto& side : box2){
-        auto rotated = new hittable(hittable(hittable::make_rotateY(&side, -18)));
-        auto translated = new hittable(hittable(hittable::make_translate(rotated, glm::vec3(130.0f, 0.0f, 65.0f))));
-        h_hittables_list.push_back(*translated);
-        allocated_hittables.push_back(rotated);
-        allocated_hittables.push_back(translated);
-    }
+    // for (auto& side : box2){
+    //     auto rotated = new hittable(hittable(hittable::make_rotateY(&side, -18)));
+    //     auto translated = new hittable(hittable(hittable::make_translate(rotated, glm::vec3(130.0f, 0.0f, 65.0f))));
+    //     auto smoked     = new hittable(hittable::make_constantMedium(translated, 0.01f, glm::vec3(1.0f, 1.0f, 1.0f)));
+    //     h_hittables_list.push_back(*smoked);
+    //     allocated_hittables.push_back(rotated);
+    //     allocated_hittables.push_back(translated);
+    // }
 
 
 

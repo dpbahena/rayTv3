@@ -74,7 +74,7 @@ struct hittableList_data {
     int objects_size;
     AaBb bbox;
     __device__ __host__
-    bool hit(const ray& r, interval ray_t, hit_record& rec, curandState_t* state,  int i, int j) const;
+    bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
     __device__ __host__
     void setList(hittable* hittables, size_t list_size);
     
@@ -115,8 +115,8 @@ struct constantMedium_data {
     material* phase_function;
     
 
-    __device__
-    bool hit(const ray& r, interval ray_t, hit_record& rec, curandState_t* states,  int i, int j);
+    __device__ __host__
+    bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber);
     __device__ __host__
     AaBb bounding_box() const;
 
@@ -284,6 +284,16 @@ struct hittable {
         obj.constantMedium.boundary = boundary;
         obj.constantMedium.neg_inv_density = -1.0f / density;
         obj.constantMedium.phase_function = new material(material::isotropic_material(albedo));
+
+        return obj;
+    }
+
+    static hittable make_constantMedium(hittable* boundary, float density, material* mat) {
+        hittable obj;
+        obj.type = Type::MEDIUM;
+        obj.constantMedium.boundary = boundary;
+        obj.constantMedium.neg_inv_density = -1.0f / density;
+        obj.constantMedium.phase_function = mat;
 
         return obj;
     }
