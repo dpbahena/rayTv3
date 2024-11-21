@@ -464,7 +464,7 @@ inline void box(std::vector<hittable>& sides, const glm::vec3& a, const glm::vec
  * @param b 
  * @param mat 
  */
-hittable* box(const glm::vec3& a, const glm::vec3& b, material* mat) {
+hittable* box( const glm::vec3& a, const glm::vec3& b, material* mat) {
     
     auto sides = new hittable[6];
     

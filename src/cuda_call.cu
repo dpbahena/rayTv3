@@ -63,14 +63,107 @@ inline glm::vec3 unit_vector(const glm::vec3& v){
 }
 
 
+/**
+ * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
+ * 
+ * @param sides 
+ * @param a 
+ * @param b 
+ * @param mat 
+ */
+// hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
+    
+//     //* Allocate memory for the box (6 sides )
+ 
+//     hittable* sides = memoryManager.allocateHost<hittable>(6);
 
-#define checkCuda(result) { gpuAssert((result), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
-   if (code != cudaSuccess) {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) assert(code == cudaSuccess);
-   }
+//     // construct the two opposite vertices with the minimum and maximum coordinates
+//     auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+//     auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+
+//     auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+//     auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+//     auto dz = glm::vec3(0, 0, max.z - min.z);
+
+    
+//     sides[0] = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
+//     sides[1] = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
+//     sides[2] = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
+//     sides[3] = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
+//     sides[4] = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
+//     sides[5] = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+
+
+//     return sides;
+// }
+hittable* box(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
+    
+    auto sides = new hittable[6];
+    memoryManager.host_allocations.push_back(sides);
+    
+    // construct the two opposite vertices with the minimum and maximum coordinates
+    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+
+    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+    auto dz = glm::vec3(0, 0, max.z - min.z);
+
+    auto side0 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
+    auto side1 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
+    auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
+    auto side3 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
+    auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
+    auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+
+    sides[0] = side0;
+    sides[1] = side1;
+    sides[2] = side2;
+    sides[3] = side3;
+    sides[4] = side4;
+    sides[5] = side5;
+
+    return sides;
 }
+hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
+    // Allocate raw memory for 6 hittable objects
+    hittable* sides = static_cast<hittable*>(::operator new[](sizeof(hittable) * 6));
+    memoryManager.host_allocations.push_back(sides); // Track allocation for cleanup
+
+    // Calculate dimensions
+    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+
+    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+    auto dz = glm::vec3(0, 0, max.z - min.z);
+
+    // Use placement new to initialize the array elements
+    new (&sides[0]) hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z), dx, dy, mat));  // front
+    new (&sides[1]) hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz, dy, mat)); // right
+    new (&sides[2]) hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx, dy, mat)); // back
+    new (&sides[3]) hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z), dz, dy, mat));  // left
+    new (&sides[4]) hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z), dx, -dz, mat)); // top
+    new (&sides[5]) hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z), dx, dz, mat));  // bottom
+
+    auto box = memoryManager.allocateHost<hittable>(hittable::make_hittableList()); 
+    box->hittableList.setList(sides, 6);
+
+    return box;
+    
+    // return sides;
+
+}
+
+
+
+// #define checkCuda(result) { gpuAssert((result), __FILE__, __LINE__); }
+// inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+//    if (code != cudaSuccess) {
+//       fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+//       if (abort) assert(code == cudaSuccess);
+//    }
+// }
 
 
 __device__
@@ -1410,7 +1503,7 @@ void cornell_box_instances(Camera& cam, rtw_image* &d_rtw_image, std::vector<mat
 
 }
 
-void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> device_materials, std::vector<texture*> device_textures, std::vector<hittable*>  allocated_hittables, std::vector<BVHNode*> allocated_flat_nodes, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 278.0f, 278.0f, -800.0f);
@@ -1427,50 +1520,46 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
 
     hittable hittable_obj;  // holds any hittable temporarily
 
-    auto atex = texture::solid_texture(glm::vec3(0.0f, 0.0f, 0.0f));
-    texture* d_atex;
-    checkCuda(cudaMalloc(&d_atex, sizeof(texture)));
-    checkCuda(cudaMemcpy(d_atex, &atex, sizeof(texture), cudaMemcpyHostToDevice));
-    auto negro = material::isotropic_material(d_atex);
-    device_textures.push_back(d_atex);
-    material* d_negro;
-    checkCuda(cudaMalloc((void**)&d_negro, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_negro, &negro, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_negro);
+    // allocate textures
+    auto atex = texture::solid_texture(glm::vec3(0.0f, 0.0f, 0.0f)); 
+    texture* d_atex = memoryManager.allocateDevice<texture>();
+    memoryManager.copyToDevice(d_atex, &atex);
 
-    auto adeffuLigt = texture::solid_texture(glm::vec3(7.0f, 7.0f, 7.0f));
-    texture* d_deffuLigt;
-    checkCuda(cudaMalloc(&d_deffuLigt, sizeof(texture)));
-    checkCuda(cudaMemcpy(d_deffuLigt, &adeffuLigt, sizeof(texture), cudaMemcpyHostToDevice));
+    auto blueTex = texture::solid_texture(glm::vec3(0.1f, 0.1f, 1.0f)); 
+    texture* d_blueTex = memoryManager.allocateDevice<texture>();
+    memoryManager.copyToDevice(d_blueTex, &blueTex);
+
+
+
+    auto light_tex = texture::solid_texture(glm::vec3(7.0f, 7.0f, 7.0f));
+    texture* d_light_tex = memoryManager.allocateDevice<texture>();
+    memoryManager.copyToDevice(d_light_tex, &light_tex);
+   
+    // Allocate Materials
+    auto negro = material::isotropic_material(d_atex);
+    material* d_negro = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_negro, &negro);
+
+    auto blueish = material::isotropic_material(d_blueTex);
+    material* d_blueish = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_blueish, &blueish);
 
 
     auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
+    material* d_red = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_red, &red);
+
     auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
+    material* d_white = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_white, &white);
+
     auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
-    auto light = material::diffuseLight_material(d_deffuLigt);
+    material* d_green = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_green, &green);
 
-    material* d_red;  
-    material* d_white;
-    material* d_green;
-    material* d_light;
-
-    checkCuda(cudaMalloc((void**)&d_red, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_red, &red, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_red);
-
-    checkCuda(cudaMalloc((void**)&d_white, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_white, &white, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_white);
-
-    checkCuda(cudaMalloc((void**)&d_green, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_green, &green, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_green);
-
-    checkCuda(cudaMalloc((void**)&d_light, sizeof(material)) );
-    checkCuda(cudaMemcpy(d_light, &light, sizeof(material), cudaMemcpyHostToDevice) );
-    device_materials.push_back(d_light);
-
-
+    auto light = material::diffuseLight_material(d_light_tex);
+    material* d_light = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_light, &light);
 
     auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
     auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
@@ -1486,74 +1575,24 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
     h_hittables_list.push_back(obj5);
     h_hittables_list.push_back(obj6);
 
-    // auto bola = new hittable(hittable::make_sphere(glm::vec3(275,150,275),/*  glm::vec3(275, 350, 275), */ 120, d_white));
-    // auto smoke = new hittable(hittable::make_constantMedium(bola, 0.01f, d_negro));
+    auto sphere = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(150, 350, 275), 60, d_white));
+    auto nube   = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(sphere, 0.01f, d_blueish));
+    h_hittables_list.push_back(*nube);
+
+    // Allocate hittable boxes
+    auto box1 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
+    auto box2 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 165.0f, 165.0f), d_white);
     
-    // h_hittables_list.push_back(*smoke);
-    // allocated_hittables.push_back(bola);
-    // allocated_hittables.push_back(smoke);
-
-    //* Create two boxes
-    auto box1 = box(glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
-    auto box2 = box(glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 165.0f, 165.0f), d_white);
-    allocated_hittables.push_back(box1);
-    allocated_hittables.push_back(box2);
-
-    
-
-    auto mybox = new hittable (hittable::make_hittableList());
-    mybox->hittableList.setList(box1, 6);
-    auto translated  = new hittable(hittable::make_rotateY(mybox, 15));
-    auto rotated     = new hittable(hittable::make_translate(translated, glm::vec3(265, 0, 295)));
-    auto blackSmoked = new hittable(hittable::make_constantMedium(rotated, 0.01f, d_negro));
-    allocated_hittables.push_back(rotated);
-    allocated_hittables.push_back(mybox);
-    allocated_hittables.push_back(translated);
-    allocated_hittables.push_back(blackSmoked);
-    h_hittables_list.push_back(*blackSmoked);
-
-    mybox = new hittable (hittable::make_hittableList());
-    mybox->hittableList.setList(box2, 6);
-    rotated     = new hittable(hittable::make_rotateY(mybox, -18));
-    translated  = new hittable(hittable::make_translate(rotated, glm::vec3(130, 0, 65)));
-    blackSmoked = new hittable(hittable::make_constantMedium(translated, 0.01f, d_white));
-    allocated_hittables.push_back(rotated);
-    allocated_hittables.push_back(mybox);
-    allocated_hittables.push_back(translated);
-    allocated_hittables.push_back(blackSmoked);
-    h_hittables_list.push_back(*blackSmoked);
+    auto rotated        = memoryManager.allocateHost<hittable>(hittable::make_rotateY(box1, 15));
+    auto translated     = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(265, 0, 295)));
+    auto smoked    = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(translated, 0.01f, d_negro));
+    h_hittables_list.push_back(*smoked);
 
 
-
-   
-    // for (auto& side : box1){
-    //     // auto rotated    = new hittable(hittable::make_rotateY(&side, 15));
-    //     // auto translated = new hittable(hittable::make_translate(rotated, glm::vec3(265.0f, 0.0f, 295.0f)));
-    //     // auto smoked     = new hittable(hittable::make_constantMedium(translated, 0.01f, glm::vec3(0.0f, 0.0f, 0.0f)));
-    //     auto smoked     = new hittable(hittable::make_constantMedium(&side, 0.01f, d_negro));
-    //     box2.push_back(*smoked);  
-    //     // allocated_hittables.push_back(rotated);
-    //     // allocated_hittables.push_back(translated);
-    //     allocated_hittables.push_back(smoked);
-    // }
-
-    // h_hittables_list.insert(h_hittables_list.begin(), box2.begin(), box2.end());
-
-
-
-    
-   
-    // for (auto& side : box2){
-    //     auto rotated = new hittable(hittable(hittable::make_rotateY(&side, -18)));
-    //     auto translated = new hittable(hittable(hittable::make_translate(rotated, glm::vec3(130.0f, 0.0f, 65.0f))));
-    //     auto smoked     = new hittable(hittable::make_constantMedium(translated, 0.01f, glm::vec3(1.0f, 1.0f, 1.0f)));
-    //     h_hittables_list.push_back(*smoked);
-    //     allocated_hittables.push_back(rotated);
-    //     allocated_hittables.push_back(translated);
-    // }
-
-
-
+    rotated     = memoryManager.allocateHost<hittable>(hittable::make_rotateY(box2, -18));
+    translated  = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(130, 0, 65)));
+    smoked      = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(translated, 0.01f, d_white));
+    h_hittables_list.push_back(*smoked);
 
    
     size_t number_of_hittables = h_hittables_list.size();
@@ -1602,7 +1641,8 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     }
 
 
-    
+    HybridMemoryManager memoryManager;
+
 
 
     std::vector<material*>  device_materials;  
@@ -1652,7 +1692,8 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         cornell_box_instances(cam, d_rtw_image, device_materials, device_textures, allocated_hittables, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world);
         break;
     case 9:
-        cornell_smoke(cam, d_rtw_image, device_materials, device_textures, allocated_hittables, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world);
+        // cornell_smoke(cam, d_rtw_image, device_materials, device_textures, allocated_hittables, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world);
+        cornell_smoke(cam, d_rtw_image, memoryManager, bvh_nodes, d_hittables_list, d_world);
         break;
     default:
         break;
