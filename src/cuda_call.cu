@@ -1486,28 +1486,45 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
     h_hittables_list.push_back(obj5);
     h_hittables_list.push_back(obj6);
 
-    auto bola = new hittable(hittable::make_sphere(glm::vec3(275,150,275), glm::vec3(275, 350, 275), 120, d_white));
-    auto smoke = new hittable(hittable::make_constantMedium(bola, 0.01f, d_negro));
+    // auto bola = new hittable(hittable::make_sphere(glm::vec3(275,150,275),/*  glm::vec3(275, 350, 275), */ 120, d_white));
+    // auto smoke = new hittable(hittable::make_constantMedium(bola, 0.01f, d_negro));
     
-    h_hittables_list.push_back(*smoke);
-    allocated_hittables.push_back(bola);
-    allocated_hittables.push_back(smoke);
+    // h_hittables_list.push_back(*smoke);
+    // allocated_hittables.push_back(bola);
+    // allocated_hittables.push_back(smoke);
 
-    std::vector<hittable> box1, box2;
+    //* Create two boxes
+    auto box1 = box(glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
+    auto box2 = box(glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+    allocated_hittables.push_back(box1);
+    allocated_hittables.push_back(box2);
 
-    // //* Create two boxes
-    box(box1, glm::vec3(.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
-
-
-
-    // // box(box2, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+    
 
     auto mybox = new hittable (hittable::make_hittableList());
-    mybox->hittableList.setList(box1.data(), 6); 
-    auto rotated = new hittable(hittable::make_rotateY(mybox, 15));
-    auto translated = new hittable(hittable::make_translate(rotated, glm::vec3(265, 0, 295)));
+    mybox->hittableList.setList(box1, 6);
+    auto translated  = new hittable(hittable::make_rotateY(mybox, 15));
+    auto rotated     = new hittable(hittable::make_translate(translated, glm::vec3(265, 0, 295)));
+    auto blackSmoked = new hittable(hittable::make_constantMedium(rotated, 0.01f, d_negro));
+    allocated_hittables.push_back(rotated);
+    allocated_hittables.push_back(mybox);
+    allocated_hittables.push_back(translated);
+    allocated_hittables.push_back(blackSmoked);
+    h_hittables_list.push_back(*blackSmoked);
 
-    h_hittables_list.push_back(*translated);
+    mybox = new hittable (hittable::make_hittableList());
+    mybox->hittableList.setList(box2, 6);
+    rotated     = new hittable(hittable::make_rotateY(mybox, -18));
+    translated  = new hittable(hittable::make_translate(rotated, glm::vec3(130, 0, 65)));
+    blackSmoked = new hittable(hittable::make_constantMedium(translated, 0.01f, d_white));
+    allocated_hittables.push_back(rotated);
+    allocated_hittables.push_back(mybox);
+    allocated_hittables.push_back(translated);
+    allocated_hittables.push_back(blackSmoked);
+    h_hittables_list.push_back(*blackSmoked);
+
+
+
    
     // for (auto& side : box1){
     //     // auto rotated    = new hittable(hittable::make_rotateY(&side, 15));
