@@ -15,8 +15,8 @@ int main(int arg, char** argv) {
    
 
     // Window
-    // Window win{"Dario", 1440, 720};
-    Window win{"Dario", 300, 200};
+    Window win{"Dario", 1440, 720};
+    // Window win{"Dario", 600, 400};
     Renderer myRender{win};
     // Camera cam{myRender.colorBuffer};
     Camera cam;

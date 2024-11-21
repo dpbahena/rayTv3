@@ -104,15 +104,27 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
 
         //     }
         // }
-        // if (objects[i].type == Type::MEDIUM) {
-        //     if (objects[i].constantMedium.hit(r, interval(ray_t.min, closest_so_far), temp_rec, randNumber)){
+        if (objects[i].type == Type::MEDIUM) {
+            if (objects[i].constantMedium.hit(r, interval(ray_t.min, closest_so_far), temp_rec, randNumber)){
 
-        //         hit_anything = true;
-        //         closest_so_far = temp_rec.t;
-        //         rec = temp_rec;
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
 
-        //     }
-        // }
+            }
+        }
+
+        if (objects[i].type == Type::LIST) {
+            if (objects[i].hittableList.hit(r, interval(ray_t.min, closest_so_far), temp_rec, randNumber)){
+
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+
+            }
+        }
+
+
         
 
 
@@ -232,12 +244,12 @@ bool constantMedium_data::hit(const ray& r, interval ray_t, hit_record& rec, flo
     hit_record rec1, rec2;
     bool hit_anything = false;
 
-    if (boundary->type == Type::QUAD) {
-        hit_anything = boundary->quad.hit(r, interval::universe(), rec1);
-        if (!hit_anything) return false;
-        hit_anything = boundary->quad.hit(r, interval(rec1.t + 0.0001f, MAXFLOAT), rec2);
-        if (!hit_anything) return false;
-    } 
+    // if (boundary->type == Type::QUAD) {
+    //     hit_anything = boundary->quad.hit(r, interval::universe(), rec1);
+    //     if (!hit_anything) return false;
+    //     hit_anything = boundary->quad.hit(r, interval(rec1.t + 0.0001f, MAXFLOAT), rec2);
+    //     if (!hit_anything) return false;
+    // } 
     if (boundary->type == Type::SPHERE) {
         hit_anything = boundary->sphere.hit(r, interval::universe(), rec1);
         if (!hit_anything) return false;
@@ -274,7 +286,7 @@ bool constantMedium_data::hit(const ray& r, interval ray_t, hit_record& rec, flo
     //     hit_anything = boundary->rotateY.hit(r, interval(rec1.t + 0.0001f, MAXFLOAT), rec2);
     // }
 
-    if (!hit_anything) return false;
+    // if (!hit_anything) return false;
 
     if (rec1.t < ray_t.min) rec1.t = ray_t.min;
     if (rec2.t > ray_t.max) rec2.t = ray_t.max;
@@ -287,6 +299,7 @@ bool constantMedium_data::hit(const ray& r, interval ray_t, hit_record& rec, flo
     auto distance_inside_boundary = (rec2.t -rec1.t) * ray_length;
     
     auto hit_distance = neg_inv_density * logf(randNumber);
+    
     
     if (hit_distance > distance_inside_boundary) return false;
 
@@ -450,35 +463,37 @@ inline void box(std::vector<hittable>& sides, const glm::vec3& a, const glm::vec
     
 }
 
-std::shared_ptr<hittableList_data> box(const glm::vec3& a, const glm::vec3& b, material* mat) {
+// hittable* box(const glm::vec3& a, const glm::vec3& b, material* mat) {
     
-    auto sides = std::make_shared<hittableList_data>();
-    std::vector<hittable> fig;
-    // construct the two opposite vertices with the minimum and maximum coordinates
-    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
-    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+//     // auto sides = std::make_shared<hittableList_data>();
 
-    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
-    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
-    auto dz = glm::vec3(0, 0, max.z - min.z);
+    
+//     std::vector<hittable> fig;
+//     // construct the two opposite vertices with the minimum and maximum coordinates
+//     auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+//     auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
 
-    auto side1 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
-    auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
-    auto side3 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
-    auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
-    auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
-    auto side6 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+//     auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+//     auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+//     auto dz = glm::vec3(0, 0, max.z - min.z);
 
-    fig.push_back(side1);
-    fig.push_back(side2);
-    fig.push_back(side3);
-    fig.push_back(side4);
-    fig.push_back(side5);
-    fig.push_back(side6);
+//     auto side1 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
+//     auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
+//     auto side3 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
+//     auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
+//     auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
+//     auto side6 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+
+//     fig.push_back(side1);
+//     fig.push_back(side2);
+//     fig.push_back(side3);
+//     fig.push_back(side4);
+//     fig.push_back(side5);
+//     fig.push_back(side6);
      
-    sides.get()->setList(fig.data(), fig.size());
+//     sides.get()->setList(fig.data(), fig.size());
 
-    return sides;
+//     return sides;
 
     
-}
+// }
