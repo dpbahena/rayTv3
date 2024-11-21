@@ -87,7 +87,7 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
             }
         }
         if (objects[i].type == Type::ROTATE_Y) {
-            if (objects[i].rotateY.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+            if (objects[i].rotateY.hit(r, interval(ray_t.min, closest_so_far), temp_rec, randNumber)){
 
                 hit_anything = true;
                 closest_so_far = temp_rec.t;
@@ -95,15 +95,15 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
 
             }
         }
-        // if (objects[i].type == Type::TRANSLATE) {
-        //     if (objects[i].translate.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+        if (objects[i].type == Type::TRANSLATE) {
+            if (objects[i].translate.hit(r, interval(ray_t.min, closest_so_far), temp_rec, randNumber)){
 
-        //         hit_anything = true;
-        //         closest_so_far = temp_rec.t;
-        //         rec = temp_rec;
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
 
-        //     }
-        // }
+            }
+        }
         if (objects[i].type == Type::MEDIUM) {
             if (objects[i].constantMedium.hit(r, interval(ray_t.min, closest_so_far), temp_rec, randNumber)){
 
@@ -175,7 +175,7 @@ bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
 }
 
 __device__ __host__
-bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
+bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber)  const {
     //* Move the ray backwards by the offset
     ray offset_r(r.origin - offset, r.direction, r.time());
 
@@ -187,7 +187,7 @@ bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     } else if (object->type == Type::QUAD) {
         hit_anything = object->quad.hit(offset_r, ray_t, rec);
     } else if (object->type == Type::ROTATE_Y) {
-        hit_anything = object->rotateY.hit(offset_r, ray_t, rec);
+        hit_anything = object->rotateY.hit(offset_r, ray_t, rec, randNumber);
     } //else if (object->type == Type::LIST) {
     //     hit_anything = object->hittableList.hit(offset_r, ray_t, rec);
     // } 
@@ -206,7 +206,7 @@ bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
 }
 
 __device__ __host__
-bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
+bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {
     //* Transform the ray from world space to object space
     auto origin     = glm::vec3(cos_theta * r.origin.x - sin_theta * r.origin.z, r.origin.y, sin_theta * r.origin.x + cos_theta * r.origin.z);
     auto direction  = glm::vec3(cos_theta * r.direction.x - sin_theta * r.direction.z, r.direction.y, sin_theta * r.direction.x + cos_theta * r.direction.z);
@@ -220,11 +220,11 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec) const {
         hit_anything = object->quad.hit(rotated_r, ray_t, rec);
     } else if (object->type == Type::SPHERE) {
         hit_anything = object->sphere.hit(rotated_r, ray_t, rec);
-    } else if (object->type == Type::TRANSLATE) {
-        hit_anything = object->translate.hit(rotated_r, ray_t, rec);
-    } //else if (object->type == Type::LIST) {
-    //     hit_anything = object->hittableList.hit(rotated_r, ray_t, rec);
-    // } 
+    // } else if (object->type == Type::TRANSLATE) {
+        // hit_anything = object->translate.hit(rotated_r, ray_t, rec);
+    } else if (object->type == Type::LIST) {
+        hit_anything = object->hittableList.hit(rotated_r, ray_t, rec, randNumber);
+    } 
 
     if (hit_anything){
         //* Transform the intersection from object space back to world space

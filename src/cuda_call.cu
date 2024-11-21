@@ -1497,12 +1497,17 @@ void cornell_smoke(Camera& cam, rtw_image* &d_rtw_image, std::vector<material*> 
 
     // //* Create two boxes
     box(box1, glm::vec3(.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
+
+
+
     // // box(box2, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), d_white);
 
     auto mybox = new hittable (hittable::make_hittableList());
-    mybox->hittableList.setList(box1.data(), 6);
+    mybox->hittableList.setList(box1.data(), 6); 
+    auto rotated = new hittable(hittable::make_rotateY(mybox, 15));
+    auto translated = new hittable(hittable::make_translate(rotated, glm::vec3(265, 0, 295)));
 
-    h_hittables_list.push_back(*mybox);
+    h_hittables_list.push_back(*translated);
    
     // for (auto& side : box1){
     //     // auto rotated    = new hittable(hittable::make_rotateY(&side, 15));

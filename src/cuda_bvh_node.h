@@ -1020,13 +1020,13 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __
                             rec = temp_rec;
                         }
                     } else if (obj->type == Type::ROTATE_Y){
-                        if (obj->rotateY.hit(r, ray_t, temp_rec)) {
+                        if (obj->rotateY.hit(r, ray_t, temp_rec, 0.004)) {
                             hit_anything = true;
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;
                         }
                     } else if (obj->type == Type::TRANSLATE){
-                        if (obj->translate.hit(r, ray_t, temp_rec)) {
+                        if (obj->translate.hit(r, ray_t, temp_rec, 0.004)) {
                             hit_anything = true;
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;

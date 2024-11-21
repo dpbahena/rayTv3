@@ -90,7 +90,7 @@ struct translate_data {
     glm::vec3 offset;
     AaBb bbox;
     __device__ __host__
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
 };
@@ -102,7 +102,7 @@ struct rotateY_data {
     float cos_theta;
     AaBb bbox;
     __device__ __host__
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
 
