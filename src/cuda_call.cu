@@ -1310,20 +1310,23 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager,  std::vector<m
 
     
 
-    auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
-    auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
-    auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
-    auto light = material::diffuseLight_material(glm::vec3(15, 15, 15));
+    auto red    = material::lambertian_material(glm::vec3(.65, .05, .05));
+    auto white  = material::lambertian_material(glm::vec3(.73, .73, .73));
+    auto green  = material::lambertian_material(glm::vec3(.12, .45, .15));
+    auto light  = material::diffuseLight_material(glm::vec3(15, 15, 15));
+    auto mirror = material::metal_material(glm::vec3(1.0, 1.0, 1.0), 0.0);
 
-    material* d_red     =memoryManager.allocateDevice<material>();  
-    material* d_white   =memoryManager.allocateDevice<material>();
-    material* d_green   =memoryManager.allocateDevice<material>();
-    material* d_light   =memoryManager.allocateDevice<material>();
+    material* d_red     = memoryManager.allocateDevice<material>();  
+    material* d_white   = memoryManager.allocateDevice<material>();
+    material* d_green   = memoryManager.allocateDevice<material>();
+    material* d_light   = memoryManager.allocateDevice<material>();
+    material* d_mirror  = memoryManager.allocateDevice<material>();
 
     memoryManager.copyToDevice(d_red, &red);
     memoryManager.copyToDevice(d_white, &white);
     memoryManager.copyToDevice(d_green, &green);
     memoryManager.copyToDevice(d_light, &light);
+    memoryManager.copyToDevice(d_mirror, &mirror);
 
 
 
@@ -1352,12 +1355,15 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager,  std::vector<m
     auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), d_white));
     auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
    
+    auto obj7 = hittable(hittable::make_quad(glm::vec3(555,0, 75), glm::vec3(0,200,0), glm::vec3(0, 0, 200), d_mirror));
+
     h_hittables_list.push_back(obj1);
     h_hittables_list.push_back(obj2);
     h_hittables_list.push_back(obj3);
     h_hittables_list.push_back(obj4);
     h_hittables_list.push_back(obj5);
     h_hittables_list.push_back(obj6);
+    h_hittables_list.push_back(obj7);
     
     //* Create two boxes
     // box(h_hittables_list, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), d_white);
@@ -1537,12 +1543,21 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     material* d_light = memoryManager.allocateDevice<material>();
     memoryManager.copyToDevice(d_light, &light);
 
+    auto mirror = material::metal_material(glm::vec3(0.7, 0.6, 0.5), 0.0);
+    material* d_mirror  = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_mirror, &mirror);
+
+
     auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
     auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
     auto obj3 = hittable(hittable::make_quad(glm::vec3(113, 554, 127), glm::vec3(330,0,0), glm::vec3(0,0, 305), d_light));
     auto obj4 = hittable(hittable::make_quad(glm::vec3(0,555,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
     auto obj5 = hittable(hittable::make_quad(glm::vec3(0 ,0 , 0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
     auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
+
+    auto obj7 = hittable(hittable::make_quad(glm::vec3(555,50, 50), glm::vec3(0,400,0), glm::vec3(0, 0, 400), d_mirror));
+    auto obj8 = hittable(hittable::make_quad(glm::vec3(0,50, 50), glm::vec3(0,400,0), glm::vec3(0, 0, 400), d_mirror));
+   
    
     h_hittables_list.push_back(obj1);
     h_hittables_list.push_back(obj2);
@@ -1550,6 +1565,9 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     h_hittables_list.push_back(obj4);
     h_hittables_list.push_back(obj5);
     h_hittables_list.push_back(obj6);
+    h_hittables_list.push_back(obj7);
+    h_hittables_list.push_back(obj8);
+    
 
     auto sphere = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(150, 350, 275), 60, d_white));
     auto nube   = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(sphere, 0.01f, d_blueish));
