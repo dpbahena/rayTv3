@@ -994,7 +994,7 @@ __global__ void build_bvh_NR_ROPE7(BVHNode* nodes, hittable* hittables, size_t N
 
 
 __device__
-bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables) {
+bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, float randNumber) {
     const BVHNode* current = nodes;  // Start at the root node
     bool hit_anything = false;
     hit_record temp_rec;
@@ -1020,18 +1020,30 @@ bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __
                             rec = temp_rec;
                         }
                     } else if (obj->type == Type::ROTATE_Y){
-                        if (obj->rotateY.hit(r, ray_t, temp_rec, 0.004)) {
+                        if (obj->rotateY.hit(r, ray_t, temp_rec, randNumber)) {
                             hit_anything = true;
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;
                         }
                     } else if (obj->type == Type::TRANSLATE){
-                        if (obj->translate.hit(r, ray_t, temp_rec, 0.004)) {
+                        if (obj->translate.hit(r, ray_t, temp_rec, randNumber)) {
                             hit_anything = true;
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;
                         }
-                    } 
+                    } else if (obj->type == Type::MEDIUM) {
+                        if (obj->constantMedium.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } else if (obj->type == Type::LIST) {
+                        if (obj->hittableList.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    }
                 }
                 // Move to the next node via the rope
                 if (current->rope_index != -1/*  && current->rope_index != (current - nodes) */) {
@@ -1090,6 +1102,10 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
                 bbox = AaBb(bbox, (hittables + i)->rotateY.bounding_box());
             } else if (hittables[i].type == Type::TRANSLATE) {
                 bbox = AaBb(bbox, (hittables + i)->translate.bounding_box());
+            } else if (hittables[i].type == Type::MEDIUM) {
+                bbox = AaBb(bbox, (hittables + i)->constantMedium.bounding_box());
+            } else if (hittables[i].type == Type::LIST) {
+                bbox = AaBb(bbox, (hittables + i)->hittableList.bounding_box());
             }
             
         }
@@ -1226,14 +1242,14 @@ bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, const  BVHNode
 
 
 __device__
-bool hit(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack)  {
+bool hit(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack, float randNumber)  {
     hit_record temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
     // bool gotHit;
     
     // if(hit3(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
-    if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables)){
+    if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, randNumber)){
     // if(hit_optimized(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, stack)){
         
         hit_anything = true;

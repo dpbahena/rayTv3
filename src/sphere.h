@@ -67,7 +67,7 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
     auto closest_so_far = ray_t.max;
     
     
-    for (int i = 0; i < objects_size; i++){
+        for (int i = 0; i < objects_size; i++){
         if (objects[i].type == Type::SPHERE) {
             if (objects[i].sphere.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
                 
@@ -137,6 +137,26 @@ __device__ __host__
 void hittableList_data::setList(hittable* hittables, size_t list_size) {
     objects = hittables;
     objects_size = list_size;
+    for (int i = 0; i < objects_size; i++){
+        if (objects[i].type == Type::SPHERE) {
+            bbox = AaBb(bbox, objects[i].sphere.bounding_box());
+        }
+        if (objects[i].type == Type::QUAD) {
+            bbox = AaBb(bbox, objects[i].quad.bounding_box());
+        }
+        if (objects[i].type == Type::ROTATE_Y) {
+            bbox = AaBb(bbox, objects[i].rotateY.bounding_box());
+        }
+        if (objects[i].type == Type::TRANSLATE) {
+            bbox = AaBb(bbox, objects[i].translate.bounding_box());
+        }
+        if (objects[i].type == Type::MEDIUM) {
+            bbox = AaBb(bbox, objects[i].constantMedium.bounding_box());
+        }
+        if (objects[i].type == Type::LIST) {
+            bbox = AaBb(bbox, objects[i].hittableList.bounding_box());
+        }
+    }
 }
 
 
@@ -243,7 +263,7 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec, float rand
 
 
 __device__ __host__
-bool constantMedium_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) {
+bool constantMedium_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {
     hit_record rec1, rec2;
     bool hit_anything = false;
 
@@ -317,6 +337,12 @@ AaBb constantMedium_data::bounding_box() const {
         bbox = boundary->quad.bounding_box();
     } else if (boundary->type == Type::SPHERE) {
         bbox = boundary->sphere.bounding_box();
+    } else if (boundary->type == Type::TRANSLATE) {
+        bbox = boundary->translate.bounding_box();
+    } else if (boundary->type == Type::ROTATE_Y) {
+        bbox = boundary->rotateY.bounding_box(); 
+    } else if (boundary->type == Type::LIST) {
+        bbox = boundary->hittableList.bounding_box();
     }
     return bbox;
 }
