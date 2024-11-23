@@ -137,18 +137,24 @@ hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, cons
     auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
     auto dy = glm::vec3(0, max.y - min.y, 0.0f);
     auto dz = glm::vec3(0, 0, max.z - min.z);
-
+    AaBb bbox;
     // Use placement new to initialize the array elements
     new (&sides[0]) hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z), dx, dy, mat));  // front
+    bbox = AaBb(bbox, sides[0].quad.bounding_box());
     new (&sides[1]) hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz, dy, mat)); // right
+    bbox = AaBb(bbox, sides[1].quad.bounding_box());
     new (&sides[2]) hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx, dy, mat)); // back
+    bbox = AaBb(bbox, sides[2].quad.bounding_box());
     new (&sides[3]) hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z), dz, dy, mat));  // left
+    bbox = AaBb(bbox, sides[3].quad.bounding_box());
     new (&sides[4]) hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z), dx, -dz, mat)); // top
+    bbox = AaBb(bbox, sides[4].quad.bounding_box());
     new (&sides[5]) hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z), dx, dz, mat));  // bottom
+    bbox = AaBb(bbox, sides[5].quad.bounding_box());
 
     auto box = memoryManager.allocateHost<hittable>(hittable::make_hittableList()); 
     box->hittableList.setList(sides, 6);
-
+    box->hittableList.bbox = bbox;
     return box;
     
     // return sides;
