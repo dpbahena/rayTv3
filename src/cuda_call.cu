@@ -437,7 +437,7 @@ glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::ve
         state[i] = x;  // saves back the value
 
         // Check if the ray hits anything; if not, add the background color and return
-        if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, stack, randNumber)) {
+        if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, /* stack, */ randNumber)) {
             final_color += cur_attenuation * background;
             return final_color;
         }
@@ -496,8 +496,9 @@ glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::ve
         curandState_t x = state[i];
         float randNumber = random_float(&x);
         state[i] = x;  // saves back the value
+        
         // Check if the ray hits anything; if not, add the background color and return
-        if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, world->hittableList.nodeObjects, world->hittableList.objects, stack, randNumber)) {
+        if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, world->hittableList.nodeObjects, world->hittableList.objects, /* stack, */ randNumber)) {
             final_color += cur_attenuation * background;
             return final_color;
         }
@@ -708,7 +709,7 @@ __global__ void rayTracer_nodes_kernel(curandState_t* states, Camera* cam, uint3
     if (i >= cam->image_width || j >= cam->image_height) return;
     // compute a unique thread ID within the block
     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
-
+    
     extern __shared__ int shared_memory[];
     int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
 
@@ -1466,7 +1467,7 @@ void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHN
 
   
     size_t number_of_hittables = h_hittables_list.size();
-    printf("size: %d\n", (int)number_of_hittables);
+    // printf("size: %d\n", (int)number_of_hittables);
   
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
@@ -1505,7 +1506,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     std::vector<hittable> h_hittables_list;
     
     
-    hittable hittable_obj;  // holds any hittable temporarily
+    // hittable hittable_obj;  // holds any hittable temporarily
 
     // allocate textures
     auto atex = texture::solid_texture(glm::vec3(0.0f, 0.0f, 0.0f)); 
@@ -1617,9 +1618,13 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     } else {
         /** Implementing ROPE based BHV nodes ind cuda */
         int number_of_nodes = (2 * number_of_hittables -1);
-        checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+
+        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
         build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
         h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+        memoryManager.allocateDeferred(d_world, 1);
+        memoryManager.copyToDevice(d_world, &h_world, 1);
        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
         // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
     }
@@ -1733,8 +1738,11 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
  
     
     size_t shared_memory_size =  blockSize.x * blockSize.y * MAX_STACK_SIZE * sizeof(int);
-    if(cam.isBvh)
+    if(cam.isBvh){
+        
         rayTracer_nodes_kernel<<<gridSize, blockSize, shared_memory_size>>>(d_states, d_cam, d_image, d_world);
+        
+    }
         // rayTracer_kernel<<<gridSize, blockSize, shared_memory_size>>>(d_states, d_cam, d_image, d_world, bvh_nodes, d_hittables_list);
     else
         rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);

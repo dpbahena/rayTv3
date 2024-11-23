@@ -995,10 +995,11 @@ __global__ void build_bvh_NR_ROPE7(BVHNode* nodes, hittable* hittables, size_t N
 
 __device__
 bool hit_rope7(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, float randNumber) {
+    
     const BVHNode* current = nodes;  // Start at the root node
     bool hit_anything = false;
     hit_record temp_rec;
-
+    
     while (current != nullptr) {
         if (current->bbox.hit(r, ray_t)) {
             if (current->is_leaf) {
@@ -1188,6 +1189,7 @@ __global__ void build_bvh_NR_ROPE8(BVHNode* nodes, hittable* hittables, size_t N
             }
         }
     }
+    
 }
 
 __device__
@@ -1242,7 +1244,8 @@ bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, const  BVHNode
 
 
 __device__
-bool hit(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack, float randNumber)  {
+bool hit(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, /* int* stack, */ float randNumber)  {
+    
     hit_record temp_rec;
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
