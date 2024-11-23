@@ -1504,7 +1504,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     
     std::vector<hittable> h_hittables_list;
     
-
+    
     hittable hittable_obj;  // holds any hittable temporarily
 
     // allocate textures
@@ -1570,6 +1570,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     h_hittables_list.push_back(obj4);
     h_hittables_list.push_back(obj5);
     h_hittables_list.push_back(obj6);
+    
     h_hittables_list.push_back(obj7);
     h_hittables_list.push_back(obj8);
     
@@ -1586,6 +1587,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     auto translated     = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(265, 0, 295)));
     auto smoked    = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(translated, 0.01f, d_negro));
     h_hittables_list.push_back(*smoked);
+    
 
 
     rotated     = memoryManager.allocateHost<hittable>(hittable::make_rotateY(box2, -18));
@@ -1599,7 +1601,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
-
+    
     hittable h_world = hittable::make_hittableList();
     
     
@@ -1607,6 +1609,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     
     if (!cam.isBvh){ //* No bboxes
         h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+        
         /* Allocate memory for hittable list on the device */
         memoryManager.allocateDeferred(d_world, 1);
         memoryManager.copyToDevice(d_world, &h_world, 1);

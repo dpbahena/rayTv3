@@ -137,26 +137,28 @@ __device__ __host__
 void hittableList_data::setList(hittable* hittables, size_t list_size) {
     objects = hittables;
     objects_size = list_size;
-    for (int i = 0; i < objects_size; i++){
-        if (objects[i].type == Type::SPHERE) {
-            bbox = AaBb(bbox, objects[i].sphere.bounding_box());
-        }
-        if (objects[i].type == Type::QUAD) {
-            bbox = AaBb(bbox, objects[i].quad.bounding_box());
-        }
-        if (objects[i].type == Type::ROTATE_Y) {
-            bbox = AaBb(bbox, objects[i].rotateY.bounding_box());
-        }
-        if (objects[i].type == Type::TRANSLATE) {
-            bbox = AaBb(bbox, objects[i].translate.bounding_box());
-        }
-        if (objects[i].type == Type::MEDIUM) {
-            bbox = AaBb(bbox, objects[i].constantMedium.bounding_box());
-        }
-        if (objects[i].type == Type::LIST) {
-            bbox = AaBb(bbox, objects[i].hittableList.bounding_box());
-        }
-    }
+    
+    // for (int i = 0; i < objects_size; i++){
+    //     if (objects[i].type == Type::SPHERE) {
+    //         bbox = AaBb(bbox, objects[i].sphere.bounding_box());
+    //     }
+    //     if (objects[i].type == Type::QUAD) {
+    //         bbox = AaBb(bbox, objects[i].quad.bounding_box());
+    //     }
+    //     if (objects[i].type == Type::ROTATE_Y) {
+    //         bbox = AaBb(bbox, objects[i].rotateY.bounding_box());
+    //     }
+    //     if (objects[i].type == Type::TRANSLATE) {
+    //         bbox = AaBb(bbox, objects[i].translate.bounding_box());
+    //     }
+    //     if (objects[i].type == Type::MEDIUM) {
+    //         bbox = AaBb(bbox, objects[i].constantMedium.bounding_box());
+    //     }
+    //     if (objects[i].type == Type::LIST) {
+    //         bbox = AaBb(bbox, objects[i].hittableList.bounding_box());
+    //     }
+    // }
+    
 }
 
 
