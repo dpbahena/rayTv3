@@ -157,7 +157,7 @@ hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, cons
     box->hittableList.bbox = bbox;
     return box;
     
-    // return sides;
+    
 
 }
 
@@ -942,23 +942,12 @@ void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode*
     
     if (!cam.isBvh){  //* No bboxes
         h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
     } else {
         /** Implementing ROPE based BHV nodes ind cuda */
         int number_of_nodes = (2 * number_of_hittables -1);
         memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
         build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        
         h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
     }
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
