@@ -1650,32 +1650,11 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         checkCuda(cudaDeviceSetLimit(cudaLimitStackSize, newSize));
          printf("New Stack Size: %d bytes\n", (int)newSize);
     }
-
-
     HybridMemoryManager memoryManager;
-
-
-
-    // std::vector<material*>  device_materials;  
-    // std::vector<texture*>   device_textures;
-    // std::vector<BVHNode*>   allocated_flat_nodes; 
-    // std::vector<hittable*>  allocated_hittables;
-    hittable*               d_hittables_list = memoryManager.deferDeviceAllocation<hittable>();
-    hittable*               d_world = memoryManager.deferDeviceAllocation<hittable>();
-
-    
-
-    Camera* d_cam;
-
-    /* device variables */
-    uint32_t*   d_image;    // for display buffer
-    curandState_t* d_states;  // random calculations in GPU
-    
-    
-    BVHNode* bvh_nodes = memoryManager.deferDeviceAllocation<BVHNode>();
-    
-    
-
+   
+    hittable*   d_hittables_list    = memoryManager.deferDeviceAllocation<hittable>();
+    hittable*   d_world             = memoryManager.deferDeviceAllocation<hittable>();
+    BVHNode*    bvh_nodes           = memoryManager.deferDeviceAllocation<BVHNode>();
       
     switch (cam.scene)  
     {
@@ -1705,17 +1684,21 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         cornell_box_instances(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
         break;
     case 9:
-        // cornell_smoke(cam, device_materials, device_textures, allocated_hittables, allocated_flat_nodes, bvh_nodes, d_hittables_list, d_world);
         cornell_smoke(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
         break;
     default:
         break;
     }
+    Camera*     d_cam       = memoryManager.allocateDevice<Camera>();
+    uint32_t*   d_image     = memoryManager.allocateDevice<uint32_t>(cam.image_width * cam.image_height * sizeof(uint32_t));    // for display buffer
     
     
-    checkCuda(cudaMalloc((void**)&d_image, cam.image_width * cam.image_height * sizeof(uint32_t)));
-    checkCuda(cudaMalloc((void**)&d_cam,  sizeof(Camera)));
-    checkCuda(cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice));
+    memoryManager.copyToDevice(d_cam, &cam);
+    
+
+    // checkCuda(cudaMalloc((void**)&d_image, cam.image_width * cam.image_height * sizeof(uint32_t)));
+    // checkCuda(cudaMalloc((void**)&d_cam,  sizeof(Camera)));
+    // checkCuda(cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice));
     
     
     clock_t start, stop;
@@ -1731,8 +1714,8 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 
     //generate random seed to be used in rayTracer kernel
     int num_threads = threads * threads * blocks_x * blocks_y;
-    
-    checkCuda(cudaMalloc(&d_states, num_threads * sizeof(curandState_t)));
+    curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_threads * sizeof(curandState_t));  // random calculations in GPU
+    // checkCuda(cudaMalloc(&d_states, num_threads * sizeof(curandState_t)));
     init_random<<<gridSize, blockSize>>>(seed, d_states);
     // checkCuda(cudaDeviceSynchronize() );
  
@@ -1755,30 +1738,12 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 
     checkCuda(cudaMemcpy(colorBuffer, d_image, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
-    // delete all device pointers of the materials and AaBb boxes
+   
+    // checkCuda(cudaFree(d_image) );
     
-    // for (auto nodes : allocated_flat_nodes)
-    //     delete nodes;
-
-    // for (auto alloc : allocated_hittables) 
-    //     delete alloc;
-    
-    // for(auto& device : device_materials) 
-    //     checkCuda(cudaFree(device) );
-    // for(auto& device : device_textures) 
-    //     checkCuda(cudaFree(device) );
-    
-    // checkCuda(cudaFree(d_hittables_list) );
-    checkCuda(cudaFree(d_image) );
-    
-    checkCuda(cudaFree(d_cam) );
-    // if(cam.isBvh) {
-    //     checkCuda(cudaFree(bvh_nodes) );
-    // }else {
-    //     // checkCuda(cudaFree(d_world) );
-    //     // checkCuda(cudaFree(d_world))
-    // }
-    checkCuda(cudaFree(d_states) );
+    // checkCuda(cudaFree(d_cam) );
+   
+    // checkCuda(cudaFree(d_states) );
     
     
 }
