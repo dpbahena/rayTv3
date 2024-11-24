@@ -40,6 +40,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_compile_options(${PROJECT_NAME} PRIVATE 
     $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=20012>
     $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=550>
-    $<$<COMPILE_LANGUAGE:CUDA>:-rdc=true>
+    # $<$<COMPILE_LANGUAGE:CUDA>:-rdc=true>
     # $<$<COMPILE_LANGUAGE:CUDA>:-G -g>
 )

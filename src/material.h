@@ -1,5 +1,5 @@
 #pragma once
-// #include "types.h"
+#include "ray.h"
 #include "texture.h"
 
 // enum class Type {NONE, SPHERE, BBOX, LAMBERTIAN, METAL, DIELECTRIC};
@@ -49,20 +49,7 @@ struct material {
 
     /* Default constructor */
     material(): type(Type::NONE) {}
-
-    // ~material() {
-    //     // Clean up dynamically allocated memory based on type
-    //     if (type == Type::LAMBERTIAN && lambertian.tex != nullptr){
-    //         delete lambertian.tex;
-    //         lambertian.tex = nullptr;   // set to nullptr to avoid dangling pointer
-    //     }
-    //     if (type == Type::DIFFUSE && diffuseLight.tex != nullptr){
-    //         delete diffuseLight.tex;
-    //         diffuseLight.tex = nullptr;   // set to nullptr to avoid dangling pointer
-    //     } 
-
-    // }
-
+    
     // constructor for type lambertian
     static material lambertian_material(const glm::vec3& albedo) {
         material obj;

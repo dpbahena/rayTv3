@@ -1,16 +1,40 @@
 #pragma once
 
-
+#include "interval.h"
 #include "material.h"
 #include "texture.h"
 #include "aabb.h"
-#include <vector>
+// #include <vector>
 
 #include <curand_kernel.h>
+#include <thrust/sort.h>
 
 
-struct BVHNode;
-struct material;
+
+// struct material;
+
+struct alignas(16) BVHNode {
+    AaBb bbox;
+    int left_child_index;     // Index of left child in the BVH array (-1 if it's a leaf)
+    int right_child_index;    // Index of right child in the BVH array (-1 if it's a leaf)
+    int rope_index;
+    bool is_leaf;             // Is this node a leaf?
+    size_t start;
+    size_t end;
+    int object_index;         // Index of the object (used if it's a leaf)
+    
+};
+
+
+struct alignas(16) StackNode {
+            size_t start, end;
+            int nodeIndex; // indext of the node being processed
+            int parentIndex;
+            bool isLeftChild;           
+            int ropeIndex;
+};
+
+
 
 class hit_record {
     public:
@@ -83,6 +107,20 @@ struct hittableList_data {
     AaBb bounding_box() const {return bbox;}
 };
 
+struct bvhNode_data {
+    hittable* objects;
+    BVHNode* nodes;
+    size_t objects_size;
+    AaBb bbox;
+
+    __device__ __host__
+    bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
+    __device__ __host__
+    AaBb bounding_box() const {return bbox;}
+    __device__ __host__
+    void build_bvh();
+};
+
 
 //* translate struct
 struct translate_data {
@@ -137,6 +175,7 @@ struct hittable {
         translate_data translate;
         rotateY_data rotateY;
         constantMedium_data constantMedium;
+        bvhNode_data bvhNode;
     };
 
     // default constructor
@@ -196,6 +235,25 @@ struct hittable {
         hittable obj;
         obj.type = Type::LIST;
          
+        return obj;
+    }
+
+    //* bvhNode constructor
+    // static hittable make_bvhNode(hittable list){
+    //     hittable obj;
+    //     obj.type = Type::BVH;
+                
+    //     return obj;
+    // }
+
+    static hittable make_bvhNode(BVHNode* nodes, hittable* objects, size_t objects_size){
+        hittable obj;
+        obj.type = Type::BVH;
+        obj.bvhNode.nodes = nodes;
+        obj.bvhNode.objects = objects;
+        obj.bvhNode.objects_size = objects_size;
+        obj.bvhNode.build_bvh();
+
         return obj;
     }
 

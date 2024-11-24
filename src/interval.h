@@ -1,9 +1,5 @@
 #pragma once
 
-// #include <cfloat>
-
-
-
 
 class interval {
         public:

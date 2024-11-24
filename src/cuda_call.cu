@@ -1,9 +1,11 @@
 #include "cuda_call.h"
-#include "ray.h"
-#include "interval.h"
+// #include "ray.h"
+// #include "interval.h"
 
 // #include "bvh_node.h"
-#include "cuda_bvh_node.h"
+// #include "cuda_bvh_node.h"
+#include "hittable.h"
+#include "sphere.h"
 #include "mem_manager.h"
 #include "texture.h"
 
@@ -469,124 +471,124 @@ __device__ int random_int(curandState_t* state, int a, int b) {
 
 
 // YES BVH
-__device__
-glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::vec3& background, const ray& r, const hittable& world, const BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
-    ray cur_ray = r;
-    glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-    glm::vec3 final_color = glm::vec3(0.0f, 0.0f, 0.0f);
+// __device__
+// glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::vec3& background, const ray& r, const hittable& world, const BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
+//     ray cur_ray = r;
+//     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
+//     glm::vec3 final_color = glm::vec3(0.0f, 0.0f, 0.0f);
 
-    // Loop through the ray bounces up to the specified depth
-    for (int k = 0; k < depth; k++) {
-        hit_record rec;
-        curandState_t x = state[i];
-        float randNumber = random_float(&x);
-        state[i] = x;  // saves back the value
+//     // Loop through the ray bounces up to the specified depth
+//     for (int k = 0; k < depth; k++) {
+//         hit_record rec;
+//         curandState_t x = state[i];
+//         float randNumber = random_float(&x);
+//         state[i] = x;  // saves back the value
 
-        // Check if the ray hits anything; if not, add the background color and return
-        if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, /* stack, */ randNumber)) {
-            final_color += cur_attenuation * background;
-            return final_color;
-        }
+//         // Check if the ray hits anything; if not, add the background color and return
+//         if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, /* stack, */ randNumber)) {
+//             final_color += cur_attenuation * background;
+//             return final_color;
+//         }
 
-        // Ensure that the material pointer is valid
-        // if (!rec.mat) return final_color;
+//         // Ensure that the material pointer is valid
+//         // if (!rec.mat) return final_color;
 
-        // Handle emission from the material
-        glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-        if (rec.mat->type == Type::DIFFUSE) {
-            color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
-        }
+//         // Handle emission from the material
+//         glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
+//         if (rec.mat->type == Type::DIFFUSE) {
+//             color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+//         }
 
-        // Add the emitted light to the final color
-        // final_color += cur_attenuation * (color_from_emission * 3.5f);  // 3.5 creates intensity ..(my own idea)
-        final_color += cur_attenuation * color_from_emission;
+//         // Add the emitted light to the final color
+//         // final_color += cur_attenuation * (color_from_emission * 3.5f);  // 3.5 creates intensity ..(my own idea)
+//         final_color += cur_attenuation * color_from_emission;
 
-        // Prepare to handle scattering
-        ray scattered;
-        glm::vec3 attenuation;
-        bool did_scatter = false;
+//         // Prepare to handle scattering
+//         ray scattered;
+//         glm::vec3 attenuation;
+//         bool did_scatter = false;
 
-        // Scatter based on the material type
-        if (rec.mat->type == Type::METAL) {
-            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-        } else if (rec.mat->type == Type::LAMBERTIAN) {
-            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-        } else if (rec.mat->type == Type::DIELECTRIC) {
-            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);
-        }
+//         // Scatter based on the material type
+//         if (rec.mat->type == Type::METAL) {
+//             did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+//         } else if (rec.mat->type == Type::LAMBERTIAN) {
+//             did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+//         } else if (rec.mat->type == Type::DIELECTRIC) {
+//             did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);
+//         }
 
-        // If scattering did not occur, return the accumulated color
-        if (!did_scatter) {
-            return final_color;
-        }
+//         // If scattering did not occur, return the accumulated color
+//         if (!did_scatter) {
+//             return final_color;
+//         }
 
-        // Update the current ray and attenuation for the next bounce
-        cur_ray = scattered;
-        cur_attenuation *= attenuation;
-    }
+//         // Update the current ray and attenuation for the next bounce
+//         cur_ray = scattered;
+//         cur_attenuation *= attenuation;
+//     }
 
-    // Return the accumulated color after all bounces
-    return final_color;
-}
+//     // Return the accumulated color after all bounces
+//     return final_color;
+// }
 
 // YES BVH  hittable world list
-__device__
-glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::vec3& background, const ray& r, hittable* world, int* stack) {
-    ray cur_ray = r;
-    glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-    glm::vec3 final_color = glm::vec3(0.0f, 0.0f, 0.0f);
+// __device__
+// glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::vec3& background, const ray& r, hittable* world, int* stack) {
+//     ray cur_ray = r;
+//     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
+//     glm::vec3 final_color = glm::vec3(0.0f, 0.0f, 0.0f);
     
-    // Loop through the ray bounces up to the specified depth
-    for (int k = 0; k < depth; k++) {
-        hit_record rec;
-        curandState_t x = state[i];
-        float randNumber = random_float(&x);
-        state[i] = x;  // saves back the value
+//     // Loop through the ray bounces up to the specified depth
+//     for (int k = 0; k < depth; k++) {
+//         hit_record rec;
+//         curandState_t x = state[i];
+//         float randNumber = random_float(&x);
+//         state[i] = x;  // saves back the value
         
-        // Check if the ray hits anything; if not, add the background color and return
-        if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, world->hittableList.nodeObjects, world->hittableList.objects, /* stack, */ randNumber)) {
-            final_color += cur_attenuation * background;
-            return final_color;
-        }
-        // Handle emission from the material
-        glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-        if (rec.mat->type == Type::DIFFUSE) {
-            color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
-        }
+//         // Check if the ray hits anything; if not, add the background color and return
+//         if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, world->hittableList.nodeObjects, world->hittableList.objects, /* stack, */ randNumber)) {
+//             final_color += cur_attenuation * background;
+//             return final_color;
+//         }
+//         // Handle emission from the material
+//         glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
+//         if (rec.mat->type == Type::DIFFUSE) {
+//             color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+//         }
 
-        // Add the emitted light to the final color
-        // final_color += cur_attenuation * (color_from_emission * 3.5f);  // 3.5 creates intensity ..(my own idea)
-        final_color += cur_attenuation * color_from_emission;
+//         // Add the emitted light to the final color
+//         // final_color += cur_attenuation * (color_from_emission * 3.5f);  // 3.5 creates intensity ..(my own idea)
+//         final_color += cur_attenuation * color_from_emission;
 
-        // Prepare to handle scattering
-        ray scattered;
-        glm::vec3 attenuation;
-        bool did_scatter = false;
+//         // Prepare to handle scattering
+//         ray scattered;
+//         glm::vec3 attenuation;
+//         bool did_scatter = false;
 
-        // Scatter based on the material type
-        if (rec.mat->type == Type::METAL) {
-            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-        } else if (rec.mat->type == Type::LAMBERTIAN) {
-            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-        } else if (rec.mat->type == Type::DIELECTRIC) {
-            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);
-        } else if (rec.mat->type == Type::ISOTROPIC){
-            did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, state, i, j);    
-        }
+//         // Scatter based on the material type
+//         if (rec.mat->type == Type::METAL) {
+//             did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+//         } else if (rec.mat->type == Type::LAMBERTIAN) {
+//             did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+//         } else if (rec.mat->type == Type::DIELECTRIC) {
+//             did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);
+//         } else if (rec.mat->type == Type::ISOTROPIC){
+//             did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, state, i, j);    
+//         }
 
-        // If scattering did not occur, return the accumulated color
-        if (!did_scatter) {
-            return final_color;
-        }
+//         // If scattering did not occur, return the accumulated color
+//         if (!did_scatter) {
+//             return final_color;
+//         }
 
-        // Update the current ray and attenuation for the next bounce
-        cur_ray = scattered;
-        cur_attenuation *= attenuation;
-    }
+//         // Update the current ray and attenuation for the next bounce
+//         cur_ray = scattered;
+//         cur_attenuation *= attenuation;
+//     }
 
-    // Return the accumulated color after all bounces
-    return final_color;
-}
+//     // Return the accumulated color after all bounces
+//     return final_color;
+// }
 
 
 // NO BVH
@@ -725,50 +727,50 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 
 
 // YES BVH
-__global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+// __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i >= cam->image_width || j >= cam->image_height) return;
-    // compute a unique thread ID within the block
-    int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
+//     if (i >= cam->image_width || j >= cam->image_height) return;
+//     // compute a unique thread ID within the block
+//     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
 
-    extern __shared__ int shared_memory[];
-    int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
+//     extern __shared__ int shared_memory[];
+//     int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
 
-    glm::vec3 color = {0.0f, 0.0f, 0.0f};
-    for (int sample = 0; sample < cam->samples_per_pixel; sample++){
-        ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-        color  += ray_color(states, i, j, cam->max_depth, cam->background, r, *world, nodes, hittables, stack);
-        // color  += ray_color(states, i, j, depth, r, *world);
-    }
-    // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
-    color *= cam->pixel_sample_scale;
-    image[cam->image_width * j + i] = colorToUint32_t(color);  
-}
+//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
+//     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
+//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
+//         color  += ray_color(states, i, j, cam->max_depth, cam->background, r, *world, nodes, hittables, stack);
+//         // color  += ray_color(states, i, j, depth, r, *world);
+//     }
+//     // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
+//     color *= cam->pixel_sample_scale;
+//     image[cam->image_width * j + i] = colorToUint32_t(color);  
+// }
 
 // YES BVH hittable   list
-__global__ void rayTracer_nodes_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+// __global__ void rayTracer_nodes_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i >= cam->image_width || j >= cam->image_height) return;
-    // compute a unique thread ID within the block
-    int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
+//     if (i >= cam->image_width || j >= cam->image_height) return;
+//     // compute a unique thread ID within the block
+//     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
     
-    extern __shared__ int shared_memory[];
-    int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
+//     extern __shared__ int shared_memory[];
+//     int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
 
-    glm::vec3 color = {0.0f, 0.0f, 0.0f};
-    for (int sample = 0; sample < cam->samples_per_pixel; sample++){
-        ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-        color  += ray_color(states, i, j, cam->max_depth, cam->background, r, world, stack);
-        // color  += ray_color(states, i, j, depth, r, *world);
-    }
-    // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
-    color *= cam->pixel_sample_scale;
-    image[cam->image_width * j + i] = colorToUint32_t(color);  
-}
+//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
+//     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
+//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
+//         color  += ray_color(states, i, j, cam->max_depth, cam->background, r, world, stack);
+//         // color  += ray_color(states, i, j, depth, r, *world);
+//     }
+//     // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
+//     color *= cam->pixel_sample_scale;
+//     image[cam->image_width * j + i] = colorToUint32_t(color);  
+// }
 
 // NO BVH 
 // __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable_list* world) {
@@ -906,27 +908,40 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
 
     auto h_world = hittable::make_hittableList();
 
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    // auto h_nodes = memoryManager.allocateHost<BVHNode>(number_of_nodes);
+    // auto h_bvh =  hittable::make_bvhNode(h_nodes, d_hittable_list, number_of_hittables);
 
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    
+    // printf("dario\n");
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_bvh, 1);
+
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
     
 
 }
@@ -979,18 +994,25 @@ void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode*
      
 
     hittable h_world = hittable::make_hittableList();
-    
-    if (!cam.isBvh){  //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    }
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+
+
+    // if (!cam.isBvh){  //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    // }
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
    
 
 }
@@ -1055,27 +1077,34 @@ void earth(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
      
 
     auto h_world = hittable::make_hittableList();
+
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    memoryManager.allocateDeferred(d_world, 1);
+    memoryManager.copyToDevice(d_world, &h_world, 1);
     
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, sizeof(hittable)); // or 1
-        // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, sizeof(hittable)); // or 1
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
         
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
-    memoryManager.allocateDeferred(d_world, sizeof(hittable)); // or 1
-    memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+    // memoryManager.allocateDeferred(d_world, sizeof(hittable)); // or 1
+    // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
    
 
 }
@@ -1133,26 +1162,34 @@ void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &b
 
     hittable h_world = hittable::make_hittableList();
     
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+
+
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+        
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
    
 
 }
@@ -1230,26 +1267,32 @@ void quads(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
      
 
     hittable h_world = hittable::make_hittableList();
-    
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+    
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
     
 
 }
@@ -1330,26 +1373,32 @@ void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh
      
 
     hittable h_world = hittable::make_hittableList();
-    
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+    
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
     
 
 }
@@ -1446,28 +1495,34 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
      
 
     hittable h_world = hittable::make_hittableList();
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    memoryManager.allocateDeferred(d_world, 1);
+    memoryManager.copyToDevice(d_world, &h_world, 1);
     
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1); // or sizeof(hittable)
-        // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // memoryManager.allocateDeferred(d_world,1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
-    memoryManager.allocateDeferred(d_world, 1); // or sizeof(hittable)
-    memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, 1); // or sizeof(hittable)
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    //     // memoryManager.allocateDeferred(d_world,1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+    // memoryManager.allocateDeferred(d_world, 1); // or sizeof(hittable)
+    // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
     
 
 }
@@ -1535,24 +1590,30 @@ void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHN
 
 
     hittable h_world = hittable::make_hittableList();
-    
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+    
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
 }
 
 void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
@@ -1668,32 +1729,37 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
     
     hittable h_world = hittable::make_hittableList();
-    
-    
-
-    
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        
-        /* Allocate memory for hittable list on the device */
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-        
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-
-        // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        // memoryManager.allocateDeferred(d_world, 1);
-        // memoryManager.copyToDevice(d_world, &h_world, 1);
-       // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-        // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    }
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+    
+
+    
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+        
+    //     /* Allocate memory for hittable list on the device */
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+        
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+
+    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    //     // memoryManager.allocateDeferred(d_world, 1);
+    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
+    //    // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
+    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
+    // }
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
 }
 
 texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 color, const char* filename = "", float scramble_frequency = 0){
@@ -1842,20 +1908,27 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     
     hittable h_world = hittable::make_hittableList();
     
+
+    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    /** Implementing ROPE based BHV nodes ind cuda */
+    int number_of_nodes = (2 * number_of_hittables -1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    memoryManager.allocateDeferred(d_world, 1);
+    memoryManager.copyToDevice(d_world, &h_world, 1);
     
 
     
-    if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    } else {
-        /** Implementing ROPE based BHV nodes ind cuda */
-        int number_of_nodes = (2 * number_of_hittables -1);
-        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    }
-    memoryManager.allocateDeferred(d_world, 1);
-    memoryManager.copyToDevice(d_world, &h_world, 1);
+    // if (!cam.isBvh){ //* No bboxes
+    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    // } else {
+    //     /** Implementing ROPE based BHV nodes ind cuda */
+    //     int number_of_nodes = (2 * number_of_hittables -1);
+    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    // }
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
 
 
 }
@@ -1949,15 +2022,14 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     // checkCuda(cudaDeviceSynchronize() );
  
     
-    size_t shared_memory_size =  blockSize.x * blockSize.y * MAX_STACK_SIZE * sizeof(int);
-    if(cam.isBvh){
+    // size_t shared_memory_size =  blockSize.x * blockSize.y * MAX_STACK_SIZE * sizeof(int);
+    // if(cam.isBvh){
         
-        rayTracer_nodes_kernel<<<gridSize, blockSize, shared_memory_size>>>(d_states, d_cam, d_image, d_world);
+    //     rayTracer_nodes_kernel<<<gridSize, blockSize, shared_memory_size>>>(d_states, d_cam, d_image, d_world);
         
-    }
-        // rayTracer_kernel<<<gridSize, blockSize, shared_memory_size>>>(d_states, d_cam, d_image, d_world, bvh_nodes, d_hittables_list);
-    else
-        rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
+    // }
+    // else
+    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
     
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
