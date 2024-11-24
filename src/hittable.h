@@ -105,6 +105,7 @@ struct rotateY_data {
     bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
+    void calculateBbox();
 
 };
 
@@ -202,6 +203,7 @@ struct hittable {
     static hittable make_translate(hittable* object, const glm::vec3& offset) {
         hittable obj;
         obj.type = Type::TRANSLATE;
+        obj.translate.object = object;
         
         obj.translate.offset = offset;
         switch (object->type){
@@ -214,14 +216,18 @@ struct hittable {
             case Type::ROTATE_Y:
                 obj.translate.bbox = object->rotateY.bounding_box() + offset;
                 break;
+            case Type::LIST:
+                obj.translate.bbox = object->hittableList.bounding_box() + offset;
+                break;
+            case Type::MEDIUM:
+                obj.translate.bbox = object->constantMedium.bounding_box() + offset;
+                break;
             default:
                 break;
         }
-
-        obj.translate.object = object;
+        
 
         return obj;
-
     }
 
     //* RotateY object constructor
@@ -231,51 +237,64 @@ struct hittable {
         auto radians = glm::radians(angle);
         obj.rotateY.sin_theta = sin(radians);
         obj.rotateY.cos_theta = cos(radians);
-        
+        obj.rotateY.object = object;
         switch (object->type){
             case Type::SPHERE:
                 obj.rotateY.bbox = object->sphere.bounding_box();
+                obj.rotateY.calculateBbox();
                 break;
             case Type::QUAD:
                 obj.rotateY.bbox = object->quad.bounding_box();
+                obj.rotateY.calculateBbox();
                 break;
             case Type::TRANSLATE:
                 obj.rotateY.bbox = object->translate.bounding_box();
+                obj.rotateY.calculateBbox();
+                break;
+            case Type::LIST:
+                obj.rotateY.bbox = object->hittableList.bounding_box();
+                obj.rotateY.calculateBbox();
+                break;
+            case Type::MEDIUM:
+                obj.rotateY.bbox = object->constantMedium.bounding_box();
+                obj.rotateY.calculateBbox();
                 break;
             default:
                 break;
         }
-        obj.rotateY.object = object;
-
-        glm::vec3 min(MAXFLOAT, MAXFLOAT, MAXFLOAT);
-        glm::vec3 max(-MAXFLOAT, -MAXFLOAT, -MAXFLOAT);
-
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 2; j++) {
-                for (int k = 0; k < 2; k++) {
-                    auto x = i * obj.rotateY.bbox.x.max + (1 - i) * obj.rotateY.bbox.x.min;
-                    auto y = j * obj.rotateY.bbox.y.max + (1 - j) * obj.rotateY.bbox.y.min;
-                    auto z = k * obj.rotateY.bbox.z.max + (1 - k) * obj.rotateY.bbox.z.min;
-
-                    auto newx =  obj.rotateY.cos_theta * x + obj.rotateY.sin_theta * z;
-                    auto newz = -obj.rotateY.sin_theta * x + obj.rotateY.cos_theta * z;
-
-                    glm::vec3 tester(newx, y, newz);
-
-                    for (int c = 0; c < 3; c++) {
-                        min[c] = fminf(min[c], tester[c]);
-                        max[c] = fmaxf(max[c], tester[c]);
-                    }
-
-                }
-            }
-        }
         
-        obj.rotateY.bbox = AaBb(min, max);
+
+        // glm::vec3 min(MAXFLOAT, MAXFLOAT, MAXFLOAT);
+        // glm::vec3 max(-MAXFLOAT, -MAXFLOAT, -MAXFLOAT);
+
+        // for (int i = 0; i < 2; i++) {
+        //     for (int j = 0; j < 2; j++) {
+        //         for (int k = 0; k < 2; k++) {
+        //             auto x = i * obj.rotateY.bbox.x.max + (1 - i) * obj.rotateY.bbox.x.min;
+        //             auto y = j * obj.rotateY.bbox.y.max + (1 - j) * obj.rotateY.bbox.y.min;
+        //             auto z = k * obj.rotateY.bbox.z.max + (1 - k) * obj.rotateY.bbox.z.min;
+
+        //             auto newx =  obj.rotateY.cos_theta * x + obj.rotateY.sin_theta * z;
+        //             auto newz = -obj.rotateY.sin_theta * x + obj.rotateY.cos_theta * z;
+
+        //             glm::vec3 tester(newx, y, newz);
+
+        //             for (int c = 0; c < 3; c++) {
+        //                 min[c] = fminf(min[c], tester[c]);
+        //                 max[c] = fmaxf(max[c], tester[c]);
+        //             }
+
+        //         }
+        //     }
+        // }
+        
+        // obj.rotateY.bbox = AaBb(min, max);
         
         return obj;
 
     }
+
+    
 
 
     static hittable make_constantMedium(hittable* boundary, float density, const glm::vec3& albedo) {
@@ -307,10 +326,6 @@ struct hittable {
 
         return obj;
     }
-
-    
-
-    
 
 };
      

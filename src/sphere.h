@@ -263,6 +263,35 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec, float rand
     }
 }
 
+void rotateY_data::calculateBbox() {
+
+    glm::vec3 min(MAXFLOAT, MAXFLOAT, MAXFLOAT);
+    glm::vec3 max(-MAXFLOAT, -MAXFLOAT, -MAXFLOAT);
+    
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+            for (int k = 0; k < 2; k++) {
+                auto x = i * bbox.x.max + (1 - i) * bbox.x.min;
+                auto y = j * bbox.y.max + (1 - j) * bbox.y.min;
+                auto z = k * bbox.z.max + (1 - k) * bbox.z.min;
+
+                auto newx =  cos_theta * x + sin_theta * z;
+                auto newz = -sin_theta * x + cos_theta * z;
+
+                glm::vec3 tester(newx, y, newz);
+
+                for (int c = 0; c < 3; c++) {
+                    min[c] = fminf(min[c], tester[c]);
+                    max[c] = fmaxf(max[c], tester[c]);
+                }
+
+            }
+        }
+    }
+    bbox = AaBb(min, max);
+
+}
+
 
 __device__ __host__
 bool constantMedium_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {

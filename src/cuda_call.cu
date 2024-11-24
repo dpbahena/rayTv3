@@ -1826,8 +1826,8 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
 
 
     auto conglomerate = createConglomerate(memoryManager, a, b, whiteMat, 1000 );
-    auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
-    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(-100, 270, 395)));
+    // auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
+    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(-100, 270, 395)));
 
     h_hittables_list.push_back(*translated);
 
