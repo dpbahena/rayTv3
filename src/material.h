@@ -13,6 +13,7 @@ struct lambertian_data {
 
 struct metal_data {
     glm::vec3 albedo;
+    texture* tex;
     float fuzz;
 };
 
@@ -82,6 +83,13 @@ struct material {
         material obj;
         obj.type = Type::METAL;
         obj.metal.albedo = albedo;
+        obj.metal.fuzz = fuzz < 1 ? fuzz : 1.0;
+        return obj;
+    }
+    static material metal_material(texture* tex, double fuzz) {
+        material obj;
+        obj.type = Type::METAL;
+        obj.metal.tex = tex;
         obj.metal.fuzz = fuzz < 1 ? fuzz : 1.0;
         return obj;
     }

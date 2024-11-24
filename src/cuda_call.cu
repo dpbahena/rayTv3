@@ -156,10 +156,49 @@ hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, cons
     box->hittableList.setList(sides, 6);
     box->hittableList.bbox = bbox;
     return box;
-    
-    
-
 }
+
+hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat, int numSpheres) {
+    // Allocate raw memory for the number of spheres
+    hittable* spheres = static_cast<hittable*>(::operator new[](sizeof(hittable) * numSpheres));
+    memoryManager.host_allocations.push_back(spheres); // Track allocation for cleanup
+
+    AaBb bbox;
+    bool firstSphere = true;
+
+    // Random number generator for sphere positions
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> distX(a.x, b.x);
+    std::uniform_real_distribution<float> distY(a.y, b.y);
+    std::uniform_real_distribution<float> distZ(a.z, b.z);
+    std::uniform_real_distribution<float> radiusDist(0.1f, glm::length(b - a) * 0.1f); // Spheres' radii
+
+    for (int i = 0; i < numSpheres; ++i) {
+        // Randomized center position
+        glm::vec3 center(distX(gen), distY(gen), distZ(gen));
+        float radius = radiusDist(gen);
+
+        // Create sphere using placement new
+        new (&spheres[i]) hittable(hittable::make_sphere(center, radius, mat));
+
+        // Update bounding box
+        if (firstSphere) {
+            bbox = spheres[i].sphere.bounding_box();
+            firstSphere = false;
+        } else {
+            bbox = AaBb(bbox, spheres[i].sphere.bounding_box());
+        }
+    }
+
+    // Allocate a hittable list for the conglomerate
+    auto conglomerate = memoryManager.allocateHost<hittable>(hittable::make_hittableList());
+    conglomerate->hittableList.setList(spheres, numSpheres);
+    conglomerate->hittableList.bbox = bbox;
+
+    return conglomerate;
+}
+
 
 
 
@@ -193,7 +232,8 @@ static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& att
     reflected = glm::normalize(reflected) + (metal.fuzz * random_unit_vector(states,  i, j));
     scattered = ray(rec.p, reflected, r_in.time());
     attenuation = metal.albedo;
-    
+    // attenuation = metal.tex->value(rec.u, rec.v, rec.p);
+
     return (glm::dot(scattered.direction, rec.normal) > 0);
 }
 
@@ -1654,9 +1694,169 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     }
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
+}
+
+texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 color, const char* filename = "", float scramble_frequency = 0){
+    texture* d_texture = memoryManager.allocateDevice<texture>();
+
+    if (type == Type::SOLID) {
+        texture h_color = texture::solid_texture(color);
+        memoryManager.copyToDevice(d_texture, &h_color);
+    
+    } else if (type == Type::IMAGE) {
+        auto image = rtw_image(filename);
+        int size = image.width() * image.height() * image.pixelSize();
+        unsigned char* d_bdata = memoryManager.allocateDevice<unsigned char>(size);
+        memoryManager.copyToDevice(d_bdata, image.imageData(), size);
+        auto h_image = texture::image_texture(d_bdata, image.width(), image.height(), image.scanLineSize(), image.pixelSize());
+        memoryManager.copyToDevice(d_texture, &h_image);
+
+    } else if (type == Type::NOISE) {
+       Perlin noise;
+       auto h_noise = texture(texture::noise_texture(noise, scramble_frequency));
+       memoryManager.copyToDevice(d_texture, &h_noise);
+    }
+    return d_texture;
+}
+
+material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture* tex, float fuzz = 0.0f, float refraction_index = 0.0f){
+    material* d_mat = memoryManager.allocateDevice<material>();;
+    if(type == Type::LAMBERTIAN){
+        material h_mat = material::lambertian_material(tex);
+        memoryManager.copyToDevice(d_mat, &h_mat);
+        
+    } else if(type == Type::DIFFUSE) {
+        material h_mat = material::diffuseLight_material(tex);
+        memoryManager.copyToDevice(d_mat, &h_mat);
+        
+    } else if(type == Type::DIELECTRIC) {
+        material h_mat = material::dielectric_material(refraction_index);
+        memoryManager.copyToDevice(d_mat, &h_mat);
+    }
+    return d_mat;
+}
+
+void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+    
+    cam.vfov = 40.0f;
+    cam.lookfrom = glm::vec3( 478.0f, 278.0f, -600.0f);
+    cam.lookat   = glm::vec3( 278.0f, 278.0f,  0.0f);
+    cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+    cam.defocus_angle = 0.0f;
+    cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.0f, 0.0f, 0.0f);
+    cam.initialize();
+    
+    // hold ALL hittables
+    std::vector<hittable> h_hittables_list;
+    
+    // create a hittable list of boxes (each box is a hittable)
+    auto groundColor = createTexture(memoryManager, Type::SOLID, glm::vec3(0.48, 0.83, 0.53));
+    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, groundColor, 0, 0);
+
+
+    std::vector<hittable> boxes;
+    int boxes_per_side = 20;
+
+    for (int i = 0; i < boxes_per_side; i++) {
+        for (int j = 0; j < boxes_per_side; j++) {
+            auto w = 100.0;
+            auto x0 = -1000.0 + i * w;
+            auto z0 = -1000.0 + j * w;
+            auto y0 = 0.0;
+            auto x1 = x0 + w;
+            auto y1 = random_double(1,101);
+            auto z1 = z0 + w;
+            auto box = createBox(memoryManager, glm::vec3(x0, y0, z0), glm::vec3(x1, y1, z1), ground);
+            h_hittables_list.push_back(*box);
+        }
+    }
+
+    // auto andrea = createTexture(memoryManager, Type::IMAGE, glm::vec3(0,0,0), "images/andrea.jpeg");
+    // auto andreaMat = createMaterial(memoryManager, Type::LAMBERTIAN, andrea);
+
+    // auto sofia = createTexture(memoryManager, Type::IMAGE, glm::vec3(0,0,0), "images/sofia.jpeg");
+    // auto sofiaMat = createMaterial(memoryManager, Type::LAMBERTIAN, sofia);
 
     
+
+    // ceiling light
+    auto lightColor = createTexture(memoryManager, Type::SOLID, glm::vec3(7.0, 7.0, 7.0));
+    auto light      = createMaterial(memoryManager, Type::DIFFUSE, lightColor, 0, 0);
+    auto ceilingLamp = hittable::make_quad(glm::vec3(123, 554, 147), glm::vec3(300, 0, 0), glm::vec3(0, 0, 226), light);
+    h_hittables_list.push_back(ceilingLamp);
     
+    //moving sphere
+    auto center1 = glm::vec3(400, 400, 200);
+    auto center2 = center1 + glm::vec3(30, 0, 0);
+    auto sphereTexture  = createTexture(memoryManager, Type::SOLID, glm::vec3(0.7, 0.3, 0.1));
+    auto sphereMaterial = createMaterial(memoryManager, Type::LAMBERTIAN, sphereTexture, 0, 0);
+    h_hittables_list.push_back(hittable::make_sphere(center1, center2, 50, sphereMaterial));
+    // glass sphere
+    auto glass_material = createMaterial(memoryManager, Type::DIELECTRIC, 0, 0, 1.5f );
+    h_hittables_list.push_back(hittable::make_sphere(glm::vec3(260, 150, 45), 50, glass_material));
+    // metal sphere
+    auto d_metal_material = memoryManager.allocateDevice<material>();
+    auto h_metal_material = material::metal_material(glm::vec3(0.8f, 0.8f, 0.9f), 1.0f);
+    memoryManager.copyToDevice(d_metal_material, &h_metal_material);
+    h_hittables_list.push_back(hittable::make_sphere(glm::vec3(0, 150, 145), 50, d_metal_material));
+
+    // blue shiny sphere
+    auto boundary = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(360, 150, 145), 70, createMaterial(memoryManager, Type::DIELECTRIC, NULL, 0, 1.5)));
+    h_hittables_list.push_back(*boundary);
+    h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary, 0.2, glm::vec3(0.2, 0.4, 0.9))));
+    // ??? what sphere is this one?
+    auto boundary1 = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(0, 0, 0), 5000, createMaterial(memoryManager, Type::DIELECTRIC, NULL, 0, 1.5) ));
+    h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary1, .0001f, createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 1.0, 1.0)))));
+    // Globe
+    auto mapTex = createTexture(memoryManager, Type::IMAGE, glm::vec3(0,0,0), "images/earth_map.jpg");
+    auto emat = createMaterial(memoryManager, Type::LAMBERTIAN, mapTex, 0, 0);
+    h_hittables_list.push_back(hittable::make_sphere(glm::vec3(400, 200, 400), 100, emat ));
+    // Perlin patter sphere
+    auto perlinTex = createTexture(memoryManager, Type::NOISE, glm::vec3(0,0,0), "", 0.2);
+    h_hittables_list.push_back(hittable::make_sphere(glm::vec3(220, 280, 300), 80, createMaterial(memoryManager, Type::LAMBERTIAN, perlinTex)));
+    // h_hittables_list.push_back(hittable::make_sphere(glm::vec3(220, 280, 300), 80, andreaMat));
+    auto a = glm::vec3(0, 0, 0);
+    auto b = glm::vec3(165, 165, 165);
+
+    auto white  = createTexture(memoryManager, Type::SOLID, glm::vec3(0.73, 0.73, 0.73));
+    auto whiteMat = createMaterial(memoryManager, Type::LAMBERTIAN, white);
+
+    
+
+
+    auto conglomerate = createConglomerate(memoryManager, a, b, whiteMat, 1000 );
+    auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
+    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(-100, 270, 395)));
+
+    h_hittables_list.push_back(*translated);
+
+
+
+    // complete the scene
+    size_t number_of_hittables = h_hittables_list.size();
+    printf("size: %d\n", (int)number_of_hittables);
+    
+    memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
+    memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
+    
+    hittable h_world = hittable::make_hittableList();
+    
+    
+
+    
+    if (!cam.isBvh){ //* No bboxes
+        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    } else {
+        /** Implementing ROPE based BHV nodes ind cuda */
+        int number_of_nodes = (2 * number_of_hittables -1);
+        memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+        build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
+        h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+    }
+    memoryManager.allocateDeferred(d_world, 1);
+    memoryManager.copyToDevice(d_world, &h_world, 1);
+
 
 }
 
@@ -1711,6 +1911,9 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         break;
     case 9:
         cornell_smoke(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        break;
+    case 10:
+        finalScene(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
         break;
     default:
         break;
