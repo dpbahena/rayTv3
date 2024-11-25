@@ -921,7 +921,9 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     // auto h_nodeList = hittable::make_bvhNode(bvh_nodes, d_hittable_list, number_of_hittables);
 
 
-    auto h_world = hittable::make_hittableList();
+    auto h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    memoryManager.allocateDeferred(d_world, 1);
+    memoryManager.copyToDevice(d_world, &h_world, 1);
     // h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
 
 
@@ -932,7 +934,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     
    
     // if (!cam.isBvh){ //* No bboxes
-        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+        // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     //     /* Allocate memory for hittable list on the device */
     //     // memoryManager.allocateDeferred(d_world, 1);
     //     // memoryManager.copyToDevice(d_world, &h_world, 1);
@@ -951,8 +953,8 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     // }
 
 
-    memoryManager.allocateDeferred(d_world, 1);
-    memoryManager.copyToDevice(d_world, &h_world, 1);
+    // memoryManager.allocateDeferred(d_world, 1);
+    // memoryManager.copyToDevice(d_world, &h_world, 1);
 
     // memoryManager.copyToDevice(d_world, &h_world, 1);
     
@@ -1006,8 +1008,8 @@ void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode*
     // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    hittable h_world = hittable::make_hittableList();
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
@@ -1089,9 +1091,9 @@ void earth(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
     // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    auto h_world = hittable::make_hittableList();
+    auto h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
 
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
@@ -1173,9 +1175,9 @@ void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &b
     // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    hittable h_world = hittable::make_hittableList();
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
     
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
@@ -1279,8 +1281,8 @@ void quads(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
     // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    hittable h_world = hittable::make_hittableList();
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
@@ -1385,8 +1387,8 @@ void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh
     // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    hittable h_world = hittable::make_hittableList();
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
@@ -1507,8 +1509,8 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
     // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
-    hittable h_world = hittable::make_hittableList();
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
@@ -1602,8 +1604,8 @@ void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHN
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
 
 
-    hittable h_world = hittable::make_hittableList();
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
@@ -1741,8 +1743,8 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
     
-    hittable h_world = hittable::make_hittableList();
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);

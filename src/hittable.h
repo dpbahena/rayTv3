@@ -233,13 +233,17 @@ struct hittable {
         return obj;
     }
 
-    //* bvhNode constructor
-    // static hittable make_bvhNode(hittable list){
-    //     hittable obj;
-    //     obj.type = Type::BVH;
-                
-    //     return obj;
-    // }
+    //* hittable list constructor
+    static hittable make_hittableList(hittable* objects, size_t objects_size) {
+        hittable obj;
+        obj.type = Type::LIST;
+        obj.hittableList.objects = objects;
+        obj.hittableList.objects_size = objects_size;
+         
+        return obj;
+    }
+
+    
     
     static hittable make_bvhNode(BVHNode* nodes, hittable* objects, size_t objects_size){
         hittable obj;
