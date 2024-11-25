@@ -72,13 +72,13 @@ struct material {
         obj.metal.fuzz = fuzz < 1 ? fuzz : 1.0;
         return obj;
     }
-    static material metal_material(texture* tex, double fuzz) {
-        material obj;
-        obj.type = Type::METAL;
-        obj.metal.tex = tex;
-        obj.metal.fuzz = fuzz < 1 ? fuzz : 1.0;
-        return obj;
-    }
+    // static material metal_material(texture* tex, double fuzz) {
+    //     material obj;
+    //     obj.type = Type::METAL;
+    //     obj.metal.tex = tex;
+    //     obj.metal.fuzz = fuzz < 1 ? fuzz : 1.0;
+    //     return obj;
+    // }
     // constructor for type dielectric
     static material dielectric_material(double refraction_index) {
         material obj;

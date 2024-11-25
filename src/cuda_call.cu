@@ -95,20 +95,27 @@ texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 
     return d_texture;
 }
 
-material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture* tex, float fuzz = 0.0f, float refraction_index = 0.0f){
-    material* d_mat = memoryManager.allocateDevice<material>();;
+material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture* tex, glm::vec3 color = glm::vec3(0.0f), float fuzz = 0.0f, float refraction_index = 0.0f){
+    material* d_mat = memoryManager.allocateDevice<material>();
+    
     if(type == Type::LAMBERTIAN){
-        material h_mat = material::lambertian_material(tex);
+        auto h_mat = material::lambertian_material(tex);
         memoryManager.copyToDevice(d_mat, &h_mat);
         
     } else if(type == Type::DIFFUSE) {
-        material h_mat = material::diffuseLight_material(tex);
+        auto h_mat = material::diffuseLight_material(tex);
         memoryManager.copyToDevice(d_mat, &h_mat);
         
     } else if(type == Type::DIELECTRIC) {
-        material h_mat = material::dielectric_material(refraction_index);
+        auto h_mat = material::dielectric_material(refraction_index);
+        memoryManager.copyToDevice(d_mat, &h_mat);
+    
+    } else if (type == Type::METAL) {
+        
+        auto h_mat = material::metal_material(color, fuzz);
         memoryManager.copyToDevice(d_mat, &h_mat);
     }
+     
     return d_mat;
 }
 
@@ -542,26 +549,12 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
 
+    std::vector<hittable> h_hittables_list, bvh_group;
     
-    std::vector<hittable> h_hittables_list, h_hittable_group;
-
-    // material* d_ground = memoryManager.allocateDevice<material>();
-    // texture* d_ground_tex = memoryManager.allocateDevice<texture>();
-    
-    // ground 
-    /* material */
-    // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
-    // memoryManager.copyToDevice(d_ground_tex, &h_ground_tex);
-    
-    // material h_ground = material::lambertian_material(d_ground_tex);
-    // memoryManager.copyToDevice(d_ground, &h_ground);
-    
-    auto checkerTex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f), NULL, 0, 0.32f);
-    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, checkerTex);
+    auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
+    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
     auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
     h_hittables_list.push_back(hittable_obj);
-
-    // h_hittable_group.push_back(hittable_obj);
 
     // Create random spheres 
     for (int a = -11; a < 11; a++) {
@@ -569,76 +562,54 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
             auto choose_material = random_double();
             glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
             hittable sphere;
+
             if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
                 if(choose_material < 0.8f) {
                     // difuse
                     glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    auto a_material = material::lambertian_material(albedo);
-                    material* d_mat = memoryManager.allocateDevice<material>();
-                    memoryManager.copyToDevice(d_mat, &a_material);
                     glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
-                    sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
-                    // h_hittables_list.push_back(sphere);
+                    auto lmat = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, albedo));
+                    
+                    sphere = hittable::make_sphere(center, center2, 0.2f, lmat);
 
                 }else if(choose_material < 0.95f) {
                     // metal
                     glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
                     float fuzz = random_double(0.0f, 0.5f);
-                    auto a_material = material::metal_material(albedo, fuzz);
-                    material* d_mat = memoryManager.allocateDevice<material>();
-                    memoryManager.copyToDevice(d_mat, &a_material);
-                    sphere = hittable::make_sphere(center, 0.2f, d_mat);
-                    // h_hittables_list.push_back(sphere);
+                    auto mat = createMaterial(memoryManager, Type::METAL, {}, albedo, fuzz);
+                    sphere = hittable::make_sphere(center, 0.2f, mat);
                 }
                 else  {
                     // dielectric
-                    glm::vec3 albedo = glm::vec3(random_double(), random_double(), random_double()) * glm::vec3(random_double(), random_double(), random_double());
-                    auto a_material = material::dielectric_material(1.5);
-                    material* d_mat = memoryManager.allocateDevice<material>();
-                    memoryManager.copyToDevice(d_mat, &a_material);
-                    sphere = hittable::make_sphere(center, 0.2f, d_mat);
-                    // h_hittables_list.push_back(sphere);
+                    auto mat = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5);
+                    sphere = hittable::make_sphere(center, 0.2f, mat);
                 }
-                h_hittable_group.push_back(sphere);
+                bvh_group.push_back(sphere);
             }
         }
     }
 
 
     // Three secundary spheres
+    auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
+    hittable_obj = hittable::make_sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, glass);
+    h_hittables_list.push_back(hittable_obj);
 
-    /* material */
-    material h_mat1 = material::dielectric_material(1.5f);
-    material* d_mat1 = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_mat1, &h_mat1);
-    hittable_obj = hittable::make_sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, d_mat1);
+    auto a_color = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.4f, 0.2f, 0.1f), {},{},{},{}));
+    hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, a_color);
     h_hittables_list.push_back(hittable_obj);
-    // h_hittable_group.push_back(hittable_obj);
-    
-    /* Material */
-    material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
-    material* d_mat2 = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_mat2, &h_mat2);
-    hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, d_mat2);
-    h_hittables_list.push_back(hittable_obj);
-    // h_hittable_group.push_back(hittable_obj);
 
-    /* Material */
-    material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
-    material* d_mat3 = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_mat3, &h_mat3);
-    hittable_obj = hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, d_mat3);
+    auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
+    hittable_obj = hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, silver);
     h_hittables_list.push_back(hittable_obj);
-    // h_hittable_group.push_back(hittable_obj);
  
 
     // group spheres as bvh_nodes
-    auto d_hittable_group = memoryManager.allocateDevice<hittable>(h_hittable_group.size());
-    memoryManager.copyToDevice(d_hittable_group, h_hittable_group.data(), h_hittable_group.size());
-    int number_of_nodes = (2 * h_hittable_group.size() - 1);
-    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    auto d_hittable_group = memoryManager.allocateDevice<hittable>(bvh_group.size());
+    memoryManager.copyToDevice(d_hittable_group, bvh_group.data(), bvh_group.size());
+    int number_of_nodes = (2 * bvh_group.size() - 1);
     auto nodes = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
-    auto groupList = hittable::make_bvhNode(nodes, d_hittable_group, h_hittable_group.size());
+    auto groupList = hittable::make_bvhNode(nodes, d_hittable_group, bvh_group.size());
     h_hittables_list.push_back(groupList);
 
 
@@ -647,50 +618,9 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
        
-    /** Implementing ROPE based BHV nodes in cuda */
-    // int number_of_nodes = (2 * number_of_hittables -1);
-    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    // auto h_nodeList = hittable::make_bvhNode(bvh_nodes, d_hittable_list, number_of_hittables);
-
-
     auto h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
-    // h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-
-
-
-
-
-    // auto bvh_list = hittable::make_bvhNode(h_bvhNodes, h_hittables_list.data(), number_of_hittables);
-    
-   
-    // if (!cam.isBvh){ //* No bboxes
-        // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-
-
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
-
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
-    
-
 }
 
 void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
@@ -708,69 +638,25 @@ void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode*
     
     auto tex1 = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f), NULL, 0, 0.32f);
     auto topMat = createMaterial(memoryManager, Type::LAMBERTIAN, tex1);
+    
     auto tex2 = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), NULL, 0, 0.08f);
     auto bottomMat = createMaterial(memoryManager, Type::LAMBERTIAN, tex2);
-
     
-    
-    
-    
-    
-    // material* d_ground      = memoryManager.allocateDevice<material>();
-    // texture* d_ground_tex   = memoryManager.allocateDevice<texture>();
-    
-    // ground 
-    //* Texture
-    // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
-    // memoryManager.copyToDevice(d_ground_tex, &h_ground_tex);
-    // checkCuda(cudaMalloc((void**)&d_ground_tex, sizeof(texture)) );
-    // checkCuda(cudaMemcpy(d_ground_tex, &h_ground_tex, sizeof(texture), cudaMemcpyHostToDevice) );
-    // device_textures.push_back(d_ground_tex);
-    //* material
-    // material h_ground = material::lambertian_material(d_ground_tex);
-    // memoryManager.copyToDevice(d_ground, &h_ground);
-    // checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_ground);
     auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-10.0, 0.0), 10, bottomMat);
     h_hittables_list.push_back(hittable_obj);
 
     hittable_obj = hittable::make_sphere(glm::vec3(0.0, 10.0, 0.0), 10, topMat);
     h_hittables_list.push_back(hittable_obj);
 
-    
-    
     size_t number_of_hittables = h_hittables_list.size();
 
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
 
-  
-    // checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
-    // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
-     
-
     hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
-
-
-    // if (!cam.isBvh){  //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    // }
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
-   
 
 }
 
@@ -784,10 +670,7 @@ void earth(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
     cam.focus_dist = 10.0f;
     cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
-    
-    
-
-    
+      
     std::vector<hittable> h_hittables_list;
     material* d_ground     = memoryManager.allocateDevice<material>();
     texture* d_image_tex   = memoryManager.allocateDevice<texture>(); 
@@ -1537,7 +1420,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     
     // create a hittable list of boxes (each box is a hittable)
     auto groundColor = createTexture(memoryManager, Type::SOLID, glm::vec3(0.48, 0.83, 0.53));
-    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, groundColor, 0, 0);
+    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, groundColor);
 
 
     std::vector<hittable> boxesGroup, conglomerateGroup;
@@ -1567,7 +1450,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
 
     // ceiling light
     auto lightColor = createTexture(memoryManager, Type::SOLID, glm::vec3(7.0, 7.0, 7.0));
-    auto light      = createMaterial(memoryManager, Type::DIFFUSE, lightColor, 0, 0);
+    auto light      = createMaterial(memoryManager, Type::DIFFUSE, lightColor);
     auto ceilingLamp = hittable::make_quad(glm::vec3(123, 554, 147), glm::vec3(300, 0, 0), glm::vec3(0, 0, 226), light);
     h_hittables_list.push_back(ceilingLamp);
     
@@ -1575,10 +1458,10 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     auto center1 = glm::vec3(400, 400, 200);
     auto center2 = center1 + glm::vec3(30, 0, 0);
     auto sphereTexture  = createTexture(memoryManager, Type::SOLID, glm::vec3(0.7, 0.3, 0.1));
-    auto sphereMaterial = createMaterial(memoryManager, Type::LAMBERTIAN, sphereTexture, 0, 0);
+    auto sphereMaterial = createMaterial(memoryManager, Type::LAMBERTIAN, sphereTexture);
     h_hittables_list.push_back(hittable::make_sphere(center1, center2, 50, sphereMaterial));
     // glass sphere
-    auto glass_material = createMaterial(memoryManager, Type::DIELECTRIC, 0, 0, 1.5f );
+    auto glass_material = createMaterial(memoryManager, Type::DIELECTRIC, 0, glm::vec3(0), 0, 1.5f );
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(260, 150, 45), 50, glass_material));
     // metal sphere
     auto d_metal_material = memoryManager.allocateDevice<material>();
@@ -1587,15 +1470,15 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(0, 150, 145), 50, d_metal_material));
 
     // blue shiny sphere
-    auto boundary = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(360, 150, 145), 70, createMaterial(memoryManager, Type::DIELECTRIC, NULL, 0, 1.5)));
+    auto boundary = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(360, 150, 145), 70, createMaterial(memoryManager, Type::DIELECTRIC, NULL, glm::vec3(0), 0, 1.5)));
     h_hittables_list.push_back(*boundary);
     h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary, 0.2, glm::vec3(0.2, 0.4, 0.9))));
     // ??? what sphere is this one?
-    auto boundary1 = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(0, 0, 0), 5000, createMaterial(memoryManager, Type::DIELECTRIC, NULL, 0, 1.5) ));
+    auto boundary1 = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(0, 0, 0), 5000, createMaterial(memoryManager, Type::DIELECTRIC, NULL, glm::vec3(0), 0, 1.5) ));
     h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary1, .0001f, createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 1.0, 1.0)))));
     // Globe
     auto mapTex = createTexture(memoryManager, Type::IMAGE, glm::vec3(0), glm::vec3(0), "images/earth_map.jpg");
-    auto emat = createMaterial(memoryManager, Type::LAMBERTIAN, mapTex, 0, 0);
+    auto emat = createMaterial(memoryManager, Type::LAMBERTIAN, mapTex);
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(400, 200, 400), 100, emat ));
     // Perlin patter sphere
     auto perlinTex = createTexture(memoryManager, Type::NOISE, glm::vec3(0), glm::vec3(0), NULL , 0.2);
