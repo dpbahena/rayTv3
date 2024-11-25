@@ -1,9 +1,4 @@
 #include "cuda_call.h"
-// #include "ray.h"
-// #include "interval.h"
-
-// #include "bvh_node.h"
-// #include "cuda_bvh_node.h"
 #include "hittable.h"
 #include "sphere.h"
 #include "mem_manager.h"
@@ -13,7 +8,6 @@
 #include <vector>
 #include <random>
 #include <chrono>
-// #include <curand_kernel.h>
 
 #define MAX_STACK_SIZE 20
 
@@ -905,22 +899,23 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
 
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
-
-    auto h_world = hittable::make_hittableList();
-
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+       
     /** Implementing ROPE based BHV nodes ind cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
-    // auto h_nodes = memoryManager.allocateHost<BVHNode>(number_of_nodes);
-    // auto h_bvh =  hittable::make_bvhNode(h_nodes, d_hittable_list, number_of_hittables);
-
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    
-    // printf("dario\n");
-    memoryManager.allocateDeferred(d_world, 1);
-    memoryManager.copyToDevice(d_world, &h_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_bvh, 1);
+    auto h_nodeList = hittable::make_bvhNode(bvh_nodes, d_hittable_list, number_of_hittables);
 
+
+    // auto h_world = hittable::make_hittableList();
+    // h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
+
+
+
+
+
+    // auto bvh_list = hittable::make_bvhNode(h_bvhNodes, h_hittables_list.data(), number_of_hittables);
+    
+   
     // if (!cam.isBvh){ //* No bboxes
     //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     //     /* Allocate memory for hittable list on the device */
@@ -940,7 +935,10 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
     // }
 
-    // memoryManager.allocateDeferred(d_world, 1);
+
+    memoryManager.allocateDeferred(d_world, 1);
+    memoryManager.copyToDevice(d_world, &h_nodeList, 1);
+
     // memoryManager.copyToDevice(d_world, &h_world, 1);
     
 
@@ -1953,8 +1951,8 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
    
     hittable*   d_hittables_list    = memoryManager.deferDeviceAllocation<hittable>();
     hittable*   d_world             = memoryManager.deferDeviceAllocation<hittable>();
+    hittable*   d_bWorld            = memoryManager.deferDeviceAllocation<hittable>();
     BVHNode*    bvh_nodes           = memoryManager.deferDeviceAllocation<BVHNode>();
-      
     switch (cam.scene)  
     {
     case 1:

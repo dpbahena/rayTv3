@@ -4,14 +4,9 @@
 #include "material.h"
 #include "texture.h"
 #include "aabb.h"
-// #include <vector>
-
 #include <curand_kernel.h>
 #include <thrust/sort.h>
 
-
-
-// struct material;
 
 struct alignas(16) BVHNode {
     AaBb bbox;
@@ -245,13 +240,14 @@ struct hittable {
                 
     //     return obj;
     // }
-
+    
     static hittable make_bvhNode(BVHNode* nodes, hittable* objects, size_t objects_size){
         hittable obj;
         obj.type = Type::BVH;
         obj.bvhNode.nodes = nodes;
         obj.bvhNode.objects = objects;
         obj.bvhNode.objects_size = objects_size;
+        
         obj.bvhNode.build_bvh();
 
         return obj;
@@ -386,4 +382,6 @@ struct hittable {
     }
 
 };
+
+
      
