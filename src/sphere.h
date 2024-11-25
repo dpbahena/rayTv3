@@ -314,23 +314,6 @@ void bvhNode_data::build_bvh() {
     build_bvh_kernel<<<1, 1>>>(nodes, objects, objects_size);
 }
 
-// __device__ __host__
-// bool bvhNode_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {
-//     hit_record temp_rec;
-//     bool hit_anything = false;
-//     auto closest_so_far = ray_t.max;
-
-//     if(hit_rope7(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, objects, randNumber)){
-//     // if(hit_optimized(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, hittables, stack)){
-        
-//         hit_anything = true;
-//         closest_so_far = temp_rec.t;
-//         rec = temp_rec;
-//     }
-    
-
-//     return hit_anything;
-// };
 
 __device__ __host__
 bool hitBvhTransverse(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* objects, float randNumber)  {
@@ -410,7 +393,6 @@ bool hitBvhTransverse(const ray& r, interval ray_t, hit_record& rec, BVHNode* no
 __device__ __host__
 bool bvhNode_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {
 
-    // return hitBvhTransverse(r, interval(ray_t.min, closest_so_far), temp_rec, nodes, objects, randNumber);
     return hitBvhTransverse(r, ray_t, rec, nodes, objects, randNumber);
 }
 

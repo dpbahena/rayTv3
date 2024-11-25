@@ -900,7 +900,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
        
-    /** Implementing ROPE based BHV nodes ind cuda */
+    /** Implementing ROPE based BHV nodes in cuda */
     int number_of_nodes = (2 * number_of_hittables -1);
     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     auto h_nodeList = hittable::make_bvhNode(bvh_nodes, d_hittable_list, number_of_hittables);
@@ -1800,7 +1800,7 @@ material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture*
     return d_mat;
 }
 
-void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, BVHNode* &bvh_nodes2, hittable* &d_hittable_list, hittable* &d_hittable_g1, hittable* &d_hittable_g2, hittable* &d_world, hittable* &d_world_g1, hittable* d_world_g2){
     
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 478.0f, 278.0f, -600.0f);
@@ -1811,7 +1811,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     cam.background = glm::vec3(0.0f, 0.0f, 0.0f);
     cam.initialize();
     
-    // hold ALL hittables
+    // hold some hittables
     std::vector<hittable> h_hittables_list;
     
     // create a hittable list of boxes (each box is a hittable)
@@ -1819,7 +1819,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, groundColor, 0, 0);
 
 
-    std::vector<hittable> boxes;
+    std::vector<hittable> boxesGroup, conglomerateGroup;
     int boxes_per_side = 20;
 
     for (int i = 0; i < boxes_per_side; i++) {
@@ -1832,7 +1832,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
             auto y1 = random_double(1,101);
             auto z1 = z0 + w;
             auto box = createBox(memoryManager, glm::vec3(x0, y0, z0), glm::vec3(x1, y1, z1), ground);
-            h_hittables_list.push_back(*box);
+            boxesGroup.push_back(*box);
         }
     }
 
@@ -1893,9 +1893,28 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     // auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
     auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(-100, 270, 395)));
 
-    h_hittables_list.push_back(*translated);
+    conglomerateGroup.push_back(*translated);
 
 
+    // group 1 BVH nodes 
+    auto d_g1_hittables = memoryManager.allocateDevice<hittable>(boxesGroup.size());
+    // memoryManager.allocateDeferred(d_hittable_g1, boxesGroup.size());
+    memoryManager.copyToDevice(d_g1_hittables, boxesGroup.data(), boxesGroup.size());
+    int number_of_nodes = (2 * boxesGroup.size() - 1);
+    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    auto boxList = hittable::make_bvhNode(bvh_nodes, d_g1_hittables, boxesGroup.size());
+    h_hittables_list.push_back(boxList);
+    // grou 2 BVH nodes
+    auto d_g2_hittables = memoryManager.allocateDevice<hittable>(conglomerateGroup.size());
+    memoryManager.copyToDevice(d_g2_hittables, conglomerateGroup.data(), conglomerateGroup.size());
+    number_of_nodes = (2 * conglomerateGroup.size() - 1);
+    auto bvh2 = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
+    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    auto conglom_list = hittable::make_bvhNode(bvh2, d_g2_hittables, conglomerateGroup.size());
+    h_hittables_list.push_back(conglom_list);
+
+
+    // overall
 
     // complete the scene
     size_t number_of_hittables = h_hittables_list.size();
@@ -1904,13 +1923,18 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
     
+
+
+
+
+
     hittable h_world = hittable::make_hittableList();
     
 
     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    // int number_of_nodes = (2 * number_of_hittables -1);
+    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
     
@@ -1950,9 +1974,13 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     HybridMemoryManager memoryManager;
    
     hittable*   d_hittables_list    = memoryManager.deferDeviceAllocation<hittable>();
+    hittable*   d_hittables_group1  = memoryManager.deferDeviceAllocation<hittable>();
+    hittable*   d_hittables_group2  = memoryManager.deferDeviceAllocation<hittable>();
+    hittable*   d_group1            = memoryManager.deferDeviceAllocation<hittable>();
+    hittable*   d_group2            = memoryManager.deferDeviceAllocation<hittable>();
     hittable*   d_world             = memoryManager.deferDeviceAllocation<hittable>();
-    hittable*   d_bWorld            = memoryManager.deferDeviceAllocation<hittable>();
     BVHNode*    bvh_nodes           = memoryManager.deferDeviceAllocation<BVHNode>();
+    BVHNode*    bvh_nodes2          = memoryManager.deferDeviceAllocation<BVHNode>();
     switch (cam.scene)  
     {
     case 1:
@@ -1984,7 +2012,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         cornell_smoke(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
         break;
     case 10:
-        finalScene(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        finalScene(cam, memoryManager, bvh_nodes, bvh_nodes2, d_hittables_list, d_hittables_group1, d_hittables_group2, d_world, d_group1, d_group2);
         break;
     default:
         break;
