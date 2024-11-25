@@ -829,6 +829,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     
     auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, d_ground);
     h_hittables_list.push_back(hittable_obj);
+    // h_hittable_group.push_back(hittable_obj);
 
     // Create random spheres 
     for (int a = -11; a < 11; a++) {
@@ -880,6 +881,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     memoryManager.copyToDevice(d_mat1, &h_mat1);
     hittable_obj = hittable::make_sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, d_mat1);
     h_hittables_list.push_back(hittable_obj);
+    // h_hittable_group.push_back(hittable_obj);
     
     /* Material */
     material h_mat2 = material::lambertian_material(glm::vec3(0.4f, 0.2f, 0.1f));
@@ -887,6 +889,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     memoryManager.copyToDevice(d_mat2, &h_mat2);
     hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, d_mat2);
     h_hittables_list.push_back(hittable_obj);
+    // h_hittable_group.push_back(hittable_obj);
 
     /* Material */
     material h_mat3 = material::metal_material(glm::vec3(0.7f, 0.6f, 0.5f), 0.0);
@@ -894,6 +897,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     memoryManager.copyToDevice(d_mat3, &h_mat3);
     hittable_obj = hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, d_mat3);
     h_hittables_list.push_back(hittable_obj);
+    // h_hittable_group.push_back(hittable_obj);
  
 
     // group spheres as bvh_nodes
