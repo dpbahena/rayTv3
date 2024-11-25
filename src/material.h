@@ -2,7 +2,6 @@
 #include "ray.h"
 #include "texture.h"
 
-// enum class Type {NONE, SPHERE, BBOX, LAMBERTIAN, METAL, DIELECTRIC};
 
 
 // Define a struct for lambertian material
@@ -49,7 +48,7 @@ struct material {
 
     /* Default constructor */
     material(): type(Type::NONE) {}
-    
+        
     // constructor for type lambertian
     static material lambertian_material(const glm::vec3& albedo) {
         material obj;

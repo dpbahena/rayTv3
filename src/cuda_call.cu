@@ -16,20 +16,23 @@ __device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, 
 __device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
 __device__ inline glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max);
 __device__ inline glm::vec3 random_vector(curandState_t* states,  int i, int j);
-__device__ inline float     random_float_in_range(curandState_t* state, float a, float b);
 __device__ inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n);
 __device__ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_over_etat);
 __device__ inline glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
 __device__ inline glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
-// __device__ inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const ray &r, const hittable_list& world);
 __device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
 __device__ inline bool      near_zero(const glm::vec3 v);
 __device__ inline float     reflectance(float cosine, float refraction_index);
-__device__  inline float     random_float(curandState_t* state);
+__device__ inline float     random_float(curandState_t* state);
+__device__ inline float     random_float_in_range(curandState_t* state, float a, float b);
 
-
-
-
+// host function declarations
+hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat);
+hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat, int numSpheres);
+inline double random_double();
+inline double random_double(float min, float max);
+inline int random_int(int min, int max);
+inline glm::vec3 unit_vector(const glm::vec3& v);
 
 
 
@@ -53,11 +56,61 @@ inline int random_int(int min, int max) {
 }
 
 inline glm::vec3 unit_vector(const glm::vec3& v){
-    // auto a = glm::length(v);
-    // return glm::vec3(v/a);
     return glm::normalize(v);
 }
 
+/**
+ * @SOLID:   createTexture(memoryManager, Type::SOLID, color)
+ * @IMAGE:   createTexture(memoryManager, Type::IMAGE, glm::vec3(0.0), glm::vec3(0.0), "/images/filename")
+ * @CHECKER: createTexture(memoryManager, Type::CHECKER, glm::vec3(red, green, blue), glm::vec3(red, green, blue), NULL, 0, scale (0.0f - 1.0f))
+ * @NOISE:   createTexture(memoryManager, Type::NOISE, glm::vec3(0.0), glm::vec3(0.0), NULL, scramble_frequency (0.0f - 1.0f))
+ */
+texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 color, glm::vec3 color2 = glm::vec3(0.0f), const char* filename = "", float scramble_frequency = 0.0f, float scale = 0.0f){
+    texture* d_texture = memoryManager.allocateDevice<texture>();
+
+    if (type == Type::SOLID) {
+        texture h_color = texture::solid_texture(color);
+        memoryManager.copyToDevice(d_texture, &h_color);
+    
+    } else if (type == Type::IMAGE) {
+        auto image = rtw_image(filename);
+        int size = image.width() * image.height() * image.pixelSize();
+        unsigned char* d_bdata = memoryManager.allocateDevice<unsigned char>(size);
+        memoryManager.copyToDevice(d_bdata, image.imageData(), size);
+        auto h_image = texture::image_texture(d_bdata, image.width(), image.height(), image.scanLineSize(), image.pixelSize());
+        memoryManager.copyToDevice(d_texture, &h_image);
+
+    } else if (type == Type::NOISE) {
+        Perlin noise;
+        auto h_noise = texture(texture::noise_texture(noise, scramble_frequency));
+        memoryManager.copyToDevice(d_texture, &h_noise);
+
+    } else if (type == Type::CHECKER) {
+        auto odd = memoryManager.allocateHost<texture>(texture::solid_texture(color));
+        auto even = memoryManager.allocateHost<texture>(texture::solid_texture(color2));
+        auto checkerColor = texture::checker_texture(scale, odd, even);
+        memoryManager.copyToDevice(d_texture, &checkerColor);
+    }
+
+    return d_texture;
+}
+
+material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture* tex, float fuzz = 0.0f, float refraction_index = 0.0f){
+    material* d_mat = memoryManager.allocateDevice<material>();;
+    if(type == Type::LAMBERTIAN){
+        material h_mat = material::lambertian_material(tex);
+        memoryManager.copyToDevice(d_mat, &h_mat);
+        
+    } else if(type == Type::DIFFUSE) {
+        material h_mat = material::diffuseLight_material(tex);
+        memoryManager.copyToDevice(d_mat, &h_mat);
+        
+    } else if(type == Type::DIELECTRIC) {
+        material h_mat = material::dielectric_material(refraction_index);
+        memoryManager.copyToDevice(d_mat, &h_mat);
+    }
+    return d_mat;
+}
 
 /**
  * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
@@ -67,60 +120,6 @@ inline glm::vec3 unit_vector(const glm::vec3& v){
  * @param b 
  * @param mat 
  */
-// hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
-    
-//     //* Allocate memory for the box (6 sides )
- 
-//     hittable* sides = memoryManager.allocateHost<hittable>(6);
-
-//     // construct the two opposite vertices with the minimum and maximum coordinates
-//     auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
-//     auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
-
-//     auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
-//     auto dy = glm::vec3(0, max.y - min.y, 0.0f);
-//     auto dz = glm::vec3(0, 0, max.z - min.z);
-
-    
-//     sides[0] = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
-//     sides[1] = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
-//     sides[2] = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
-//     sides[3] = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
-//     sides[4] = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
-//     sides[5] = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
-
-
-//     return sides;
-// }
-hittable* box(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
-    
-    auto sides = new hittable[6];
-    memoryManager.host_allocations.push_back(sides);
-    
-    // construct the two opposite vertices with the minimum and maximum coordinates
-    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
-    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
-
-    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
-    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
-    auto dz = glm::vec3(0, 0, max.z - min.z);
-
-    auto side0 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
-    auto side1 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
-    auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
-    auto side3 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
-    auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
-    auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
-
-    sides[0] = side0;
-    sides[1] = side1;
-    sides[2] = side2;
-    sides[3] = side3;
-    sides[4] = side4;
-    sides[5] = side5;
-
-    return sides;
-}
 hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
     // Allocate raw memory for 6 hittable objects
     hittable* sides = static_cast<hittable*>(::operator new[](sizeof(hittable) * 6));
@@ -148,12 +147,20 @@ hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, cons
     new (&sides[5]) hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z), dx, dz, mat));  // bottom
     bbox = AaBb(bbox, sides[5].quad.bounding_box());
 
-    auto box = memoryManager.allocateHost<hittable>(hittable::make_hittableList()); 
-    box->hittableList.setList(sides, 6);
+    auto box = memoryManager.allocateHost<hittable>(hittable::make_hittableList(sides, 6)); 
     box->hittableList.bbox = bbox;
     return box;
 }
-
+/**
+ * @brief Generates a collection of spheres with randomized positions 
+ *        within a bounding box defined by glm::vec3(a) and glm::vec3(b). 
+ *        The function uses placement new for efficient memory management 
+ *        and integrates with the HybridMemoryManager class.
+ * @param memoryManager - manages memory allocations and deletions
+ * @param a random position within a bounding box
+ * @param b random position within a bounding box
+ * @param tex - texture of each sphere in the conglomerate 
+ */
 hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat, int numSpheres) {
     // Allocate raw memory for the number of spheres
     hittable* spheres = static_cast<hittable*>(::operator new[](sizeof(hittable) * numSpheres));
@@ -188,23 +195,11 @@ hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3
     }
 
     // Allocate a hittable list for the conglomerate
-    auto conglomerate = memoryManager.allocateHost<hittable>(hittable::make_hittableList());
-    conglomerate->hittableList.setList(spheres, numSpheres);
+    auto conglomerate = memoryManager.allocateHost<hittable>(hittable::make_hittableList(spheres, numSpheres));
     conglomerate->hittableList.bbox = bbox;
 
     return conglomerate;
 }
-
-
-
-
-// #define checkCuda(result) { gpuAssert((result), __FILE__, __LINE__); }
-// inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
-//    if (code != cudaSuccess) {
-//       fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-//       if (abort) assert(code == cudaSuccess);
-//    }
-// }
 
 
 __device__
@@ -232,7 +227,6 @@ static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& att
 
     return (glm::dot(scattered.direction, rec.normal) > 0);
 }
-
 
 __device__
 static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, dielectric_data& dielectric, curandState_t* states,  int i, int j) {
@@ -267,21 +261,9 @@ static glm::vec3 emitted(float u, float v, const glm::vec3& p, diffuseLight_data
 __device__ 
 static bool isotropic_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, isotropic_data& isotropic, curandState_t* states,  int i, int j){
     scattered = ray(rec.p, random_unit_vector(states,  i, j), r_in.time());
-    // if(isotropic.tex->type == Type::CHECKER) {
-    //  attenuation = isotropic.tex->checkerTexture.value(rec.u, rec.v, rec.p);
-    // } else if (isotropic.tex->type == Type::IMAGE) {
-    //  attenuation = isotropic.tex->imageTexture.value(rec.u, rec.v, rec.p);
-    // } else if (isotropic.tex->type == Type::NOISE) {
-    //  attenuation = isotropic.tex->noiseTexture.value(rec.u, rec.v, rec.p);
-    // } else if (isotropic.tex->type == Type::SOLID) {
      attenuation = isotropic.tex->solidColor.value(rec.u, rec.v, rec.p);
-    // }
     return true;
-
 }
-
-
-
 
 __device__ __host__
 static glm::vec3 checkeredTexture_value(float u, float v, const glm::vec3& p, checkerTexture_data& checkered) {
@@ -293,8 +275,6 @@ static glm::vec3 checkeredTexture_value(float u, float v, const glm::vec3& p, ch
     // return isEven ? even->checkerTexture.value(u, v, p) : odd->checkerTexture.value(u, v, p);
     return isEven ? checkered.even->value(u, v, p) : checkered.odd->value(u, v, p);
 }
-
-
 
 __device__
 inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n){
@@ -321,9 +301,6 @@ __device__
 inline float random_float(curandState_t* state){
     return curand_uniform_double(state);
 }
-
-
-
 
 __device__ 
 glm::vec3 random_unit_vector(curandState_t* states, int i, int j){
@@ -444,13 +421,6 @@ glm::vec3 random_vector(curandState_t* states,  int i, int j){
 
 }
 
-
-
-
-
-
-
-
 __device__ float random_float_in_range(curandState_t* state, float a, float b) {
     // return a + (b - a) * curand_uniform_float(state);  // this does not include b  e.g -1 to 1.0  it does not include 1.0
     return a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
@@ -463,180 +433,6 @@ __device__ int random_int(curandState_t* state, int a, int b) {
     return static_cast<int>(a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0);  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
 }
 
-
-// YES BVH
-// __device__
-// glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::vec3& background, const ray& r, const hittable& world, const BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables, int* stack) {
-//     ray cur_ray = r;
-//     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-//     glm::vec3 final_color = glm::vec3(0.0f, 0.0f, 0.0f);
-
-//     // Loop through the ray bounces up to the specified depth
-//     for (int k = 0; k < depth; k++) {
-//         hit_record rec;
-//         curandState_t x = state[i];
-//         float randNumber = random_float(&x);
-//         state[i] = x;  // saves back the value
-
-//         // Check if the ray hits anything; if not, add the background color and return
-//         if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, nodes, hittables, /* stack, */ randNumber)) {
-//             final_color += cur_attenuation * background;
-//             return final_color;
-//         }
-
-//         // Ensure that the material pointer is valid
-//         // if (!rec.mat) return final_color;
-
-//         // Handle emission from the material
-//         glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-//         if (rec.mat->type == Type::DIFFUSE) {
-//             color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
-//         }
-
-//         // Add the emitted light to the final color
-//         // final_color += cur_attenuation * (color_from_emission * 3.5f);  // 3.5 creates intensity ..(my own idea)
-//         final_color += cur_attenuation * color_from_emission;
-
-//         // Prepare to handle scattering
-//         ray scattered;
-//         glm::vec3 attenuation;
-//         bool did_scatter = false;
-
-//         // Scatter based on the material type
-//         if (rec.mat->type == Type::METAL) {
-//             did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-//         } else if (rec.mat->type == Type::LAMBERTIAN) {
-//             did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-//         } else if (rec.mat->type == Type::DIELECTRIC) {
-//             did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);
-//         }
-
-//         // If scattering did not occur, return the accumulated color
-//         if (!did_scatter) {
-//             return final_color;
-//         }
-
-//         // Update the current ray and attenuation for the next bounce
-//         cur_ray = scattered;
-//         cur_attenuation *= attenuation;
-//     }
-
-//     // Return the accumulated color after all bounces
-//     return final_color;
-// }
-
-// YES BVH  hittable world list
-// __device__
-// glm::vec3 ray_color(curandState_t* state, int i, int j, int depth, const glm::vec3& background, const ray& r, hittable* world, int* stack) {
-//     ray cur_ray = r;
-//     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-//     glm::vec3 final_color = glm::vec3(0.0f, 0.0f, 0.0f);
-    
-//     // Loop through the ray bounces up to the specified depth
-//     for (int k = 0; k < depth; k++) {
-//         hit_record rec;
-//         curandState_t x = state[i];
-//         float randNumber = random_float(&x);
-//         state[i] = x;  // saves back the value
-        
-//         // Check if the ray hits anything; if not, add the background color and return
-//         if (!hit(cur_ray, interval(0.001f, FLT_MAX), rec, world->hittableList.nodeObjects, world->hittableList.objects, /* stack, */ randNumber)) {
-//             final_color += cur_attenuation * background;
-//             return final_color;
-//         }
-//         // Handle emission from the material
-//         glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-//         if (rec.mat->type == Type::DIFFUSE) {
-//             color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
-//         }
-
-//         // Add the emitted light to the final color
-//         // final_color += cur_attenuation * (color_from_emission * 3.5f);  // 3.5 creates intensity ..(my own idea)
-//         final_color += cur_attenuation * color_from_emission;
-
-//         // Prepare to handle scattering
-//         ray scattered;
-//         glm::vec3 attenuation;
-//         bool did_scatter = false;
-
-//         // Scatter based on the material type
-//         if (rec.mat->type == Type::METAL) {
-//             did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-//         } else if (rec.mat->type == Type::LAMBERTIAN) {
-//             did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-//         } else if (rec.mat->type == Type::DIELECTRIC) {
-//             did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);
-//         } else if (rec.mat->type == Type::ISOTROPIC){
-//             did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, state, i, j);    
-//         }
-
-//         // If scattering did not occur, return the accumulated color
-//         if (!did_scatter) {
-//             return final_color;
-//         }
-
-//         // Update the current ray and attenuation for the next bounce
-//         cur_ray = scattered;
-//         cur_attenuation *= attenuation;
-//     }
-
-//     // Return the accumulated color after all bounces
-//     return final_color;
-// }
-
-
-// NO BVH
-// __device__
-// glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::vec3& background, const ray &r, const hittable_list& world) {
-//     ray cur_ray = r;
-//     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
-//     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
-    
-//     // Loop through the ray bounces up to the specified depth
-//     for (int k = 0; k < depth; k++){
-//         hit_record rec;
-        
-//         //* Check if the ray hits anything; if not, add the background color and return;
-//         if(!world.hit(cur_ray, interval(0.001f, FLT_MAX), rec)){
-//             final_color += cur_attenuation * background;
-//             return final_color;
-//         }
-//         //* Handle emitted light fromt he material
-//         glm::vec3 color_from_emission = glm::vec3(0.0f, 0.0f, 0.0f);
-//         if (rec.mat->type == Type::DIFFUSE){
-//             color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
-//         }
-//         //* Add the emitted light to the final color
-//         final_color += cur_attenuation * color_from_emission;
-
-//         //* Prepare to handle scattering
-//             // auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
-//         ray scattered;
-//         glm::vec3 attenuation;
-//         bool did_scatter = false;
-//         //* Scatter based on material type
-//         if (rec.mat->type == Type::METAL){
-//             did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
-//         } else if (rec.mat->type == Type::LAMBERTIAN){
-//             did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
-//         } else if (rec.mat->type == Type::DIELECTRIC){
-//             did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
-//         }
-//         //* If scattering did not occur, return the accumulated color
-//         if(!did_scatter) {
-//             return final_color;
-//         }
-        
-//         //* Update the current ray and attenuation for the next bounce
-//         cur_ray = scattered;
-//         cur_attenuation *= attenuation;
-//     }
-    
-//     // Return the accumulated color after all bounces
-//     return final_color;
-// }
-
-// NO BVH HITTABLE
 __device__
 glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::vec3& background, const ray &r, const hittable* world) {
     ray cur_ray = r;
@@ -663,7 +459,6 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::v
         final_color += cur_attenuation * color_from_emission;
 
         //* Prepare to handle scattering
-            // auto dir = rec.normal + random_unit_vector(state, i, j); // first approach using Lambertian  reflection
         ray scattered;
         glm::vec3 attenuation;
         bool did_scatter = false;
@@ -719,71 +514,6 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
     curand_init(seed, idx, 0, &states[idx]);
 }
 
-
-// YES BVH
-// __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ hittables) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= cam->image_width || j >= cam->image_height) return;
-//     // compute a unique thread ID within the block
-//     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
-
-//     extern __shared__ int shared_memory[];
-//     int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
-
-//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
-//     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
-//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-//         color  += ray_color(states, i, j, cam->max_depth, cam->background, r, *world, nodes, hittables, stack);
-//         // color  += ray_color(states, i, j, depth, r, *world);
-//     }
-//     // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
-//     color *= cam->pixel_sample_scale;
-//     image[cam->image_width * j + i] = colorToUint32_t(color);  
-// }
-
-// YES BVH hittable   list
-// __global__ void rayTracer_nodes_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= cam->image_width || j >= cam->image_height) return;
-//     // compute a unique thread ID within the block
-//     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;   // like column calculations
-    
-//     extern __shared__ int shared_memory[];
-//     int* stack = &shared_memory[thread_id * MAX_STACK_SIZE];  
-
-//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
-//     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
-//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-//         color  += ray_color(states, i, j, cam->max_depth, cam->background, r, world, stack);
-//         // color  += ray_color(states, i, j, depth, r, *world);
-//     }
-//     // float pixel_sample_scale = 1.0f / static_cast<float>(cam->samples_per_pixel); // color scale factor for a sume of pixel samples
-//     color *= cam->pixel_sample_scale;
-//     image[cam->image_width * j + i] = colorToUint32_t(color);  
-// }
-
-// NO BVH 
-// __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable_list* world) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= cam->image_width || j >= cam->image_height) return;
-    
-//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
-//     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
-//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-//         color  += ray_color(states, i, j, cam->max_depth, cam->background, r, *world);
-//     }
-    
-//     color *= cam->pixel_sample_scale;
-//     image[cam->image_width * j + i] = colorToUint32_t(color);  
-// }
-
-// NO BVH HITTABLE*
 __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -800,9 +530,7 @@ __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* i
     image[cam->image_width * j + i] = colorToUint32_t(color);  
 }
 
-
-
-
+// scenes 1 - 10
 void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 20.0f;
@@ -816,19 +544,23 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
 
     
     std::vector<hittable> h_hittables_list, h_hittable_group;
-    material* d_ground = memoryManager.allocateDevice<material>();
-    texture* d_ground_tex = memoryManager.allocateDevice<texture>();
+
+    // material* d_ground = memoryManager.allocateDevice<material>();
+    // texture* d_ground_tex = memoryManager.allocateDevice<texture>();
     
     // ground 
     /* material */
-    texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
-    memoryManager.copyToDevice(d_ground_tex, &h_ground_tex);
+    // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
+    // memoryManager.copyToDevice(d_ground_tex, &h_ground_tex);
     
-    material h_ground = material::lambertian_material(d_ground_tex);
-    memoryManager.copyToDevice(d_ground, &h_ground);
+    // material h_ground = material::lambertian_material(d_ground_tex);
+    // memoryManager.copyToDevice(d_ground, &h_ground);
     
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, d_ground);
+    auto checkerTex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f), NULL, 0, 0.32f);
+    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, checkerTex);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
     h_hittables_list.push_back(hittable_obj);
+
     // h_hittable_group.push_back(hittable_obj);
 
     // Create random spheres 
@@ -972,28 +704,38 @@ void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode*
     cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
 
-    
     std::vector<hittable> h_hittables_list;
-    material* d_ground      = memoryManager.allocateDevice<material>();
-    texture* d_ground_tex   = memoryManager.allocateDevice<texture>();
+    
+    auto tex1 = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f), NULL, 0, 0.32f);
+    auto topMat = createMaterial(memoryManager, Type::LAMBERTIAN, tex1);
+    auto tex2 = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), NULL, 0, 0.08f);
+    auto bottomMat = createMaterial(memoryManager, Type::LAMBERTIAN, tex2);
+
+    
+    
+    
+    
+    
+    // material* d_ground      = memoryManager.allocateDevice<material>();
+    // texture* d_ground_tex   = memoryManager.allocateDevice<texture>();
     
     // ground 
     //* Texture
-    texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
-    memoryManager.copyToDevice(d_ground_tex, &h_ground_tex);
+    // texture h_ground_tex = texture::checker_texture(0.32f, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f));
+    // memoryManager.copyToDevice(d_ground_tex, &h_ground_tex);
     // checkCuda(cudaMalloc((void**)&d_ground_tex, sizeof(texture)) );
     // checkCuda(cudaMemcpy(d_ground_tex, &h_ground_tex, sizeof(texture), cudaMemcpyHostToDevice) );
     // device_textures.push_back(d_ground_tex);
     //* material
-    material h_ground = material::lambertian_material(d_ground_tex);
-    memoryManager.copyToDevice(d_ground, &h_ground);
+    // material h_ground = material::lambertian_material(d_ground_tex);
+    // memoryManager.copyToDevice(d_ground, &h_ground);
     // checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
     // checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
     // device_materials.push_back(d_ground);
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-10.0, 0.0), 10, d_ground);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-10.0, 0.0), 10, bottomMat);
     h_hittables_list.push_back(hittable_obj);
 
-    hittable_obj = hittable::make_sphere(glm::vec3(0.0, 10.0, 0.0), 10, d_ground);
+    hittable_obj = hittable::make_sphere(glm::vec3(0.0, 10.0, 0.0), 10, topMat);
     h_hittables_list.push_back(hittable_obj);
 
     
@@ -1777,45 +1519,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     // memoryManager.copyToDevice(d_world, &h_world, 1);
 }
 
-texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 color, const char* filename = "", float scramble_frequency = 0){
-    texture* d_texture = memoryManager.allocateDevice<texture>();
 
-    if (type == Type::SOLID) {
-        texture h_color = texture::solid_texture(color);
-        memoryManager.copyToDevice(d_texture, &h_color);
-    
-    } else if (type == Type::IMAGE) {
-        auto image = rtw_image(filename);
-        int size = image.width() * image.height() * image.pixelSize();
-        unsigned char* d_bdata = memoryManager.allocateDevice<unsigned char>(size);
-        memoryManager.copyToDevice(d_bdata, image.imageData(), size);
-        auto h_image = texture::image_texture(d_bdata, image.width(), image.height(), image.scanLineSize(), image.pixelSize());
-        memoryManager.copyToDevice(d_texture, &h_image);
-
-    } else if (type == Type::NOISE) {
-       Perlin noise;
-       auto h_noise = texture(texture::noise_texture(noise, scramble_frequency));
-       memoryManager.copyToDevice(d_texture, &h_noise);
-    }
-    return d_texture;
-}
-
-material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture* tex, float fuzz = 0.0f, float refraction_index = 0.0f){
-    material* d_mat = memoryManager.allocateDevice<material>();;
-    if(type == Type::LAMBERTIAN){
-        material h_mat = material::lambertian_material(tex);
-        memoryManager.copyToDevice(d_mat, &h_mat);
-        
-    } else if(type == Type::DIFFUSE) {
-        material h_mat = material::diffuseLight_material(tex);
-        memoryManager.copyToDevice(d_mat, &h_mat);
-        
-    } else if(type == Type::DIELECTRIC) {
-        material h_mat = material::dielectric_material(refraction_index);
-        memoryManager.copyToDevice(d_mat, &h_mat);
-    }
-    return d_mat;
-}
 
 void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, BVHNode* &bvh_nodes2, hittable* &d_hittable_list, hittable* &d_hittable_g1, hittable* &d_hittable_g2, hittable* &d_world, hittable* &d_world_g1, hittable* d_world_g2){
     
@@ -1890,11 +1594,11 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     auto boundary1 = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(0, 0, 0), 5000, createMaterial(memoryManager, Type::DIELECTRIC, NULL, 0, 1.5) ));
     h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary1, .0001f, createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 1.0, 1.0)))));
     // Globe
-    auto mapTex = createTexture(memoryManager, Type::IMAGE, glm::vec3(0,0,0), "images/earth_map.jpg");
+    auto mapTex = createTexture(memoryManager, Type::IMAGE, glm::vec3(0), glm::vec3(0), "images/earth_map.jpg");
     auto emat = createMaterial(memoryManager, Type::LAMBERTIAN, mapTex, 0, 0);
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(400, 200, 400), 100, emat ));
     // Perlin patter sphere
-    auto perlinTex = createTexture(memoryManager, Type::NOISE, glm::vec3(0,0,0), "", 0.2);
+    auto perlinTex = createTexture(memoryManager, Type::NOISE, glm::vec3(0), glm::vec3(0), NULL , 0.2);
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(220, 280, 300), 80, createMaterial(memoryManager, Type::LAMBERTIAN, perlinTex)));
     // h_hittables_list.push_back(hittable::make_sphere(glm::vec3(220, 280, 300), 80, andreaMat));
     auto a = glm::vec3(0, 0, 0);

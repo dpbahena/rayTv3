@@ -88,16 +88,17 @@ struct texture {
         
     }
 
-    static texture checker_texture(float scale, const glm::vec3& color1, const glm::vec3& color2) {
-        texture obj;
-        obj.type = Type::CHECKER;
-        obj.checkerTexture.inv_scale = (1.0f / scale);
-        obj.checkerTexture.even =  new texture(solid_texture(color1));
-        obj.checkerTexture.odd =  new texture(solid_texture(color2));
+    // static texture checker_texture(float scale, const glm::vec3& color1, const glm::vec3& color2) {
+    //     texture obj;
+    //     obj.type = Type::CHECKER;
+    //     obj.checkerTexture.inv_scale = (1.0f / scale);
+    //     obj.checkerTexture.even =  new texture(solid_texture(color1));
+    //     obj.checkerTexture.odd =  new texture(solid_texture(color2));
         
-        return obj;
+    //     return obj;
         
-    }
+    // }
+    
     // *Constructors for type IMAGE
     static texture image_texture(unsigned char* bdata, int width, int height, int vScan, int bytes_per_pixel) {
         texture obj;

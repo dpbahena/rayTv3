@@ -321,35 +321,7 @@ struct hittable {
                 break;
         }
         
-
-        // glm::vec3 min(MAXFLOAT, MAXFLOAT, MAXFLOAT);
-        // glm::vec3 max(-MAXFLOAT, -MAXFLOAT, -MAXFLOAT);
-
-        // for (int i = 0; i < 2; i++) {
-        //     for (int j = 0; j < 2; j++) {
-        //         for (int k = 0; k < 2; k++) {
-        //             auto x = i * obj.rotateY.bbox.x.max + (1 - i) * obj.rotateY.bbox.x.min;
-        //             auto y = j * obj.rotateY.bbox.y.max + (1 - j) * obj.rotateY.bbox.y.min;
-        //             auto z = k * obj.rotateY.bbox.z.max + (1 - k) * obj.rotateY.bbox.z.min;
-
-        //             auto newx =  obj.rotateY.cos_theta * x + obj.rotateY.sin_theta * z;
-        //             auto newz = -obj.rotateY.sin_theta * x + obj.rotateY.cos_theta * z;
-
-        //             glm::vec3 tester(newx, y, newz);
-
-        //             for (int c = 0; c < 3; c++) {
-        //                 min[c] = fminf(min[c], tester[c]);
-        //                 max[c] = fmaxf(max[c], tester[c]);
-        //             }
-
-        //         }
-        //     }
-        // }
-        
-        // obj.rotateY.bbox = AaBb(min, max);
-        
         return obj;
-
     }
 
     
