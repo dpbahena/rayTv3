@@ -815,7 +815,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     cam.initialize();
 
     
-    std::vector<hittable> h_hittables_list;
+    std::vector<hittable> h_hittables_list, h_hittable_group;
     material* d_ground = memoryManager.allocateDevice<material>();
     texture* d_ground_tex = memoryManager.allocateDevice<texture>();
     
@@ -835,7 +835,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
         for (int b = -11; b < 11; b++) {
             auto choose_material = random_double();
             glm::vec3 center(a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double());
-            
+            hittable sphere;
             if (glm::length(center - glm::vec3(4.0f, 0.2f, 0.0f)) > 0.9f) {
                 if(choose_material < 0.8f) {
                     // difuse
@@ -844,8 +844,8 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
                     material* d_mat = memoryManager.allocateDevice<material>();
                     memoryManager.copyToDevice(d_mat, &a_material);
                     glm::vec3 center2 = center + glm::vec3(0,random_double(0, 0.5), 0);
-                    auto sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
-                    h_hittables_list.push_back(sphere);
+                    sphere = hittable::make_sphere(center, center2, 0.2f, d_mat);
+                    // h_hittables_list.push_back(sphere);
 
                 }else if(choose_material < 0.95f) {
                     // metal
@@ -854,8 +854,8 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
                     auto a_material = material::metal_material(albedo, fuzz);
                     material* d_mat = memoryManager.allocateDevice<material>();
                     memoryManager.copyToDevice(d_mat, &a_material);
-                    auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
-                    h_hittables_list.push_back(sphere);
+                    sphere = hittable::make_sphere(center, 0.2f, d_mat);
+                    // h_hittables_list.push_back(sphere);
                 }
                 else  {
                     // dielectric
@@ -863,9 +863,10 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
                     auto a_material = material::dielectric_material(1.5);
                     material* d_mat = memoryManager.allocateDevice<material>();
                     memoryManager.copyToDevice(d_mat, &a_material);
-                    auto sphere = hittable::make_sphere(center, 0.2f, d_mat);
-                    h_hittables_list.push_back(sphere);
+                    sphere = hittable::make_sphere(center, 0.2f, d_mat);
+                    // h_hittables_list.push_back(sphere);
                 }
+                h_hittable_group.push_back(sphere);
             }
         }
     }
@@ -894,19 +895,29 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     hittable_obj = hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, d_mat3);
     h_hittables_list.push_back(hittable_obj);
  
-    
+
+    // group spheres as bvh_nodes
+    auto d_hittable_group = memoryManager.allocateDevice<hittable>(h_hittable_group.size());
+    memoryManager.copyToDevice(d_hittable_group, h_hittable_group.data(), h_hittable_group.size());
+    int number_of_nodes = (2 * h_hittable_group.size() - 1);
+    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    auto nodes = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
+    auto groupList = hittable::make_bvhNode(nodes, d_hittable_group, h_hittable_group.size());
+    h_hittables_list.push_back(groupList);
+
+
     size_t number_of_hittables = h_hittables_list.size();
 
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
        
     /** Implementing ROPE based BHV nodes in cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    auto h_nodeList = hittable::make_bvhNode(bvh_nodes, d_hittable_list, number_of_hittables);
+    // int number_of_nodes = (2 * number_of_hittables -1);
+    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    // auto h_nodeList = hittable::make_bvhNode(bvh_nodes, d_hittable_list, number_of_hittables);
 
 
-    // auto h_world = hittable::make_hittableList();
+    auto h_world = hittable::make_hittableList();
     // h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
 
 
@@ -917,7 +928,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     
    
     // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
+        h_world.hittableList.setList(d_hittable_list, number_of_hittables);
     //     /* Allocate memory for hittable list on the device */
     //     // memoryManager.allocateDeferred(d_world, 1);
     //     // memoryManager.copyToDevice(d_world, &h_world, 1);
@@ -937,7 +948,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
 
 
     memoryManager.allocateDeferred(d_world, 1);
-    memoryManager.copyToDevice(d_world, &h_nodeList, 1);
+    memoryManager.copyToDevice(d_world, &h_world, 1);
 
     // memoryManager.copyToDevice(d_world, &h_world, 1);
     

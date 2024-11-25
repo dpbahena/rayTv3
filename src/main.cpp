@@ -23,19 +23,19 @@ int main(int arg, char** argv) {
     // uint32_t* colorBuffer;
     RayTracer gpuOperations;
 
-     if (arg == 5) {
+     if (arg == 4) {
         cam.samples_per_pixel = atoi(argv[1]);
         cam.max_depth = atoi(argv[2]);
-        cam.isBvh = atoi(argv[3]); // method to use (with bvh bbox or no brute method)
-        cam.scene = atoi(argv[4]); // scene to view
+        // cam.isBvh = atoi(argv[3]); // method to use (with bvh bbox or no brute method)
+        cam.scene = atoi(argv[3]); // scene to view
 
      } else {  // default valules
         cam.samples_per_pixel = 4;
         cam.max_depth = 2;
-        cam.isBvh = true; //true;  // use bvh
+        // cam.isBvh = true; //true;  // use bvh
         cam.scene = 9;
-        printf("Using default values:  ./rayTracer 100 40 1 2\n");
-        printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <bvh?: 0-1> <scene: 1-5\n");
+        printf("Using default values:  ./rayTracer 100 40 1 \n");
+        printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <scene: 1-10\n");
      }
 
     cam.aspect_ratio = win.getExtent().width / static_cast<float>(win.getExtent().height);
