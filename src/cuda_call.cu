@@ -208,6 +208,19 @@ hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3
     return conglomerate;
 }
 
+/**
+ * @brief Convert an array of hittables to a BVH hittable
+ * @param group: std::vector<hittable> to be converted to BVH hittable
+ * @output:  a BVH hittable
+ */
+hittable createBVH(HybridMemoryManager& memoryManager, std::vector<hittable> group) {
+    auto d_group = memoryManager.allocateDevice<hittable>(group.size());
+    memoryManager.copyToDevice(d_group, group.data(), group.size());
+    int number_of_nodes = (2 * group.size() - 1);
+    auto nodes = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
+    return hittable::make_bvhNode(nodes, d_group, group.size());
+}
+
 
 __device__
 static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, lambertian_data& lambertian, curandState_t* states,  int i, int j) {
@@ -549,7 +562,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
 
-    std::vector<hittable> h_hittables_list, bvh_group;
+    std::vector<hittable> h_hittables_list, small_spheres;
     
     auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
     auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
@@ -584,7 +597,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
                     auto mat = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5);
                     sphere = hittable::make_sphere(center, 0.2f, mat);
                 }
-                bvh_group.push_back(sphere);
+                small_spheres.push_back(sphere);
             }
         }
     }
@@ -604,13 +617,9 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     h_hittables_list.push_back(hittable_obj);
  
 
-    // group spheres as bvh_nodes
-    auto d_hittable_group = memoryManager.allocateDevice<hittable>(bvh_group.size());
-    memoryManager.copyToDevice(d_hittable_group, bvh_group.data(), bvh_group.size());
-    int number_of_nodes = (2 * bvh_group.size() - 1);
-    auto nodes = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
-    auto groupList = hittable::make_bvhNode(nodes, d_hittable_group, bvh_group.size());
-    h_hittables_list.push_back(groupList);
+    // convert this group to BVH
+    auto bvhItem = createBVH(memoryManager, small_spheres);
+    h_hittables_list.push_back(bvhItem);
 
 
     size_t number_of_hittables = h_hittables_list.size();
