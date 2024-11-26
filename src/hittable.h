@@ -327,15 +327,15 @@ struct hittable {
     
 
 
-    static hittable make_constantMedium(hittable* boundary, float density, const glm::vec3& albedo) {
-        hittable obj;
-        obj.type = Type::MEDIUM;
-        obj.constantMedium.boundary = boundary;
-        obj.constantMedium.neg_inv_density = -1.0f / density;
-        obj.constantMedium.phase_function = new material(material::isotropic_material(albedo));
+    // static hittable make_constantMedium(hittable* boundary, float density, const glm::vec3& albedo) {
+    //     hittable obj;
+    //     obj.type = Type::MEDIUM;
+    //     obj.constantMedium.boundary = boundary;
+    //     obj.constantMedium.neg_inv_density = -1.0f / density;
+    //     obj.constantMedium.phase_function = new material(material::isotropic_material(albedo));
 
-        return obj;
-    }
+    //     return obj;
+    // }
 
     static hittable make_constantMedium(hittable* boundary, float density, material* mat) {
         hittable obj;
@@ -347,15 +347,15 @@ struct hittable {
         return obj;
     }
 
-    static hittable make_constantMedium(hittable* boundary, float density, texture* tex) {
-        hittable obj;
-        obj.type = Type::MEDIUM;
-        obj.constantMedium.boundary = boundary;
-        obj.constantMedium.neg_inv_density = -1.0f / density;
-        obj.constantMedium.phase_function = new material(material::isotropic_material(tex));
+    // static hittable make_constantMedium(hittable* boundary, float density, texture* tex) {
+    //     hittable obj;
+    //     obj.type = Type::MEDIUM;
+    //     obj.constantMedium.boundary = boundary;
+    //     obj.constantMedium.neg_inv_density = -1.0f / density;
+    //     obj.constantMedium.phase_function = new material(material::isotropic_material(tex));
 
-        return obj;
-    }
+    //     return obj;
+    // }
 
 };
 

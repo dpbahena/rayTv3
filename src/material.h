@@ -104,13 +104,13 @@ struct material {
     //     return obj;
     // }
 
-    static material isotropic_material(const glm::vec3& albedo) {
-        material obj;
-        obj.type = Type::ISOTROPIC;
-        obj.isotropic.tex = new texture(texture::solid_texture(albedo));
+    // static material isotropic_material(const glm::vec3& albedo) {
+    //     material obj;
+    //     obj.type = Type::ISOTROPIC;
+    //     obj.isotropic.tex = new texture(texture::solid_texture(albedo));
 
-        return obj;
-    }
+    //     return obj;
+    // }
 
     static material isotropic_material(texture* tex) {
         material obj;
