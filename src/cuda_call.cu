@@ -114,7 +114,12 @@ material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture*
         
         auto h_mat = material::metal_material(color, fuzz);
         memoryManager.copyToDevice(d_mat, &h_mat);
+
+    } else if (type == Type::ISOTROPIC) {
+        auto h_mat = material::isotropic_material(tex);
+        memoryManager.copyToDevice(d_mat, &h_mat);
     }
+
      
     return d_mat;
 }
@@ -1132,12 +1137,27 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(0, 150, 145), 50, metalMat));
 
     // blue shiny sphere
+    std::vector<hittable> blueGroup;
     auto boundary = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(360, 150, 145), 70, createMaterial(memoryManager, Type::DIELECTRIC, NULL, glm::vec3(0), 0, 1.5)));
-    h_hittables_list.push_back(*boundary);
-    h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary, 0.2, glm::vec3(0.2, 0.4, 0.9))));
+    blueGroup.push_back(*boundary);
+    // h_hittables_list.push_back(*boundary);
+    auto blue_tex = createTexture(memoryManager, Type::SOLID, glm::vec3(0.2, 0.4, 0.9));
+    auto blue_mat = createMaterial(memoryManager, Type::ISOTROPIC, blue_tex);
+    auto blueobj = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary, 0.2, blue_mat));
+    blueGroup.push_back(*blueobj);
+    auto bvh1 = createBVH(memoryManager, blueGroup);
+    h_hittables_list.push_back(bvh1);
+    // h_hittables_list.push_back(*blueobj);
+    
     // ??? what sphere is this one?
     auto boundary1 = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(0, 0, 0), 5000, createMaterial(memoryManager, Type::DIELECTRIC, NULL, glm::vec3(0), 0, 1.5) ));
-    h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary1, .0001f, createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 1.0, 1.0)))));
+    auto white_tex = createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 1.0, 1.0));
+    auto white_mat = createMaterial(memoryManager, Type::ISOTROPIC, white_tex);
+    auto bigObj = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary1, .0001f, white_mat));
+    auto bvh2 = createBVH(memoryManager, bigObj);
+    h_hittables_list.push_back(bvh2);
+    // h_hittables_list.push_back(*memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary1, .0001f, white_mat)));
+    
     // Globe
     auto mapTex = createTexture(memoryManager, Type::IMAGE, glm::vec3(0), glm::vec3(0), "images/earth_map.jpg");
     auto emat = createMaterial(memoryManager, Type::LAMBERTIAN, mapTex);
