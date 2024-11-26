@@ -38,8 +38,9 @@ struct imageTexture_data {
 struct noiseTexture_data {
     Perlin noisy;
     float scale;
+    glm::vec3 albedo;
     __device__ __host__
-    glm::vec3 value(float u, float v, const glm::vec3& p);
+    glm::vec3 value(glm::vec3 albedo, float u, float v, const glm::vec3& p);
 
 };
 
@@ -114,9 +115,10 @@ struct texture {
     }
 
     // *Constructors for type NOISE
-    static texture noise_texture(Perlin &noisy, float scale = 1.0f) {
+    static texture noise_texture(Perlin &noisy, glm::vec3 albedo, float scale = 1.0f) {
         texture obj;
         obj.type = Type::NOISE;
+        obj.noiseTexture.albedo = albedo;
         obj.noiseTexture.scale = scale;
         obj.noiseTexture.noisy = noisy;
         
@@ -139,7 +141,8 @@ struct texture {
             case Type::IMAGE:
                 return imageTexture.value(u, v, p);
             case Type::NOISE:
-                return noiseTexture.value(u, v, p);
+                // auto color = noiseTexture.albedo;
+                return noiseTexture.value(noiseTexture.albedo, u, v, p);
             default: 
                 return glm::vec3(0.0f);   // default value if none
             

@@ -483,7 +483,7 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec, float rand
         hit_anything = object->hittableList.hit(rotated_r, ray_t, rec, randNumber);
     } else if (object->type == Type::ROTATE_Y) {
         hit_anything = object->rotateY.hit(rotated_r, ray_t, rec, randNumber);
-    }
+    } 
     if (hit_anything){
         //* Transform the intersection from object space back to world space
         rec.p       = glm::vec3(cos_theta * rec.p.x + sin_theta * rec.p.z, rec.p.y, -sin_theta * rec.p.x + cos_theta * rec.p.z);
@@ -667,7 +667,7 @@ glm::vec3 imageTexture_data::value(float u, float v, const glm::vec3& p) const {
 }
 
 __device__ __host__
-    glm::vec3 noiseTexture_data::value(float u, float v, const glm::vec3& p) {
+    glm::vec3 noiseTexture_data::value(glm::vec3 albedo, float u, float v, const glm::vec3& p) {
        
         // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.noise(scale * p);
         // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.trilinear_noise_smoothing(p);
@@ -677,8 +677,8 @@ __device__ __host__
         //* 5.6 Turbolence introduction
         // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.turbolence(p, 7);
         //* 5.7 Marble texture
-        return glm::vec3(0.5f, .5f, 0.5f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
-        // return glm::vec3(0.7f, .7, 0.7f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
+        // return glm::vec3(0.5f, .5f, 0.5f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
+        return albedo * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
 
 
         

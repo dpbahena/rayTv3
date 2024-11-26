@@ -82,7 +82,7 @@ texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 
 
     } else if (type == Type::NOISE) {
         Perlin noise;
-        auto h_noise = texture(texture::noise_texture(noise, scramble_frequency));
+        auto h_noise = texture(texture::noise_texture(noise, color,  scramble_frequency));
         memoryManager.copyToDevice(d_texture, &h_noise);
 
     } else if (type == Type::CHECKER) {
@@ -681,81 +681,22 @@ void earth(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
     cam.initialize();
       
     std::vector<hittable> h_hittables_list;
-    material* d_ground     = memoryManager.allocateDevice<material>();
-    texture* d_image_tex   = memoryManager.allocateDevice<texture>(); 
-    
-    auto image = rtw_image("images/earth_map.jpg");
-    // unsigned char* d_bdata  = memoryManager.deferDeviceAllocation<unsigned char>();
-    // memoryManager.allocateDeferred(d_bdata, image.width() * image.height() * image.pixelSize() * sizeof(unsigned char));
-    // memoryManager.copyToDevice(d_bdata, image.imageData(), image.width() * image.height() * image.pixelSize() * sizeof(unsigned char) );
-    
-    // checkCuda(cudaMalloc((void**)&d_bdata, image.width() * image.height() * image.pixelSize() * sizeof(unsigned char)) );
-    // checkCuda(cudaMemcpy(d_bdata, image.imageData(), image.width() * image.height() * image.pixelSize() * sizeof(unsigned char), cudaMemcpyHostToDevice) );
 
-    unsigned char* d_bdata = memoryManager.allocateDevice<unsigned char>(image.width() * image.height() * image.pixelSize() * sizeof(unsigned char));
-    memoryManager.copyToDevice(d_bdata, image.imageData(), image.width() * image.height() * image.pixelSize() * sizeof(unsigned char) );
+    auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "images/earth_map.jpg");
+    auto globe = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
 
-
-
-    
-    texture h_image_tex = texture::image_texture(d_bdata, image.width(), image.height(), image.scanLineSize(), image.pixelSize());
-    memoryManager.copyToDevice(d_image_tex, &h_image_tex); 
-    // checkCuda(cudaMalloc((void**)&d_image_tex, sizeof(texture)) );
-    // checkCuda(cudaMemcpy(d_image_tex, &h_image_tex, sizeof(texture), cudaMemcpyHostToDevice) );
-    // device_textures.push_back(d_image_tex);
-
-    material h_ground = material::lambertian_material(d_image_tex);
-    memoryManager.copyToDevice(d_ground, &h_ground); 
-    // checkCuda(cudaMalloc((void**)&d_ground, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_ground, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_ground);
-
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,0.0, 0.0), 2, d_ground);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,0.0, 0.0), 2, globe);
     h_hittables_list.push_back(hittable_obj);
 
-    
-
-    
-    
     size_t number_of_hittables = h_hittables_list.size();
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
     
-    // checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
-    // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
-     
-
     auto h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
 
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
     
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, sizeof(hittable)); // or 1
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-        
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-    // memoryManager.allocateDeferred(d_world, sizeof(hittable)); // or 1
-    // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
-   
-
 }
 
 void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
@@ -770,32 +711,18 @@ void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &b
     cam.initialize();
     
     
-    
-    
     std::vector<hittable> h_hittables_list;
-    material* d_noise_mat   = memoryManager.allocateDevice<material>();
-    texture* d_noise_tex    = memoryManager.allocateDevice<texture>();
-    
-    //* Texture
+    auto red = glm::vec3(1.0, 0.0, 0.0f);
+    auto blue = glm::vec3(0.0, 0.0, 1.0);   
+    auto tex = createTexture(memoryManager, Type::NOISE, red, {}, {}, 4.0f);
+    auto perlin = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
 
+    auto tex1 = createTexture(memoryManager, Type::NOISE, blue, {}, {}, 1.0f);
+    auto perlin1 = createMaterial(memoryManager, Type::LAMBERTIAN, tex1);
 
-    Perlin noise;
-    float scramble_frequency = 4.0f;  // default is 1.0f;
-    texture h_noise_tex = texture::noise_texture(noise, scramble_frequency);
-    memoryManager.copyToDevice(d_noise_tex, &h_noise_tex);
-    // checkCuda(cudaMalloc((void**)&d_noise_tex, sizeof(texture)) );
-    // checkCuda(cudaMemcpy(d_noise_tex, &h_noise_tex, sizeof(texture), cudaMemcpyHostToDevice) );
-    // device_textures.push_back(d_noise_tex);
-
-    //* material
-    material h_ground = material::lambertian_material(d_noise_tex);
-    memoryManager.copyToDevice(d_noise_mat, &h_ground);
-    // checkCuda(cudaMalloc((void**)&d_noise_mat, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_noise_mat, &h_ground, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_noise_mat);
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, d_noise_mat);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, perlin);
     h_hittables_list.push_back(hittable_obj);
-    hittable_obj = hittable::make_sphere(glm::vec3(0.0,2.0, 0.0), 2, d_noise_mat);
+    hittable_obj = hittable::make_sphere(glm::vec3(0.0,2.0, 0.0), 2, perlin1);
     h_hittables_list.push_back(hittable_obj);
 
     
@@ -804,42 +731,10 @@ void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &b
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
 
-  
-    // checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
-    // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
-     
-
     hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
     
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
-
-
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-        
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
-   
 
 }
 
@@ -858,52 +753,65 @@ void quads(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
     std::vector<hittable> h_hittables_list;
     
     /* material */
-    material h_left_red = material::lambertian_material(glm::vec3(1.0, 0.2, 0.2));
-    material* d_left_red = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_left_red, &h_left_red);
+    // material h_left_red = material::lambertian_material(glm::vec3(1.0, 0.2, 0.2));
+    // material* d_left_red = memoryManager.allocateDevice<material>();
+    // memoryManager.copyToDevice(d_left_red, &h_left_red);
+
+    auto left_red = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 0.2, 0.2)));
+
     // checkCuda(cudaMalloc((void**)&d_left_red, sizeof(material)) );
     // checkCuda(cudaMemcpy(d_left_red, &h_left_red, sizeof(material), cudaMemcpyHostToDevice) );
     // device_materials.push_back(d_left_red);
 
-    material h_back_green = material::lambertian_material(glm::vec3(0.2, 1.0, 0.2));
-    material* d_back_green = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_back_green, &h_back_green);
+    // material h_back_green = material::lambertian_material(glm::vec3(0.2, 1.0, 0.2));
+    // material* d_back_green = memoryManager.allocateDevice<material>();
+    // memoryManager.copyToDevice(d_back_green, &h_back_green);
+
+    auto back_green = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.2, 1.0, 0.2)));
+
     // checkCuda(cudaMalloc((void**)&d_back_green, sizeof(material)) );
     // checkCuda(cudaMemcpy(d_back_green, &h_back_green, sizeof(material), cudaMemcpyHostToDevice) );
     // device_materials.push_back(d_back_green);
 
-    material h_right_blue = material::lambertian_material(glm::vec3(0.2, 0.2, 1.0));
-    material* d_right_blue = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_right_blue, &h_right_blue);
+    // material h_right_blue = material::lambertian_material(glm::vec3(0.2, 0.2, 1.0));
+    // material* d_right_blue = memoryManager.allocateDevice<material>();
+    // memoryManager.copyToDevice(d_right_blue, &h_right_blue);
+
+
+    auto right_blue = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.2, 0.2, 1.0)));
     // checkCuda(cudaMalloc((void**)&d_right_blue, sizeof(material)) );
     // checkCuda(cudaMemcpy(d_right_blue, &h_right_blue, sizeof(material), cudaMemcpyHostToDevice) );
     // device_materials.push_back(d_right_blue);
 
-    material h_upper_orange = material::lambertian_material(glm::vec3(1.0, 0.5, 0.0));
-    material* d_upper_orange = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_upper_orange, &h_upper_orange);
+    // material h_upper_orange = material::lambertian_material(glm::vec3(1.0, 0.5, 0.0));
+    // material* d_upper_orange = memoryManager.allocateDevice<material>();
+    // memoryManager.copyToDevice(d_upper_orange, &h_upper_orange);
+
+    auto upper_orange = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 0.5, 0.0)));
     // checkCuda(cudaMalloc((void**)&d_upper_orange, sizeof(material)) );
     // checkCuda(cudaMemcpy(d_upper_orange, &h_upper_orange, sizeof(material), cudaMemcpyHostToDevice) );
     // device_materials.push_back(d_upper_orange);
 
-    material h_lower_teal = material::lambertian_material(glm::vec3(0.2, 0.8, 0.8));
-    material* d_lower_teal = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_lower_teal, &h_lower_teal);
+    // material h_lower_teal = material::lambertian_material(glm::vec3(0.2, 0.8, 0.8));
+    // material* d_lower_teal = memoryManager.allocateDevice<material>();
+    // memoryManager.copyToDevice(d_lower_teal, &h_lower_teal);
+
+    auto lower_teal = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.2, 0.8, 0.8)));
     // checkCuda(cudaMalloc((void**)&d_lower_teal, sizeof(material)) );
     // checkCuda(cudaMemcpy(d_lower_teal, &h_lower_teal, sizeof(material), cudaMemcpyHostToDevice) );
     // device_materials.push_back(d_lower_teal);
 
     /* Quads */
     hittable hittable_obj;
-    hittable_obj = hittable::make_quad(glm::vec3(-3.0f, -2.0f, 5.0f), glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_left_red);
+    hittable_obj = hittable::make_quad(glm::vec3(-3.0f, -2.0f, 5.0f), glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 4.0f,  0.0f), left_red);
     h_hittables_list.push_back(hittable_obj);
-    hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -2.0f, 0.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_back_green);
+    hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -2.0f, 0.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 4.0f,  0.0f), back_green);
     h_hittables_list.push_back(hittable_obj);
-    hittable_obj = hittable::make_quad(glm::vec3( 3.0f, -2.0f, 1.0f), glm::vec3(0.0f, 0.0f,  4.0f), glm::vec3(0.0f, 4.0f,  0.0f), d_right_blue);
+    hittable_obj = hittable::make_quad(glm::vec3( 3.0f, -2.0f, 1.0f), glm::vec3(0.0f, 0.0f,  4.0f), glm::vec3(0.0f, 4.0f,  0.0f), right_blue);
     h_hittables_list.push_back(hittable_obj);
-    hittable_obj = hittable::make_quad(glm::vec3(-2.0f,  3.0f, 1.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f,  4.0f), d_upper_orange);
+    hittable_obj = hittable::make_quad(glm::vec3(-2.0f,  3.0f, 1.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f,  4.0f), upper_orange);
     h_hittables_list.push_back(hittable_obj);
-    hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -3.0f, 5.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f, -4.0f), d_lower_teal);
+    hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -3.0f, 5.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 0.0f, -4.0f), lower_teal);
     h_hittables_list.push_back(hittable_obj);
 
     
@@ -911,39 +819,12 @@ void quads(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
 
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
-    // checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
-    // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
      
 
     hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
     
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
-    
-
 }
 
 void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
@@ -966,8 +847,9 @@ void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh
     /* texture */
     texture* d_noise_tex = memoryManager.allocateDevice<texture>();
     Perlin noise;
+    auto green = glm::vec3(0.0, 1.0, 0.0);
     float scramble_frequency = 4.0f;  // default is 1.0f;
-    texture h_noise_tex = texture::noise_texture(noise, scramble_frequency);
+    texture h_noise_tex = texture::noise_texture(noise, green, scramble_frequency);
     memoryManager.copyToDevice(d_noise_tex, &h_noise_tex);
     // checkCuda(cudaMalloc((void**)&d_noise_tex, sizeof(texture)) );
     // checkCuda(cudaMemcpy(d_noise_tex, &h_noise_tex, sizeof(texture), cudaMemcpyHostToDevice) );
@@ -1070,23 +952,28 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
 
     
 
-    auto red    = material::lambertian_material(glm::vec3(.65, .05, .05));
-    auto white  = material::lambertian_material(glm::vec3(.73, .73, .73));
-    auto green  = material::lambertian_material(glm::vec3(.12, .45, .15));
-    auto light  = material::diffuseLight_material(glm::vec3(15, 15, 15));
-    auto mirror = material::metal_material(glm::vec3(1.0, 1.0, 1.0), 0.0);
+    // auto red    = material::lambertian_material(glm::vec3(.65, .05, .05));
+    auto red    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.65, 0.05, 0.05)));
+    // auto white  = material::lambertian_material(glm::vec3(.73, .73, .73));
+    auto white    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.73, .73, .73)));
+    // auto green  = material::lambertian_material(glm::vec3(.12, .45, .15));
+    auto green    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.12, .45, .15)));
+    // auto light  = material::diffuseLight_material(glm::vec3(15, 15, 15));
+    auto light    = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(15, 15, 15)));
+    // auto mirror = material::metal_material(glm::vec3(1.0, 1.0, 1.0), 0.0);
+    auto mirror    = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(1.0, 1.0, 1.0), 0.0 );
 
-    material* d_red     = memoryManager.allocateDevice<material>();  
-    material* d_white   = memoryManager.allocateDevice<material>();
-    material* d_green   = memoryManager.allocateDevice<material>();
-    material* d_light   = memoryManager.allocateDevice<material>();
-    material* d_mirror  = memoryManager.allocateDevice<material>();
+    // material* d_red     = memoryManager.allocateDevice<material>();  
+    // material* d_white   = memoryManager.allocateDevice<material>();
+    // material* d_green   = memoryManager.allocateDevice<material>();
+    // material* d_light   = memoryManager.allocateDevice<material>();
+    // material* d_mirror  = memoryManager.allocateDevice<material>();
 
-    memoryManager.copyToDevice(d_red, &red);
-    memoryManager.copyToDevice(d_white, &white);
-    memoryManager.copyToDevice(d_green, &green);
-    memoryManager.copyToDevice(d_light, &light);
-    memoryManager.copyToDevice(d_mirror, &mirror);
+    // memoryManager.copyToDevice(d_red, &red);
+    // memoryManager.copyToDevice(d_white, &white);
+    // memoryManager.copyToDevice(d_green, &green);
+    // memoryManager.copyToDevice(d_light, &light);
+    // memoryManager.copyToDevice(d_mirror, &mirror);
 
 
 
@@ -1108,14 +995,14 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
 
 
 
-    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
-    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
-    auto obj3 = hittable(hittable::make_quad(glm::vec3(343, 554, 332), glm::vec3(-130,0,0), glm::vec3(0,0,-105), d_light));
-    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
-    auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), d_white));
-    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
+    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), green));
+    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), red));
+    auto obj3 = hittable(hittable::make_quad(glm::vec3(343, 554, 332), glm::vec3(-130,0,0), glm::vec3(0,0,-105), light));
+    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(555,0,0), glm::vec3(0,0,555), white));
+    auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), white));
+    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), white));
    
-    auto obj7 = hittable(hittable::make_quad(glm::vec3(555,0, 75), glm::vec3(0,200,0), glm::vec3(0, 0, 200), d_mirror));
+    auto obj7 = hittable(hittable::make_quad(glm::vec3(555,0, 75), glm::vec3(0,200,0), glm::vec3(0, 0, 200), mirror));
 
     h_hittables_list.push_back(obj1);
     h_hittables_list.push_back(obj2);
@@ -1129,8 +1016,8 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
     // box(h_hittables_list, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), d_white);
     // box(h_hittables_list, glm::vec3(265.0f, 0.0f, 295.0f), glm::vec3(430.0f, 330.0f, 460.0f), d_white);
 
-    auto box1 = createBox(memoryManager, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), d_white);
-    auto box2 = createBox(memoryManager, glm::vec3(265.0f, 0.0f, 295.0f), glm::vec3(430.0f, 330.0f, 460.0f), d_white);
+    auto box1 = createBox(memoryManager, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), white);
+    auto box2 = createBox(memoryManager, glm::vec3(265.0f, 0.0f, 295.0f), glm::vec3(430.0f, 330.0f, 460.0f), white);
     h_hittables_list.push_back(*box1);
     h_hittables_list.push_back(*box2);
     
@@ -1151,27 +1038,6 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
     
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, 1); // or sizeof(hittable)
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    //     // memoryManager.allocateDeferred(d_world,1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-    // memoryManager.allocateDeferred(d_world, 1); // or sizeof(hittable)
-    // memoryManager.copyToDevice(d_world, &h_world, 1); // or sizeof(hittable)
     
 
 }
@@ -1187,29 +1053,45 @@ void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHN
     cam.background = glm::vec3(0.0f, 0.0f, 0.0f);
     cam.initialize();
     
-    std::vector<hittable> h_hittables_list;
+    std::vector<hittable> h_hittables_list;  // hold all items in general native and bvh items
+    std::vector<hittable> boxes1, boxes2;  // holds bvh items by group
     
-    auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
-    auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
-    auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
-    auto light = material::diffuseLight_material(glm::vec3(15, 15, 15));
+    
+    
+     // auto red    = material::lambertian_material(glm::vec3(.65, .05, .05));
+    auto red    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.65, 0.05, 0.05)));
+    // auto white  = material::lambertian_material(glm::vec3(.73, .73, .73));
+    auto white    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.73, .73, .73)));
+    // auto green  = material::lambertian_material(glm::vec3(.12, .45, .15));
+    auto green    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.12, .45, .15)));
+    // auto light  = material::diffuseLight_material(glm::vec3(15, 15, 15));
+    auto light    = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(15, 15, 15)));
+    // auto mirror = material::metal_material(glm::vec3(1.0, 1.0, 1.0), 0.0);
+    auto mirror    = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(1.0, 1.0, 1.0), 0.0 );
 
-    material* d_red     = memoryManager.allocateDevice<material>();  
-    material* d_white   = memoryManager.allocateDevice<material>();
-    material* d_green   = memoryManager.allocateDevice<material>();
-    material* d_light   = memoryManager.allocateDevice<material>();
+    
+    
+    // auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
+    // auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
+    // auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
+    // auto light = material::diffuseLight_material(glm::vec3(15, 15, 15));
 
-    memoryManager.copyToDevice(d_red, &red);
-    memoryManager.copyToDevice(d_white, &white);
-    memoryManager.copyToDevice(d_green, &green);
-    memoryManager.copyToDevice(d_light, &light);
+    // material* d_red     = memoryManager.allocateDevice<material>();  
+    // material* d_white   = memoryManager.allocateDevice<material>();
+    // material* d_green   = memoryManager.allocateDevice<material>();
+    // material* d_light   = memoryManager.allocateDevice<material>();
 
-    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
-    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
-    auto obj3 = hittable(hittable::make_quad(glm::vec3(343, 554, 332), glm::vec3(-130,0,0), glm::vec3(0,0,-105), d_light));
-    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
-    auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), d_white));
-    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
+    // memoryManager.copyToDevice(d_red, &red);
+    // memoryManager.copyToDevice(d_white, &white);
+    // memoryManager.copyToDevice(d_green, &green);
+    // memoryManager.copyToDevice(d_light, &light);
+
+    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), green));
+    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), red));
+    auto obj3 = hittable(hittable::make_quad(glm::vec3(343, 554, 332), glm::vec3(-130,0,0), glm::vec3(0,0,-105), light));
+    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(555,0,0), glm::vec3(0,0,555), white));
+    auto obj5 = hittable(hittable::make_quad(glm::vec3(555,555,555), glm::vec3(-555,0,0), glm::vec3(0,0,-555), white));
+    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), white));
    
     h_hittables_list.push_back(obj1);
     h_hittables_list.push_back(obj2);
@@ -1218,51 +1100,39 @@ void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHN
     h_hittables_list.push_back(obj5);
     h_hittables_list.push_back(obj6);
 
+    
+
     //* Create two boxes
-    auto box1 = createBox(memoryManager, glm::vec3(.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
-    auto box2 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+    auto box1 = createBox(memoryManager, glm::vec3(.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), white);
+    auto box2 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(165.0f, 165.0f, 165.0f), white);
+    
 
     auto rotated = memoryManager.allocateHost<hittable>(hittable::make_rotateY(box1, 15));
     auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(265.0, 0.0f, 295.0f)));
-    h_hittables_list.push_back(*translated);
+    // h_hittables_list.push_back(*translated);
+    boxes1.push_back(*translated);
 
     rotated = memoryManager.allocateHost<hittable>(hittable::make_rotateY(box2, -18));
     translated = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(130.0f, 0.0f, 65.0f)));
-    h_hittables_list.push_back(*translated);
+    // h_hittables_list.push_back(*translated);
+    boxes2.push_back(*translated);
 
+    // transfer boxes to BVH nodes
+    auto bvhItem1 = createBVH(memoryManager, boxes1);
+    h_hittables_list.push_back(bvhItem1);
+    auto bvhItem2 = createBVH(memoryManager, boxes2);
+    h_hittables_list.push_back(bvhItem2);
   
     size_t number_of_hittables = h_hittables_list.size();
-    // printf("size: %d\n", (int)number_of_hittables);
   
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
 
-
     hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
-    
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
+
 }
 
 void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
@@ -1277,11 +1147,9 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     cam.initialize();
    
     
-    std::vector<hittable> h_hittables_list;
+    std::vector<hittable> h_hittables_list;  // hold all items in general native and bvh items
+    std::vector<hittable> boxes1, boxes2;  // holds bvh items by group
     
-    
-    // hittable hittable_obj;  // holds any hittable temporarily
-
     // allocate textures
     auto atex = texture::solid_texture(glm::vec3(0.0f, 0.0f, 0.0f)); 
     texture* d_atex = memoryManager.allocateDevice<texture>();
@@ -1290,8 +1158,6 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     auto blueTex = texture::solid_texture(glm::vec3(0.1f, 0.1f, 1.0f)); 
     texture* d_blueTex = memoryManager.allocateDevice<texture>();
     memoryManager.copyToDevice(d_blueTex, &blueTex);
-
-
 
     auto light_tex = texture::solid_texture(glm::vec3(7.0f, 7.0f, 7.0f));
     texture* d_light_tex = memoryManager.allocateDevice<texture>();
@@ -1307,36 +1173,21 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     memoryManager.copyToDevice(d_blueish, &blueish);
 
 
-    auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
-    material* d_red = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_red, &red);
+    auto red    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.65, 0.05, 0.05)));
+    auto white    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.73, .73, .73)));
+    auto green    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.12, .45, .15)));
+    auto light    = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(7.0, 7.0, 7.0)));
+    auto mirror    = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(1.0, 1.0, 1.0), 0.0 );
 
-    auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
-    material* d_white = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_white, &white);
+    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), green));
+    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), red));
+    auto obj3 = hittable(hittable::make_quad(glm::vec3(113, 554, 127), glm::vec3(330,0,0), glm::vec3(0,0, 305), light));
+    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,555,0), glm::vec3(555,0,0), glm::vec3(0,0,555), white));
+    auto obj5 = hittable(hittable::make_quad(glm::vec3(0 ,0 , 0), glm::vec3(555,0,0), glm::vec3(0,0,555), white));
+    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), white));
 
-    auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
-    material* d_green = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_green, &green);
-
-    auto light = material::diffuseLight_material(d_light_tex);
-    material* d_light = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_light, &light);
-
-    auto mirror = material::metal_material(glm::vec3(0.7, 0.6, 0.5), 0.0);
-    material* d_mirror  = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_mirror, &mirror);
-
-
-    auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_green));
-    auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), d_red));
-    auto obj3 = hittable(hittable::make_quad(glm::vec3(113, 554, 127), glm::vec3(330,0,0), glm::vec3(0,0, 305), d_light));
-    auto obj4 = hittable(hittable::make_quad(glm::vec3(0,555,0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
-    auto obj5 = hittable(hittable::make_quad(glm::vec3(0 ,0 , 0), glm::vec3(555,0,0), glm::vec3(0,0,555), d_white));
-    auto obj6 = hittable(hittable::make_quad(glm::vec3(0,0,555), glm::vec3(555,0,0), glm::vec3(0,555,0), d_white));
-
-    auto obj7 = hittable(hittable::make_quad(glm::vec3(555,50, 50), glm::vec3(0,400,0), glm::vec3(0, 0, 400), d_mirror));
-    auto obj8 = hittable(hittable::make_quad(glm::vec3(0,50, 50), glm::vec3(0,400,0), glm::vec3(0, 0, 400), d_mirror));
+    auto obj7 = hittable(hittable::make_quad(glm::vec3(555,50, 50), glm::vec3(0,400,0), glm::vec3(0, 0, 400), mirror));
+    auto obj8 = hittable(hittable::make_quad(glm::vec3(0,50, 50), glm::vec3(0,400,0), glm::vec3(0, 0, 400), mirror));
    
    
     h_hittables_list.push_back(obj1);
@@ -1350,26 +1201,33 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     h_hittables_list.push_back(obj8);
     
 
-    auto sphere = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(150, 350, 275), 60, d_white));
+    auto sphere = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(150, 350, 275), 60, white));
     auto nube   = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(sphere, 0.01f, d_blueish));
     h_hittables_list.push_back(*nube);
 
     // Allocate hittable boxes
-    auto box1 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), d_white);
-    auto box2 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 165.0f, 165.0f), d_white);
+    auto box1 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 330.0f, 165.0f), white);
+    auto box2 = createBox(memoryManager, glm::vec3(0.0f, 0.0f, 0.0f),  glm::vec3(165.0f, 165.0f, 165.0f), white);
     
     auto rotated        = memoryManager.allocateHost<hittable>(hittable::make_rotateY(box1, 15));
     auto translated     = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(265, 0, 295)));
     auto smoked    = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(translated, 0.01f, d_negro));
-    h_hittables_list.push_back(*smoked);
+    // h_hittables_list.push_back(*smoked);
+    boxes1.push_back(*smoked);
     
 
 
     rotated     = memoryManager.allocateHost<hittable>(hittable::make_rotateY(box2, -18));
     translated  = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(130, 0, 65)));
-    smoked      = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(translated, 0.01f, d_white));
-    h_hittables_list.push_back(*smoked);
+    smoked      = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(translated, 0.01f, white));
+    // h_hittables_list.push_back(*smoked);
+    boxes2.push_back(*smoked);
 
+    // transfer boxes to BVH nodes
+    auto bvhItem1 = createBVH(memoryManager, boxes1);
+    h_hittables_list.push_back(bvhItem1);
+    auto bvhItem2 = createBVH(memoryManager, boxes2);
+    h_hittables_list.push_back(bvhItem2);
    
     size_t number_of_hittables = h_hittables_list.size();
     printf("size: %d\n", (int)number_of_hittables);
@@ -1378,37 +1236,9 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
     
     hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
-    
-
-    
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-        
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-        
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    //    // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
 }
 
 
@@ -1448,14 +1278,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
             boxesGroup.push_back(*box);
         }
     }
-
-    // auto andrea = createTexture(memoryManager, Type::IMAGE, glm::vec3(0,0,0), "images/andrea.jpeg");
-    // auto andreaMat = createMaterial(memoryManager, Type::LAMBERTIAN, andrea);
-
-    // auto sofia = createTexture(memoryManager, Type::IMAGE, glm::vec3(0,0,0), "images/sofia.jpeg");
-    // auto sofiaMat = createMaterial(memoryManager, Type::LAMBERTIAN, sofia);
-
-    
+     
 
     // ceiling light
     auto lightColor = createTexture(memoryManager, Type::SOLID, glm::vec3(7.0, 7.0, 7.0));
@@ -1473,10 +1296,8 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     auto glass_material = createMaterial(memoryManager, Type::DIELECTRIC, 0, glm::vec3(0), 0, 1.5f );
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(260, 150, 45), 50, glass_material));
     // metal sphere
-    auto d_metal_material = memoryManager.allocateDevice<material>();
-    auto h_metal_material = material::metal_material(glm::vec3(0.8f, 0.8f, 0.9f), 1.0f);
-    memoryManager.copyToDevice(d_metal_material, &h_metal_material);
-    h_hittables_list.push_back(hittable::make_sphere(glm::vec3(0, 150, 145), 50, d_metal_material));
+    auto metalMat = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.8f, 0.8f, 0.9f), 1.0f);
+    h_hittables_list.push_back(hittable::make_sphere(glm::vec3(0, 150, 145), 50, metalMat));
 
     // blue shiny sphere
     auto boundary = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(360, 150, 145), 70, createMaterial(memoryManager, Type::DIELECTRIC, NULL, glm::vec3(0), 0, 1.5)));
@@ -1490,7 +1311,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     auto emat = createMaterial(memoryManager, Type::LAMBERTIAN, mapTex);
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(400, 200, 400), 100, emat ));
     // Perlin patter sphere
-    auto perlinTex = createTexture(memoryManager, Type::NOISE, glm::vec3(0), glm::vec3(0), NULL , 0.2);
+    auto perlinTex = createTexture(memoryManager, Type::NOISE, glm::vec3(0.5,0.5,0.5), glm::vec3(0), NULL , 0.2);
     h_hittables_list.push_back(hittable::make_sphere(glm::vec3(220, 280, 300), 80, createMaterial(memoryManager, Type::LAMBERTIAN, perlinTex)));
     // h_hittables_list.push_back(hittable::make_sphere(glm::vec3(220, 280, 300), 80, andreaMat));
     auto a = glm::vec3(0, 0, 0);
@@ -1499,35 +1320,40 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     auto white  = createTexture(memoryManager, Type::SOLID, glm::vec3(0.73, 0.73, 0.73));
     auto whiteMat = createMaterial(memoryManager, Type::LAMBERTIAN, white);
 
-    
-
 
     auto conglomerate = createConglomerate(memoryManager, a, b, whiteMat, 1000 );
-    // auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
-    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(-100, 270, 395)));
+    auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
+    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(-100, 270, 395)));
 
     conglomerateGroup.push_back(*translated);
 
 
     // group 1 BVH nodes 
-    auto d_g1_hittables = memoryManager.allocateDevice<hittable>(boxesGroup.size());
-    // memoryManager.allocateDeferred(d_hittable_g1, boxesGroup.size());
-    memoryManager.copyToDevice(d_g1_hittables, boxesGroup.data(), boxesGroup.size());
-    int number_of_nodes = (2 * boxesGroup.size() - 1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    auto boxList = hittable::make_bvhNode(bvh_nodes, d_g1_hittables, boxesGroup.size());
-    h_hittables_list.push_back(boxList);
-    // grou 2 BVH nodes
-    auto d_g2_hittables = memoryManager.allocateDevice<hittable>(conglomerateGroup.size());
-    memoryManager.copyToDevice(d_g2_hittables, conglomerateGroup.data(), conglomerateGroup.size());
-    number_of_nodes = (2 * conglomerateGroup.size() - 1);
-    auto bvh2 = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
+    // auto d_g1_hittables = memoryManager.allocateDevice<hittable>(boxesGroup.size());
+    // // memoryManager.allocateDeferred(d_hittable_g1, boxesGroup.size());
+    // memoryManager.copyToDevice(d_g1_hittables, boxesGroup.data(), boxesGroup.size());
+    // int number_of_nodes = (2 * boxesGroup.size() - 1);
     // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    auto conglom_list = hittable::make_bvhNode(bvh2, d_g2_hittables, conglomerateGroup.size());
-    h_hittables_list.push_back(conglom_list);
+    // auto boxList = hittable::make_bvhNode(bvh_nodes, d_g1_hittables, boxesGroup.size());
+    // h_hittables_list.push_back(boxList);
+
+    auto bvhItem1 = createBVH(memoryManager, boxesGroup);
+    h_hittables_list.push_back(bvhItem1);
 
 
-    // overall
+
+    // grou 2 BVH nodes
+    // auto d_g2_hittables = memoryManager.allocateDevice<hittable>(conglomerateGroup.size());
+    // memoryManager.copyToDevice(d_g2_hittables, conglomerateGroup.data(), conglomerateGroup.size());
+    // number_of_nodes = (2 * conglomerateGroup.size() - 1);
+    // auto bvh2 = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
+    // // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+    // auto conglom_list = hittable::make_bvhNode(bvh2, d_g2_hittables, conglomerateGroup.size());
+    // h_hittables_list.push_back(conglom_list);
+
+    auto bvhItem2 = createBVH(memoryManager, conglomerateGroup);
+    h_hittables_list.push_back(bvhItem2);
+
 
     // complete the scene
     size_t number_of_hittables = h_hittables_list.size();

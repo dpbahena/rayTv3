@@ -50,13 +50,13 @@ struct material {
     material(): type(Type::NONE) {}
         
     // constructor for type lambertian
-    static material lambertian_material(const glm::vec3& albedo) {
-        material obj;
-        obj.type = Type::LAMBERTIAN;
-        obj.lambertian.albedo = albedo;
-        obj.lambertian.tex = new texture(texture::solid_texture(albedo));
-        return obj;
-    }
+    // static material lambertian_material(const glm::vec3& albedo) {
+    //     material obj;
+    //     obj.type = Type::LAMBERTIAN;
+    //     obj.lambertian.albedo = albedo;
+    //     obj.lambertian.tex = new texture(texture::solid_texture(albedo));
+    //     return obj;
+    // }
 
     static material lambertian_material(texture* tex) {
         material obj;
