@@ -96,13 +96,13 @@ struct material {
         return obj;
     }
 
-    static material diffuseLight_material(const glm::vec3& emit) {
-        material obj;
-        obj.type = Type::DIFFUSE;
-        obj.diffuseLight.tex = new texture(texture::solid_texture(emit));
+    // static material diffuseLight_material(const glm::vec3& emit) {
+    //     material obj;
+    //     obj.type = Type::DIFFUSE;
+    //     obj.diffuseLight.tex = new texture(texture::solid_texture(emit));
 
-        return obj;
-    }
+    //     return obj;
+    // }
 
     static material isotropic_material(const glm::vec3& albedo) {
         material obj;

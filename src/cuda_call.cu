@@ -837,61 +837,31 @@ void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh
     cam.focus_dist = 10.0f;
     cam.background = glm::vec3(0.0f, 0.0f, 0.0f);
     cam.initialize();
-   
-    
     
     std::vector<hittable> h_hittables_list;
 
-    hittable hittable_obj;  // holds any hittable temporarily
-
-    /* texture */
-    texture* d_noise_tex = memoryManager.allocateDevice<texture>();
-    Perlin noise;
-    auto green = glm::vec3(0.0, 1.0, 0.0);
-    float scramble_frequency = 4.0f;  // default is 1.0f;
-    texture h_noise_tex = texture::noise_texture(noise, green, scramble_frequency);
-    memoryManager.copyToDevice(d_noise_tex, &h_noise_tex);
-    // checkCuda(cudaMalloc((void**)&d_noise_tex, sizeof(texture)) );
-    // checkCuda(cudaMemcpy(d_noise_tex, &h_noise_tex, sizeof(texture), cudaMemcpyHostToDevice) );
-    // device_textures.push_back(d_noise_tex);
-
-    /* materials */
-    material h_mat = material::lambertian_material(d_noise_tex);
-    material* d_mat = memoryManager.allocateDevice<material>();
-    memoryManager.copyToDevice(d_mat, &h_mat);
-    // checkCuda(cudaMalloc((void**)&d_mat, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_mat, &h_mat, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_mat);
-
-    
-
+    auto whiteNoise_tex = createTexture(memoryManager, Type::NOISE, glm::vec3(0.8, 0.8, 0.8), {},{}, 4.0f);
+    auto whiteNoise = createMaterial(memoryManager, Type::LAMBERTIAN, whiteNoise_tex);
 
     /* Spheres */
-    auto hittable_obj2 = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, d_mat);
+    auto hittable_obj2 = hittable::make_sphere(glm::vec3(0.0, -1000.0, 0.0), 1000, whiteNoise);
     h_hittables_list.push_back(hittable_obj2);
 
-    auto hittable_obj3 = hittable::make_sphere(glm::vec3(0.0, 2.0, 0.0), 2, d_mat);
+    auto greenNoise_tex = createTexture(memoryManager, Type::NOISE, glm::vec3(0.1, 0.8, 0.1), {},{}, 2.0f);
+    auto greenNoise = createMaterial(memoryManager, Type::LAMBERTIAN, greenNoise_tex);
+
+
+    auto hittable_obj3 = hittable::make_sphere(glm::vec3(0.0, 2.0, 0.0), 2, greenNoise);
     h_hittables_list.push_back(hittable_obj3);
 
-    /* Quads */
-    material* d_mat1 = memoryManager.allocateDevice<material>();
-    auto h_mat1 = material::diffuseLight_material(glm::vec3(4.0f, 4.0f, 4.0f));
-    memoryManager.copyToDevice(d_mat1, &h_mat1);
-    // checkCuda(cudaMalloc((void**)&d_mat1, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_mat1, &h_mat1, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_mat1);
+    auto mat1 = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(0.0f, 0.0f, 0.0f)) );
 
-    auto hittable_obj4 = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), d_mat1);
+    auto hittable_obj4 = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), mat1);
     h_hittables_list.push_back(hittable_obj4);
 
-    material* d_mat2 = memoryManager.allocateDevice<material>();
-    auto h_mat2 = material::diffuseLight_material(glm::vec3(6.0f, 0.0f, 0.2f));
-    memoryManager.copyToDevice(d_mat2, &h_mat2);
-    // checkCuda(cudaMalloc((void**)&d_mat2, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_mat2, &h_mat2, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_mat2);
+    auto mat2 = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(8.0f, 0.0f, 0.0f)) );
 
-    hittable_obj4 = hittable::make_sphere(glm::vec3(-5.0f, 3.0f, 3.0f), .5, d_mat2);
+    hittable_obj4 = hittable::make_sphere(glm::vec3(-5.0f, 3.0f, 3.0f), .5, mat2);
     h_hittables_list.push_back(hittable_obj4);
 
     
@@ -899,39 +869,11 @@ void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
     
-    // checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
-    // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
-     
-
     hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
+
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
     
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    //     /* Allocate memory for hittable list on the device */
-    //     // memoryManager.allocateDeferred(d_world, 1);
-    //     // memoryManager.copyToDevice(d_world, &h_world, 1);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     // checkCuda(cudaMalloc((void**)&bvh_nodes, number_of_nodes * sizeof(BVHNode)) );
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    //     // checkCuda(cudaMalloc((void**)&d_world, sizeof(hittable)) );
-    //     // checkCuda(cudaMemcpy(d_world, &h_world, sizeof(hittable), cudaMemcpyHostToDevice) );  // copy host world to device world
-    // }
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
-    
-
 }
 
 
@@ -952,48 +894,11 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
 
     
 
-    // auto red    = material::lambertian_material(glm::vec3(.65, .05, .05));
     auto red    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.65, 0.05, 0.05)));
-    // auto white  = material::lambertian_material(glm::vec3(.73, .73, .73));
     auto white    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.73, .73, .73)));
-    // auto green  = material::lambertian_material(glm::vec3(.12, .45, .15));
     auto green    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.12, .45, .15)));
-    // auto light  = material::diffuseLight_material(glm::vec3(15, 15, 15));
     auto light    = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(15, 15, 15)));
-    // auto mirror = material::metal_material(glm::vec3(1.0, 1.0, 1.0), 0.0);
     auto mirror    = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(1.0, 1.0, 1.0), 0.0 );
-
-    // material* d_red     = memoryManager.allocateDevice<material>();  
-    // material* d_white   = memoryManager.allocateDevice<material>();
-    // material* d_green   = memoryManager.allocateDevice<material>();
-    // material* d_light   = memoryManager.allocateDevice<material>();
-    // material* d_mirror  = memoryManager.allocateDevice<material>();
-
-    // memoryManager.copyToDevice(d_red, &red);
-    // memoryManager.copyToDevice(d_white, &white);
-    // memoryManager.copyToDevice(d_green, &green);
-    // memoryManager.copyToDevice(d_light, &light);
-    // memoryManager.copyToDevice(d_mirror, &mirror);
-
-
-
-    // checkCuda(cudaMalloc((void**)&d_red, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_red, &red, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_red);
-
-    // checkCuda(cudaMalloc((void**)&d_white, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_white, &white, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_white);
-
-    // checkCuda(cudaMalloc((void**)&d_green, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_green, &green, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_green);
-
-    // checkCuda(cudaMalloc((void**)&d_light, sizeof(material)) );
-    // checkCuda(cudaMemcpy(d_light, &light, sizeof(material), cudaMemcpyHostToDevice) );
-    // device_materials.push_back(d_light);
-
-
 
     auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), green));
     auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), red));
@@ -1013,9 +918,6 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
     h_hittables_list.push_back(obj7);
     
     //* Create two boxes
-    // box(h_hittables_list, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), d_white);
-    // box(h_hittables_list, glm::vec3(265.0f, 0.0f, 295.0f), glm::vec3(430.0f, 330.0f, 460.0f), d_white);
-
     auto box1 = createBox(memoryManager, glm::vec3(130.0f, 0.0f, 65.0f),  glm::vec3(295.0f, 165.0f, 230.0f), white);
     auto box2 = createBox(memoryManager, glm::vec3(265.0f, 0.0f, 295.0f), glm::vec3(430.0f, 330.0f, 460.0f), white);
     h_hittables_list.push_back(*box1);
@@ -1026,20 +928,9 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
   
-    // checkCuda(cudaMalloc((void**)&d_hittable_list, number_of_hittables * sizeof(hittable)) );
-    // checkCuda(cudaMemcpy(d_hittable_list, h_hittables_list.data(), number_of_hittables * sizeof(hittable), cudaMemcpyHostToDevice) );
-     
-
     hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
-    // h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    int number_of_nodes = (2 * number_of_hittables -1);
-    memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
-    
-    
-
 }
 
 void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
@@ -1058,33 +949,12 @@ void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHN
     
     
     
-     // auto red    = material::lambertian_material(glm::vec3(.65, .05, .05));
     auto red    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.65, 0.05, 0.05)));
-    // auto white  = material::lambertian_material(glm::vec3(.73, .73, .73));
     auto white    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.73, .73, .73)));
-    // auto green  = material::lambertian_material(glm::vec3(.12, .45, .15));
     auto green    = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(.12, .45, .15)));
-    // auto light  = material::diffuseLight_material(glm::vec3(15, 15, 15));
     auto light    = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(15, 15, 15)));
-    // auto mirror = material::metal_material(glm::vec3(1.0, 1.0, 1.0), 0.0);
     auto mirror    = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(1.0, 1.0, 1.0), 0.0 );
 
-    
-    
-    // auto red   = material::lambertian_material(glm::vec3(.65, .05, .05));
-    // auto white = material::lambertian_material(glm::vec3(.73, .73, .73));
-    // auto green = material::lambertian_material(glm::vec3(.12, .45, .15));
-    // auto light = material::diffuseLight_material(glm::vec3(15, 15, 15));
-
-    // material* d_red     = memoryManager.allocateDevice<material>();  
-    // material* d_white   = memoryManager.allocateDevice<material>();
-    // material* d_green   = memoryManager.allocateDevice<material>();
-    // material* d_light   = memoryManager.allocateDevice<material>();
-
-    // memoryManager.copyToDevice(d_red, &red);
-    // memoryManager.copyToDevice(d_white, &white);
-    // memoryManager.copyToDevice(d_green, &green);
-    // memoryManager.copyToDevice(d_light, &light);
 
     auto obj1 = hittable(hittable::make_quad(glm::vec3(555,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), green));
     auto obj2 = hittable(hittable::make_quad(glm::vec3(0,0,0), glm::vec3(0,555,0), glm::vec3(0,0,555), red));
@@ -1243,7 +1113,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
 
 
 
-void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, BVHNode* &bvh_nodes2, hittable* &d_hittable_list, hittable* &d_hittable_g1, hittable* &d_hittable_g2, hittable* &d_world, hittable* &d_world_g1, hittable* d_world_g2){
+void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
     
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 478.0f, 278.0f, -600.0f);
@@ -1327,29 +1197,8 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
 
     conglomerateGroup.push_back(*translated);
 
-
-    // group 1 BVH nodes 
-    // auto d_g1_hittables = memoryManager.allocateDevice<hittable>(boxesGroup.size());
-    // // memoryManager.allocateDeferred(d_hittable_g1, boxesGroup.size());
-    // memoryManager.copyToDevice(d_g1_hittables, boxesGroup.data(), boxesGroup.size());
-    // int number_of_nodes = (2 * boxesGroup.size() - 1);
-    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    // auto boxList = hittable::make_bvhNode(bvh_nodes, d_g1_hittables, boxesGroup.size());
-    // h_hittables_list.push_back(boxList);
-
     auto bvhItem1 = createBVH(memoryManager, boxesGroup);
     h_hittables_list.push_back(bvhItem1);
-
-
-
-    // grou 2 BVH nodes
-    // auto d_g2_hittables = memoryManager.allocateDevice<hittable>(conglomerateGroup.size());
-    // memoryManager.copyToDevice(d_g2_hittables, conglomerateGroup.data(), conglomerateGroup.size());
-    // number_of_nodes = (2 * conglomerateGroup.size() - 1);
-    // auto bvh2 = memoryManager.allocateDevice<BVHNode>(number_of_nodes);
-    // // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    // auto conglom_list = hittable::make_bvhNode(bvh2, d_g2_hittables, conglomerateGroup.size());
-    // h_hittables_list.push_back(conglom_list);
 
     auto bvhItem2 = createBVH(memoryManager, conglomerateGroup);
     h_hittables_list.push_back(bvhItem2);
@@ -1361,36 +1210,11 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_n
     
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
+
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
     
-
-
-
-
-
-    hittable h_world = hittable::make_hittableList();
-    
-
-    h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    /** Implementing ROPE based BHV nodes ind cuda */
-    // int number_of_nodes = (2 * number_of_hittables -1);
-    // memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
     memoryManager.allocateDeferred(d_world, 1);
     memoryManager.copyToDevice(d_world, &h_world, 1);
-    
-
-    
-    // if (!cam.isBvh){ //* No bboxes
-    //     h_world.hittableList.setList(d_hittable_list, number_of_hittables);
-    // } else {
-    //     /** Implementing ROPE based BHV nodes ind cuda */
-    //     int number_of_nodes = (2 * number_of_hittables -1);
-    //     memoryManager.allocateDeferred(bvh_nodes, number_of_nodes);
-    //     build_bvh_NR_ROPE8<<<1, 1>>>(bvh_nodes, d_hittable_list, number_of_hittables);
-    //     h_world.hittableList.setNodes(bvh_nodes, d_hittable_list);
-    // }
-    // memoryManager.allocateDeferred(d_world, 1);
-    // memoryManager.copyToDevice(d_world, &h_world, 1);
-
 
 }
 
@@ -1413,13 +1237,8 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     HybridMemoryManager memoryManager;
    
     hittable*   d_hittables_list    = memoryManager.deferDeviceAllocation<hittable>();
-    hittable*   d_hittables_group1  = memoryManager.deferDeviceAllocation<hittable>();
-    hittable*   d_hittables_group2  = memoryManager.deferDeviceAllocation<hittable>();
-    hittable*   d_group1            = memoryManager.deferDeviceAllocation<hittable>();
-    hittable*   d_group2            = memoryManager.deferDeviceAllocation<hittable>();
     hittable*   d_world             = memoryManager.deferDeviceAllocation<hittable>();
     BVHNode*    bvh_nodes           = memoryManager.deferDeviceAllocation<BVHNode>();
-    BVHNode*    bvh_nodes2          = memoryManager.deferDeviceAllocation<BVHNode>();
     switch (cam.scene)  
     {
     case 1:
@@ -1451,7 +1270,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         cornell_smoke(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
         break;
     case 10:
-        finalScene(cam, memoryManager, bvh_nodes, bvh_nodes2, d_hittables_list, d_hittables_group1, d_hittables_group2, d_world, d_group1, d_group2);
+        finalScene(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
         break;
     default:
         break;
@@ -1461,12 +1280,6 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     
     
     memoryManager.copyToDevice(d_cam, &cam);
-    
-
-    // checkCuda(cudaMalloc((void**)&d_image, cam.image_width * cam.image_height * sizeof(uint32_t)));
-    // checkCuda(cudaMalloc((void**)&d_cam,  sizeof(Camera)));
-    // checkCuda(cudaMemcpy(d_cam, &cam, sizeof(Camera), cudaMemcpyHostToDevice));
-    
     
     clock_t start, stop;
     start = clock();
@@ -1503,13 +1316,5 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
 
     checkCuda(cudaMemcpy(colorBuffer, d_image, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
-
-   
-    // checkCuda(cudaFree(d_image) );
-    
-    // checkCuda(cudaFree(d_cam) );
-   
-    // checkCuda(cudaFree(d_states) );
-    
     
 }
