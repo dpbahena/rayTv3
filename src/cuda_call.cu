@@ -829,7 +829,7 @@ void simple_light(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_
     auto hittable_obj3 = hittable::make_sphere(glm::vec3(0.0, 2.0, 0.0), 2, greenNoise);
     h_hittables_list.push_back(hittable_obj3);
 
-    auto mat1 = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(0.0f, 0.0f, 0.0f)) );
+    auto mat1 = createMaterial(memoryManager, Type::DIFFUSE, createTexture(memoryManager, Type::SOLID, glm::vec3(4.0f, 4.0f, 4.0f)) );
 
     auto hittable_obj4 = hittable::make_quad(glm::vec3( 3.0f,  1.0f, -2.0f), glm::vec3(2.0f, 0.0f, -0.0f), glm::vec3(0.0f, 2.0f,  0.0f), mat1);
     h_hittables_list.push_back(hittable_obj4);
@@ -1224,34 +1224,43 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     switch (cam.scene)  
     {
     case 1:
-        
+        printf("Bouncing Spheres\n");
         bouncing_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 2:
+        printf("Checkered Spheres\n");
         checkered_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 3:
+        printf("Earth\n");
         earth(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 4:
+        printf("Perlin Spheres\n");
         perlin_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 5:
+        printf("Quads\n");
         quads(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 6:
+        printf("Simple Light\n");
         simple_light(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 7:
+        printf("Cornell Box\n");
         cornell_box(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 8:
+        printf("Cornell Box Instances\n");
         cornell_box_instances(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 9:
+        printf("Smoke\n");
         cornell_smoke(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 10:
+        printf("Final Scene\n");
         finalScene(cam, memoryManager, d_hittables_list, d_world);
         break;
     default:
