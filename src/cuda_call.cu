@@ -569,7 +569,7 @@ __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* i
 }
 
 // scenes 1 - 10
-void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 20.0f;
     cam.lookfrom = glm::vec3(13.0f, 2.0f,  3.0f);
@@ -650,7 +650,7 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* 
     memoryManager.copyToDevice(d_world, &h_world, 1);
 }
 
-void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 20.0f;
     cam.lookfrom = glm::vec3(13.0f, 2.0f,  3.0f);
@@ -687,7 +687,7 @@ void checkered_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode*
 
 }
 
-void earth(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void earth(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 20.0f;
     cam.lookfrom = glm::vec3(0.0f, 0.0f,  12.0f);
@@ -717,7 +717,7 @@ void earth(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
     
 }
 
-void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 20.0f;
     cam.lookfrom = glm::vec3(13.0f, 2.0f,  3.0f);
@@ -756,7 +756,7 @@ void perlin_spheres(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &b
 
 }
 
-void quads(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void quads(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 80.0f;
     cam.lookfrom = glm::vec3( 0.0f, 0.0f,  9.0f);
@@ -802,7 +802,7 @@ void quads(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes,
     
 }
 
-void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void simple_light(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 20.0f;
     cam.lookfrom = glm::vec3( 26.0f, 3.0f,  6.0f);
@@ -852,7 +852,7 @@ void simple_light(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh
 }
 
 
-void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 278.0f, 278.0f, -800.0f);
@@ -911,7 +911,7 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_
     memoryManager.copyToDevice(d_world, &h_world, 1);
 }
 
-void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 278.0f, 278.0f, -800.0f);
@@ -981,7 +981,7 @@ void cornell_box_instances(Camera& cam, HybridMemoryManager& memoryManager, BVHN
 
 }
 
-void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 278.0f, 278.0f, -800.0f);
@@ -1080,7 +1080,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bv
 
 
 
-void finalScene(Camera& cam, HybridMemoryManager& memoryManager, BVHNode* &bvh_nodes, hittable* &d_hittable_list, hittable* &d_world){
+void finalScene(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
     
     cam.vfov = 40.0f;
     cam.lookfrom = glm::vec3( 478.0f, 278.0f, -600.0f);
@@ -1220,39 +1220,39 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
    
     hittable*   d_hittables_list    = memoryManager.deferDeviceAllocation<hittable>();
     hittable*   d_world             = memoryManager.deferDeviceAllocation<hittable>();
-    BVHNode*    bvh_nodes           = memoryManager.deferDeviceAllocation<BVHNode>();
+    // BVHNode*    bvh_nodes           = memoryManager.deferDeviceAllocation<BVHNode>();
     switch (cam.scene)  
     {
     case 1:
         
-        bouncing_spheres(cam, memoryManager,  bvh_nodes, d_hittables_list, d_world);
+        bouncing_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 2:
-        checkered_spheres(cam, memoryManager,  bvh_nodes, d_hittables_list, d_world);
+        checkered_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 3:
-        earth(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        earth(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 4:
-        perlin_spheres(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        perlin_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 5:
-        quads(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        quads(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 6:
-        simple_light(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        simple_light(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 7:
-        cornell_box(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        cornell_box(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 8:
-        cornell_box_instances(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        cornell_box_instances(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 9:
-        cornell_smoke(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        cornell_smoke(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 10:
-        finalScene(cam, memoryManager, bvh_nodes, d_hittables_list, d_world);
+        finalScene(cam, memoryManager, d_hittables_list, d_world);
         break;
     default:
         break;

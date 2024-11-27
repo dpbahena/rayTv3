@@ -96,10 +96,11 @@ I started with Chapter 13 defocus Blur
 
 
 
-### Chap 10  Final render " 
-### BVH OFF:  RTX-3060  sec RTX4090:  sec
-### BVH ON:   RTX-3060  sec RTX4090:  sec
-### BVH ON:   JUNO  108 secs
+# Chap 10  Final render
+## BVH mix (boxes and sphere conglomerates only)
+### RTX-3060  510.7 secs    
+### RTX4090:  sec
+
 
 ![Screenshot of the project](output_samples/NWfinalrender.png)
 
