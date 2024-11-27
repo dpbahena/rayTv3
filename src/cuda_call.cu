@@ -341,19 +341,19 @@ inline float random_float(curandState_t* state){
 }
 
 __device__ 
-glm::vec3 random_unit_vector(curandState_t* states, int i, int j){
+inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j){
     auto p = random_in_unit_sphere(states, i, j);
     return glm::normalize(p);
 }
 
 __device__
-bool near_zero(const glm::vec3 v) {
+inline bool near_zero(const glm::vec3 v) {
     auto s = 1e-8f;
     return (fabs(v.x) < s) && (fabs(v.y) < s) && (fabs(v.z) < s);
 }
 
 __device__
-glm::vec3 sample_square(curandState_t* states, int &i, int &j) {
+inline glm::vec3 sample_square(curandState_t* states, int &i, int &j) {
     curandState_t x = states[i];
     curandState_t y = states[j];
     auto a = random_float(&x) - 0.5f;
@@ -364,7 +364,7 @@ glm::vec3 sample_square(curandState_t* states, int &i, int &j) {
 }
 
 __device__
-float linear_to_gamma(float linear_component)
+inline float linear_to_gamma(float linear_component)
 {
     if (linear_component > 0.0f)
         return std::sqrt(linear_component);
@@ -373,7 +373,7 @@ float linear_to_gamma(float linear_component)
 }
 
 __device__
-uint32_t colorToUint32_t(glm::vec3& c)
+inline uint32_t colorToUint32_t(glm::vec3& c)
 {
     /* Ensure that the input values within the range [0.0, 1.0] */
     c.x = (c.x < 0.0f) ? 0.0f : ((c.x > 1.0f) ? 1.0f : c.x);  // red
@@ -397,7 +397,7 @@ uint32_t colorToUint32_t(glm::vec3& c)
 }
 
 __device__
-glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal) {
+inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal) {
     glm::vec3 on_unit_sphere = random_unit_vector(states, i, j);
     if (glm::dot(on_unit_sphere, normal) > 0.0f) // In the same hemisphere as the normal
         return on_unit_sphere;
@@ -406,7 +406,7 @@ glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::v
 }
 
 __device__
-glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j) {
+inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j) {
     while (true) {
         glm::vec3 p = random_vector_in_range(states, i, j, -1.0f ,1.0f);
         if (glm::dot(p,p) < 1.0f){
@@ -416,7 +416,7 @@ glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j) {
 }
 
 __device__
-glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j){
+inline glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j){
     curandState_t x = states[i];
     curandState_t y = states[j];
     while (true) {
@@ -427,14 +427,14 @@ glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j){
 }
 
  __device__
-glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
+inline glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
     // returns a random point in the camera defocus disk
     glm::vec3 p = random_in_unit_disk(states, i, j);
     return center + p.x * defocusDisk_u + p.y * defocusDisk_v;
 }
 
 __device__
-glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max){
+inline glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max){
     curandState_t x = states[i];
     curandState_t y = states[j];
     float a = random_float_in_range(&x, min, max);
@@ -447,7 +447,7 @@ glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min
     return glm::vec3(a, b, c);
 }
 __device__
-glm::vec3 random_vector(curandState_t* states,  int i, int j){
+inline glm::vec3 random_vector(curandState_t* states,  int i, int j){
     curandState_t x = states[i];
     curandState_t y = states[j];
     float a = random_float(&x);
@@ -459,7 +459,7 @@ glm::vec3 random_vector(curandState_t* states,  int i, int j){
 
 }
 
-__device__ float random_float_in_range(curandState_t* state, float a, float b) {
+__device__ inline float random_float_in_range(curandState_t* state, float a, float b) {
     // return a + (b - a) * curand_uniform_float(state);  // this does not include b  e.g -1 to 1.0  it does not include 1.0
     return a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
 }
@@ -467,12 +467,12 @@ __device__ float random_float_in_range(curandState_t* state, float a, float b) {
 /**
  * @return a random integer in [min, max] including the upper limit
  */
-__device__ int random_int(curandState_t* state, int a, int b) {
+__device__ inline int random_int(curandState_t* state, int a, int b) {
     return static_cast<int>(a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0);  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
 }
 
 __device__
-glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::vec3& background, const ray &r, const hittable* world) {
+inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::vec3& background, const ray &r, const hittable* world) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -526,7 +526,7 @@ glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::v
 
 
 __device__
-ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
+inline ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
     /* Construct a camara ray originating from the defocus disk and directed at a randdomly sampled point around the pixel locations i, j */
     auto offset = sample_square(states, i, j);
     auto pixel_sample = pixel00_loc 
