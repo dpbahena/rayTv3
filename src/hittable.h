@@ -39,7 +39,6 @@ class hit_record {
         double t;
         float u;
         float v;
-        Type type;
         bool front_face;
         __device__ __host__
         void set_face_normal(const ray& r, const glm::vec3& outward_normal){
@@ -89,15 +88,11 @@ struct hittable;  // predeclare the existance of a hittable struct
 // Define a struct of a list of hittables
 struct hittableList_data {
     hittable* objects;
-    BVHNode* nodeObjects;
     int objects_size;
     AaBb bbox;
     __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
-    __device__ __host__
-    void setList(hittable* hittables, size_t list_size);
     
-    void setNodes(BVHNode* nodes, hittable* hittables);
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
 };
@@ -324,18 +319,6 @@ struct hittable {
         return obj;
     }
 
-    
-
-
-    // static hittable make_constantMedium(hittable* boundary, float density, const glm::vec3& albedo) {
-    //     hittable obj;
-    //     obj.type = Type::MEDIUM;
-    //     obj.constantMedium.boundary = boundary;
-    //     obj.constantMedium.neg_inv_density = -1.0f / density;
-    //     obj.constantMedium.phase_function = new material(material::isotropic_material(albedo));
-
-    //     return obj;
-    // }
 
     static hittable make_constantMedium(hittable* boundary, float density, material* mat) {
         hittable obj;
@@ -346,17 +329,7 @@ struct hittable {
 
         return obj;
     }
-
-    // static hittable make_constantMedium(hittable* boundary, float density, texture* tex) {
-    //     hittable obj;
-    //     obj.type = Type::MEDIUM;
-    //     obj.constantMedium.boundary = boundary;
-    //     obj.constantMedium.neg_inv_density = -1.0f / density;
-    //     obj.constantMedium.phase_function = new material(material::isotropic_material(tex));
-
-    //     return obj;
-    // }
-
+  
 };
 
 

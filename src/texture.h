@@ -14,7 +14,6 @@ struct checkerTexture_data {
 };
 
 
-
 struct solidColor_data {
     glm::vec3 albedo;
     __device__ __host__
@@ -88,17 +87,6 @@ struct texture {
         return obj;
         
     }
-
-    // static texture checker_texture(float scale, const glm::vec3& color1, const glm::vec3& color2) {
-    //     texture obj;
-    //     obj.type = Type::CHECKER;
-    //     obj.checkerTexture.inv_scale = (1.0f / scale);
-    //     obj.checkerTexture.even =  new texture(solid_texture(color1));
-    //     obj.checkerTexture.odd =  new texture(solid_texture(color2));
-        
-    //     return obj;
-        
-    // }
     
     // *Constructors for type IMAGE
     static texture image_texture(unsigned char* bdata, int width, int height, int vScan, int bytes_per_pixel) {
@@ -122,12 +110,8 @@ struct texture {
         obj.noiseTexture.scale = scale;
         obj.noiseTexture.noisy = noisy;
         
-
-
         return obj;
     }
-
-   
 
     //* Value function to dispatch based on texture type
     __device__ __host__
@@ -141,8 +125,8 @@ struct texture {
             case Type::IMAGE:
                 return imageTexture.value(u, v, p);
             case Type::NOISE:
-                // auto color = noiseTexture.albedo;
                 return noiseTexture.value(noiseTexture.albedo, u, v, p);
+                
             default: 
                 return glm::vec3(0.0f);   // default value if none
             

@@ -41,12 +41,9 @@ bool sphere_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     glm::vec3 outward_normal = (rec.p - current_center) / radius;
     rec.set_face_normal(r, outward_normal);
     get_sphere_uv(outward_normal, rec.u, rec.v);
-    rec.type = Type::SPHERE;
     rec.mat = mat;
    
-
     return true;
-    
 }
 
 __device__ __host__
@@ -147,43 +144,6 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
     
     return hit_anything;
 }
-
-__device__ __host__
-void hittableList_data::setList(hittable* hittables, size_t list_size) {
-    objects = hittables;
-    objects_size = list_size;
-    
-    // for (int i = 0; i < objects_size; i++){
-    //     if (objects[i].type == Type::SPHERE) {
-    //         bbox = AaBb(bbox, objects[i].sphere.bounding_box());
-    //     }
-    //     if (objects[i].type == Type::QUAD) {
-    //         bbox = AaBb(bbox, objects[i].quad.bounding_box());
-    //     }
-    //     if (objects[i].type == Type::ROTATE_Y) {
-    //         bbox = AaBb(bbox, objects[i].rotateY.bounding_box());
-    //     }
-    //     if (objects[i].type == Type::TRANSLATE) {
-    //         bbox = AaBb(bbox, objects[i].translate.bounding_box());
-    //     }
-    //     if (objects[i].type == Type::MEDIUM) {
-    //         bbox = AaBb(bbox, objects[i].constantMedium.bounding_box());
-    //     }
-    //     if (objects[i].type == Type::LIST) {
-    //         bbox = AaBb(bbox, objects[i].hittableList.bounding_box());
-    //     }
-    // }
-    
-}
-
-
-void hittableList_data::setNodes(BVHNode* nodes, hittable* hittables)
-{
-    nodeObjects = nodes;
-    objects = hittables;
-}
-
-
 
 __global__
 void build_bvh_kernel(BVHNode* nodes, hittable* objects, size_t objects_size) {
@@ -397,10 +357,6 @@ bool bvhNode_data::hit(const ray& r, interval ray_t, hit_record& rec, float rand
 }
 
 
-
-
-
-
 __device__ __host__
 bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     auto denom = glm::dot(normal, r.direction);
@@ -423,10 +379,8 @@ bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     rec.p = intersection;
     rec.mat = mat;
     rec.set_face_normal(r, normal);
-    rec.type = Type::QUAD;
 
     return true;
-
 }
 
 __device__ __host__
@@ -712,6 +666,29 @@ int imageTexture_data::clamp(int x, int low, int high) const {
     
 }
 
+__device__
+static bool box_compare(const hittable& a, const hittable& b, int axis_index) {
+    
+    auto a_axis_interval = a.sphere.bounding_box().axis_interval(axis_index);
+    auto b_axis_interval = b.sphere.bounding_box().axis_interval(axis_index);
+    
+    return a_axis_interval.min < b_axis_interval.min;
+}
+
+__device__
+static bool box_x_compare (const hittable& a, const hittable& b) {
+    return box_compare(a, b, 0);
+}
+__device__
+static bool box_y_compare (const hittable& a, const hittable& b) {
+    return box_compare(a, b, 1);
+}
+__device__
+static bool box_z_compare (const hittable& a, const hittable& b) {
+    return box_compare(a, b, 2);
+}
+
+
 /**
  * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
  * 
@@ -783,24 +760,3 @@ hittable* box( const glm::vec3& a, const glm::vec3& b, material* mat) {
     return sides;
 }
 
-__device__
-static bool box_compare(const hittable& a, const hittable& b, int axis_index) {
-    
-    auto a_axis_interval = a.sphere.bounding_box().axis_interval(axis_index);
-    auto b_axis_interval = b.sphere.bounding_box().axis_interval(axis_index);
-    
-    return a_axis_interval.min < b_axis_interval.min;
-}
-
-__device__
-static bool box_x_compare (const hittable& a, const hittable& b) {
-    return box_compare(a, b, 0);
-}
-__device__
-static bool box_y_compare (const hittable& a, const hittable& b) {
-    return box_compare(a, b, 1);
-}
-__device__
-static bool box_z_compare (const hittable& a, const hittable& b) {
-    return box_compare(a, b, 2);
-}

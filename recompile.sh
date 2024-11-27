@@ -1,11 +1,14 @@
 #!/bin/bash
 
+# Save the current directory
+original_dir=$(pwd)
+
 # Change to the /build directory
 cd build || exit
 
-# Run the executable with the provided parameters
-./rayTracer "$@"
-
+# Run make
+make clean
+make
 # Return to the original directory
-cd -
+cd "$original_dir"
 

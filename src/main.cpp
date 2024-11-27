@@ -23,17 +23,23 @@ int main(int arg, char** argv) {
     // uint32_t* colorBuffer;
     RayTracer gpuOperations;
 
-     if (arg == 4) {
+     if (arg == 5) {
         cam.samples_per_pixel = atoi(argv[1]);
         cam.max_depth = atoi(argv[2]);
-        // cam.isBvh = atoi(argv[3]); // method to use (with bvh bbox or no brute method)
         cam.scene = atoi(argv[3]); // scene to view
-
-     } else {  // default valules
-        cam.samples_per_pixel = 4;
+        cam.ends = atoi(argv[4]);  // ends program after first run
+        
+    } else if (arg == 4) {
+        cam.samples_per_pixel = atoi(argv[1]);
+        cam.max_depth = atoi(argv[2]);
+        cam.scene = atoi(argv[3]); // scene to view
+        cam.ends = false;  // ends program after first run
+     
+    } else {  // default valules
+        cam.samples_per_pixel = 5;
         cam.max_depth = 2;
-        // cam.isBvh = true; //true;  // use bvh
-        cam.scene = 9;
+        cam.scene = 10;
+        cam.ends = false; // true ends program after first run
         printf("Using default values:  ./rayTracer 100 40 1 \n");
         printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <scene: 1-10\n");
      }
@@ -44,18 +50,17 @@ int main(int arg, char** argv) {
     printf("Raytrace with %d samples with %d depth\n", cam.samples_per_pixel, cam.max_depth);
 
     bool rendered = false;
+    bool ends = false;
 
-    while(win.windowIsOpen()) {
+    while(win.windowIsOpen() && !ends) {
 
         if(!rendered) {
-            // cam.render();  // calculate the raytracing
-            // cam.initialize();
             gpuOperations.cudaCall(cam, myRender.colorBuffer);
-
-
             myRender.render();
             rendered = true;
         }
+        ends = cam.ends;
+        
 
         
         /* Check for keyboard input */

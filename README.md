@@ -99,10 +99,10 @@ I started with Chapter 13 defocus Blur
 # Chap 10  Final render
 ## BVH mix (boxes and sphere conglomerates only)
 ### RTX-3060  510.7 secs    
-### RTX4090:  sec
+### RTX4090:   94.2 secs (200 x 50 samples)
+### RTX4090: 4871.7 sec or 1::21::11 (10000 x 40 samples/ depth)
 
-
-![Screenshot of the project](output_samples/NWfinalrender.png)
+![Screenshot of the project](output_samples/NWfinalscene.png)
 
 
 

@@ -8,10 +8,7 @@ class rtw_image {
     public:
         rtw_image(){}
         rtw_image(const char* image_filename){
-            // // auto filename = std::string(image_filename);
-            // // auto imagedir = getenv("RTW_IMAGES");
-            // Hunt for the image file in some likely locations.
-            // // if(imagedir && load(std::string(imagedir) + "/" +image_filename)) return;
+            
             if(load(image_filename)) return;
             if(load("images/")) return;
             if(load("../images/")) return;

@@ -104,7 +104,7 @@
         int numDisplays = SDL_GetNumVideoDisplays();
         if (numDisplays > 1) {
             std::cout  << "Number of Displays : " << SDL_GetNumVideoDisplays() << std::endl;
-            SDL_GetDisplayBounds(numDisplays > 1 ? 1 : 2, &secondDisplayBounds); // Index 1 represents the second display
+            SDL_GetDisplayBounds(numDisplays > 1 ? 3 : 1, &secondDisplayBounds); // Index 1 represents the second display
                 
             width = secondDisplayBounds.w;
             height = secondDisplayBounds.h;
