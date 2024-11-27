@@ -27,8 +27,8 @@ __device__ inline float     random_float(curandState_t* state);
 __device__ inline float     random_float_in_range(curandState_t* state, float a, float b);
 
 // host function declarations
-hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat);
-hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat, int numSpheres);
+inline hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat);
+inline hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat, int numSpheres);
 inline double random_double();
 inline double random_double(float min, float max);
 inline int random_int(int min, int max);
@@ -132,7 +132,7 @@ material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture*
  * @param b 
  * @param mat 
  */
-hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
+inline hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat) {
     // Allocate raw memory for 6 hittable objects
     hittable* sides = static_cast<hittable*>(::operator new[](sizeof(hittable) * 6));
     memoryManager.host_allocations.push_back(sides); // Track allocation for cleanup
@@ -173,7 +173,7 @@ hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, cons
  * @param b random position within a bounding box
  * @param tex - texture of each sphere in the conglomerate 
  */
-hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat, int numSpheres) {
+inline hittable* createConglomerate(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat, int numSpheres) {
     // Allocate raw memory for the number of spheres
     hittable* spheres = static_cast<hittable*>(::operator new[](sizeof(hittable) * numSpheres));
     memoryManager.host_allocations.push_back(spheres); // Track allocation for cleanup
