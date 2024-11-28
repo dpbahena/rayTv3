@@ -42,7 +42,7 @@ void Camera::initialize() {
     float defocus_radius = focus_dist * tan(glm::radians(defocus_angle / 2.0f));
     defocus_disk_u = u * defocus_radius;
     defocus_disk_v = v * defocus_radius;
-    pixel_sample_scale = 1.0 / samples_per_pixel;
+    // pixel_sample_scale = 1.0 / samples_per_pixel;
     
 
 
