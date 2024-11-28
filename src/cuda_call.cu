@@ -614,12 +614,7 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 //     // image[cam->image_width * j + i] = colorToUint32_t(color);  
 // }
 
-__global__ void rayTracer_kernel_batched(
-    curandState_t* states,
-    Camera* cam,
-    float* image,
-    hittable* world
-) {
+__global__ void rayTracer_kernel_batched(curandState_t* states, Camera* cam, float* image, hittable* world) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -627,128 +622,71 @@ __global__ void rayTracer_kernel_batched(
         return;
 
     int pixel_index = j * cam->image_width + i;
-    // int thread_index = pixel_index;  // One state per pixel
-
-    // Initialize the random state for this thread
-    // curandState_t local_state = states[thread_index];
 
     glm::vec3 color = glm::vec3(0.0f);
 
     // Process samples in a loop
     for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
         // Generate ray and compute color
-        ray r = get_ray(
-            states,
-            i, j,
-            cam->pixel00_loc,
-            cam->center,
-            cam->pixel_delta_u,
-            cam->pixel_delta_v,
-            cam->defocus_angle,
-            cam->defocus_disk_u,
-            cam->defocus_disk_v
-        );
-
-        color += ray_color(
-            states,
-            i, j,
-            cam->max_depth,
-            cam->background,
-            r,
-            world
-        );
+        ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
+        color += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
     }
-
-    // Scale the color
-    // color *= cam->pixel_sample_scale;
-
     // Write the color to the image buffer
     int image_base_index = pixel_index * 3;
-    // image[image_base_index + 0] = color.r;
-    // image[image_base_index + 1] = color.g;
-    // image[image_base_index + 2] = color.b;
 
     atomicAdd(&image[image_base_index + 0], color.r);
     atomicAdd(&image[image_base_index + 1], color.g);
     atomicAdd(&image[image_base_index + 2], color.b);
-
-
-    // Update the random state
-    // states[thread_index] = local_state;
 }
 
-__global__ void rayTracer_kernel_no_batches(
-    curandState_t* states,
-    Camera* cam,
-    float* image,
-    hittable* world
-) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+// __global__ void rayTracer_kernel_no_batches(
+//     curandState_t* states,
+//     Camera* cam,
+//     float* image,
+//     hittable* world
+// ) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i >= cam->image_width || j >= cam->image_height)
-        return;
+//     if (i >= cam->image_width || j >= cam->image_height)
+//         return;
 
-    int pixel_index = j * cam->image_width + i;
-    // int thread_index = pixel_index;  // One state per pixel
+//     int pixel_index = j * cam->image_width + i;
 
-    // Initialize the random state for this thread
-    // curandState_t local_state = states[thread_index];
+//     glm::vec3 color = glm::vec3(0.0f);
 
-    glm::vec3 color = glm::vec3(0.0f);
+//     // Process samples in a loop
+//     for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
+//         // Generate ray and compute color
+//         ray r = get_ray(
+//             states,
+//             i, j,
+//             cam->pixel00_loc,
+//             cam->center,
+//             cam->pixel_delta_u,
+//             cam->pixel_delta_v,
+//             cam->defocus_angle,
+//             cam->defocus_disk_u,
+//             cam->defocus_disk_v
+//         );
 
-    // Process samples in a loop
-    for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
-        // Generate ray and compute color
-        ray r = get_ray(
-            states,
-            i, j,
-            cam->pixel00_loc,
-            cam->center,
-            cam->pixel_delta_u,
-            cam->pixel_delta_v,
-            cam->defocus_angle,
-            cam->defocus_disk_u,
-            cam->defocus_disk_v
-        );
+//         color += ray_color(
+//             states,
+//             i, j,
+//             cam->max_depth,
+//             cam->background,
+//             r,
+//             world
+//         );
+//     }
+//     // Write the color to the image buffer
+//     int image_base_index = pixel_index * 3;
+//     image[image_base_index + 0] = color.r;
+//     image[image_base_index + 1] = color.g;
+//     image[image_base_index + 2] = color.b;
+    
+// }
 
-        color += ray_color(
-            states,
-            i, j,
-            cam->max_depth,
-            cam->background,
-            r,
-            world
-        );
-    }
-
-    // Scale the color
-    // color *= cam->pixel_sample_scale;
-
-    // Write the color to the image buffer
-    int image_base_index = pixel_index * 3;
-    image[image_base_index + 0] = color.r;
-    image[image_base_index + 1] = color.g;
-    image[image_base_index + 2] = color.b;
-
-    // atomicAdd(&image[image_base_index + 0], color.r);
-    // atomicAdd(&image[image_base_index + 1], color.g);
-    // atomicAdd(&image[image_base_index + 2], color.b);
-
-
-    // Update the random state
-    // states[thread_index] = local_state;
-}
-
-
-__global__ void addToColorBuffer0(float* data, uint32_t* image, int width, int height, float scale){
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx >= width * height) return;
-    int color_idx = idx * 3;
-    glm::vec3 color(data[color_idx + 0], data[color_idx + 1], data[color_idx + 2]);
-    color*= scale;
-    image[idx] = colorToUint32_t(color);
-}
 
 __global__ void addToColorBuffer(float* data, uint32_t* image, int width, int height, float scale){
     // Calculate pixel coordinates
@@ -1480,39 +1418,16 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     
     clock_t start, stop;
     start = clock();
-
-    // int threads = 8;
-    // dim3 blockSize(threads, threads, 1);
-    // int blocks_x = (cam.image_width  + blockSize.x - 1) / blockSize.x;
-    // int blocks_y = (cam.image_height  + blockSize.y - 1) / blockSize.y;
-    // int blocks_z = (cam.samples_per_pixel + blockSize.z - 1) / blockSize.z;
-    // dim3 gridSize(blocks_x, blocks_y, blocks_z);
-
+   
     int threads = 16;  // Adjust based on your GPU's capabilities
     dim3 blockSize(threads, threads);
     int blocks_x = (cam.image_width + blockSize.x - 1) / blockSize.x;
     int blocks_y = (cam.image_height + blockSize.y - 1) / blockSize.y;
     dim3 gridSize(blocks_x, blocks_y);
 
-
-
-
-    //generate random seed to be used in rayTracer kernel
-    // int num_threads = threads * threads * blocks_x * blocks_y * blocks_z;
-    // curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_threads * sizeof(curandState_t));  // random calculations in GPU
-
-    // int num_pixels = cam.image_width * cam.image_height;
-    // curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
-    // init_random<<<gridSize, blockSize>>>(seed, d_states, cam.image_width, cam.image_height);
-
     int num_threads = threads * threads * blocks_x * blocks_y;
     curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_threads * sizeof(curandState_t));  // random calculations in GPU
-    // checkCuda(cudaMalloc(&d_states, num_threads * sizeof(curandState_t)));
     init_random<<<gridSize, blockSize>>>(seed, d_states);
-
-    // rayTracer_kernel<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
-    // checkCuda(cudaGetLastError());
-    // checkCuda(cudaDeviceSynchronize());
 
     const int batch_size = 32;
     int total_samples = cam.samples_per_pixel;
@@ -1521,49 +1436,17 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         int samples_in_batch = min(batch_size, total_samples - batch * batch_size);
 
         // Set the number of samples to process in this batch
-        // cam.pixel_sample_scale = 1.0f / samples_in_batch;
         cam.samples_per_pixel = samples_in_batch;
-        
         memoryManager.copyToDevice(d_cam, &cam);
 
         // Launch the kernel
         rayTracer_kernel_batched<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
         checkCuda(cudaGetLastError());
-        // checkCuda(cudaDeviceSynchronize());
         
     }
     // Restore the original samples per pixel and update scaling
     cam.samples_per_pixel = total_samples;
-
     cam.pixel_sample_scale = 1.0f / (float)total_samples;
-
-
-
-
-
-
-
-
-
-
-
-    // float* h_image = new float[cam.image_width * cam.image_height * 3];
-
-    // checkCuda(cudaMemcpy(h_image, d_image, cam.image_height * cam.image_width * 3 * sizeof(float), cudaMemcpyDeviceToHost));
-
-    
-    
-    // for (int j = 0; j < cam.image_height; ++j) {
-    //     for (int i = 0; i < cam.image_width; ++i) {
-    //         int idx = (j * cam.image_width + i) * 3;
-    //         glm::vec3 color(h_image[idx + 0], h_image[idx + 1], h_image[idx + 2]);
-    //         color *= cam.pixel_sample_scale;  // scale the color
-    //         colorBuffer[j * cam.image_width + i] = colorToUint32_t(color);
-    //     }
-    // }
-    // threads = 256;
-    // int blocks = (cam.image_height * cam.image_width + threads - 1) / threads;
-    // addToColorBuffer0<<<blocks, threads>>>(d_image, d_buffer, cam.image_width, cam.image_height, cam.pixel_sample_scale);
 
     // Set up block and grid sizes
     dim3 blockSize1(16, 16);
@@ -1576,8 +1459,6 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     stop = clock();
     double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
     printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
-
-
 
     checkCuda(cudaMemcpy(colorBuffer, d_buffer, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
     
