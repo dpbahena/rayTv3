@@ -1224,43 +1224,43 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     switch (cam.scene)  
     {
     case 1:
-        printf("Bouncing Spheres\n");
+        printf("Bouncing Spheres --->\t");
         bouncing_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 2:
-        printf("Checkered Spheres\n");
+        printf("Checkered Spheres --->\t");
         checkered_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 3:
-        printf("Earth\n");
+        printf("Earth --->\t");
         earth(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 4:
-        printf("Perlin Spheres\n");
+        printf("Perlin Spheres --->\t");
         perlin_spheres(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 5:
-        printf("Quads\n");
+        printf("Quads --->\t");
         quads(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 6:
-        printf("Simple Light\n");
+        printf("Simple Light --->\t");
         simple_light(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 7:
-        printf("Cornell Box\n");
+        printf("Cornell Box- --->\t");
         cornell_box(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 8:
-        printf("Cornell Box Instances\n");
+        printf("Cornell Box Instances --->\t");
         cornell_box_instances(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 9:
-        printf("Smoke\n");
+        printf("Smoke --->\t");
         cornell_smoke(cam, memoryManager, d_hittables_list, d_world);
         break;
     case 10:
-        printf("Final Scene\n");
+        printf("Final Scene --->\t");
         finalScene(cam, memoryManager, d_hittables_list, d_world);
         break;
     default:
@@ -1308,4 +1308,6 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 
     checkCuda(cudaMemcpy(colorBuffer, d_image, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
     
+    //*...
+    //* Memory manager will take care of cleaning memory allocations at exit
 }

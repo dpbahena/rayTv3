@@ -95,14 +95,18 @@ I started with Chapter 13 defocus Blur
 ![Screenshot of the project](output_samples/cornellbox2.png)
 
 
-
 # Chap 10  Final render
 ## BVH mix (boxes and sphere conglomerates only)
 ### RTX-3060  510.7 secs    
 ### RTX4090:   94.2 secs (200 x 50 samples)
 ### RTX4090: 4871.7 sec or 1::21::11 (10000 x 40 samples/ depth)
-
 ![Screenshot of the project](output_samples/NWfinalscene.png)
+
+## compiler uses
+### $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=65>  to limit the number of registers. It seems to make the program faster
+### Play with that number interactively to gain speed
+
+
 
 
 
