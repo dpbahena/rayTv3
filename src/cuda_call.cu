@@ -1599,7 +1599,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     start = clock();
 
      // Define threads per pixel and pixels per block
-    const int threads_per_pixel = 8; //16;  // Adjust as needed
+    const int threads_per_pixel = 16; //8 16;  // Adjust as needed
     const int pixels_per_block =  8;//8;    // Adjust as needed
 
     // Set up block and grid sizes
