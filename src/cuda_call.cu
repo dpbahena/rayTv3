@@ -552,6 +552,18 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
     curand_init(seed, idx, 0, &states[idx]);
 }
 
+__global__ void init_random2(unsigned int seed, curandState_t* states, int image_width, int image_height, int pixels_per_block){
+    int pixel_x = blockIdx.x;
+    int pixel_y = blockIdx.y * pixels_per_block + threadIdx.y;
+
+    if (pixel_x >= image_width || pixel_y >= image_height)
+        return;
+
+    int idx = pixel_y * image_width + pixel_x;
+    curand_init(seed, idx, 0, &states[idx]);
+}
+
+
 // __global__ void init_random(
 //     unsigned int seed,
 //     curandState_t* states,
@@ -613,6 +625,173 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 //     // color *= cam->pixel_sample_scale;
 //     // image[cam->image_width * j + i] = colorToUint32_t(color);  
 // }
+
+
+// __global__ void rayTracer_kernel_shared(curandState_t* states, Camera* cam, float* image, hittable* world) {
+//     // Define block and thread indices
+//     int tx = threadIdx.x;
+//     int ty = threadIdx.y;
+//     int bx = blockIdx.x * blockDim.x;
+//     int by = blockIdx.y * blockDim.y;
+
+//     // Calculate pixel coordinates
+//     int i = bx + tx;
+//     int j = by + ty;
+
+//     if (i >= cam->image_width || j >= cam->image_height)
+//         return;
+
+//     // Shared memory for accumulating colors
+//     extern __shared__ float shared_colors[];
+
+//     // Each pixel has 3 color components (R, G, B)
+//     int local_idx = (ty * blockDim.x + tx) * 3;
+//     shared_colors[local_idx + 0] = 0.0f;
+//     shared_colors[local_idx + 1] = 0.0f;
+//     shared_colors[local_idx + 2] = 0.0f;
+
+//     __syncthreads();
+
+//     // Calculate global thread index for random state
+//     int idx = j * cam->image_width + i;
+
+//     // Total threads in the block
+//     int total_threads_in_block = blockDim.x * blockDim.y;
+//     int thread_id_in_block = ty * blockDim.x + tx;
+
+//     // Distribute samples among threads
+//     int samples_per_thread = cam->samples_per_pixel / total_threads_in_block;
+//     int leftover_samples = cam->samples_per_pixel % total_threads_in_block;
+
+//     // Assign leftover samples to first 'leftover_samples' threads
+//     if (thread_id_in_block < leftover_samples)
+//         samples_per_thread++;
+
+//     // Accumulate color contributions
+//     for (int s = 0; s < samples_per_thread; ++s) {
+//         // Generate ray and compute color
+//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center,
+//                         cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
+//                         cam->defocus_disk_u, cam->defocus_disk_v);
+//         glm::vec3 color = ray_color(states, i, j, cam->max_depth, cam->background, r, world);
+
+//         // Accumulate color in shared memory
+//         atomicAdd(&shared_colors[local_idx + 0], color.r);
+//         atomicAdd(&shared_colors[local_idx + 1], color.g);
+//         atomicAdd(&shared_colors[local_idx + 2], color.b);
+//     }
+
+//     __syncthreads();
+
+//     // Only one thread per pixel writes back to global memory
+//     if (thread_id_in_block == 0) {
+//         int pixel_index = j * cam->image_width + i;
+//         int image_base_index = pixel_index * 3;
+
+//         image[image_base_index + 0] += shared_colors[local_idx + 0];
+//         image[image_base_index + 1] += shared_colors[local_idx + 1];
+//         image[image_base_index + 2] += shared_colors[local_idx + 2];
+//     }
+// }
+
+__global__ void rayTracer_kernel_shared(curandState_t* states, Camera* cam, float* image, hittable* world) {
+    // Number of threads assigned to each pixel
+    const int threads_per_pixel = blockDim.x;  // e.g., 32
+    // Number of pixels processed per block
+    const int pixels_per_block = blockDim.y;   // e.g., 8
+
+    // Thread index within the pixel
+    int thread_in_pixel = threadIdx.x;         // 0 to threads_per_pixel - 1
+    // Pixel index within the block
+    int pixel_in_block = threadIdx.y;          // 0 to pixels_per_block - 1
+
+    // Compute global pixel coordinates
+    int pixel_x = blockIdx.x;
+    int pixel_y = blockIdx.y * pixels_per_block + pixel_in_block;
+
+    if (pixel_x >= cam->image_width || pixel_y >= cam->image_height)
+        return;
+
+    // Index for random states
+    int idx = pixel_y * cam->image_width + pixel_x;
+
+    // Shared memory index for this pixel
+    extern __shared__ float shared_colors[];
+    int shared_mem_idx = pixel_in_block * 3;
+
+    // Initialize shared memory for the pixel (one thread does this)
+    if (thread_in_pixel == 0) {
+        shared_colors[shared_mem_idx + 0] = 0.0f;
+        shared_colors[shared_mem_idx + 1] = 0.0f;
+        shared_colors[shared_mem_idx + 2] = 0.0f;
+    }
+    __syncthreads();
+
+    // Calculate samples per thread
+    int samples_per_thread = cam->samples_per_pixel / threads_per_pixel;
+    int leftover_samples = cam->samples_per_pixel % threads_per_pixel;
+    if (thread_in_pixel < leftover_samples)
+        samples_per_thread++;
+
+    // Accumulate color contributions
+    glm::vec3 color(0.0f);
+    for (int s = 0; s < samples_per_thread; ++s) {
+        // Generate ray and compute color
+        ray r = get_ray(states, pixel_x, pixel_y, cam->pixel00_loc, cam->center,
+                        cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
+                        cam->defocus_disk_u, cam->defocus_disk_v);
+        color += ray_color(states, pixel_x, pixel_y, cam->max_depth, cam->background, r, world);
+    }
+
+    // Accumulate color in shared memory using atomic operations (on shared memory)
+    atomicAdd(&shared_colors[shared_mem_idx + 0], color.r);
+    atomicAdd(&shared_colors[shared_mem_idx + 1], color.g);
+    atomicAdd(&shared_colors[shared_mem_idx + 2], color.b);
+
+    __syncthreads();
+
+    // One thread per pixel writes the accumulated color back to global memory
+    if (thread_in_pixel == 0) {
+        int pixel_index = pixel_y * cam->image_width + pixel_x;
+        int image_base_index = pixel_index * 3;
+
+        image[image_base_index + 0] += shared_colors[shared_mem_idx + 0];
+        image[image_base_index + 1] += shared_colors[shared_mem_idx + 1];
+        image[image_base_index + 2] += shared_colors[shared_mem_idx + 2];
+    }
+}
+
+
+// __global__ void rayTracer_kernel_no_atomic(curandState_t* states, Camera* cam, float* image, hittable* world) {
+//     // Calculate pixel coordinates
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+//     if (i >= cam->image_width || j >= cam->image_height)
+//         return;
+
+//     int pixel_index = j * cam->image_width + i;
+//     int image_base_index = pixel_index * 3;
+
+//     glm::vec3 color = glm::vec3(0.0f);
+
+//     int idx = pixel_index;
+
+//     // Each thread processes all samples for its pixel
+//     for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
+//         // Generate ray and compute color
+//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center,
+//                         cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
+//                         cam->defocus_disk_u, cam->defocus_disk_v);
+//         color += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
+//     }
+
+//     // Write the color to the image buffer without atomic operations
+//     image[image_base_index + 0] = color.r;
+//     image[image_base_index + 1] = color.g;
+//     image[image_base_index + 2] = color.b;
+// }
+
 
 __global__ void rayTracer_kernel_batched(curandState_t* states, Camera* cam, float* image, hittable* world) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1418,35 +1597,70 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     
     clock_t start, stop;
     start = clock();
+
+     // Define threads per pixel and pixels per block
+    const int threads_per_pixel = 8; //16;  // Adjust as needed
+    const int pixels_per_block =  8;//8;    // Adjust as needed
+
+    // Set up block and grid sizes
+    dim3 blockSize(threads_per_pixel, pixels_per_block);
+    dim3 gridSize(cam.image_width,
+                  (cam.image_height + pixels_per_block - 1) / pixels_per_block);
+
+    // Calculate shared memory size
+    size_t shared_mem_size = pixels_per_block * 3 * sizeof(float);
+
+    // Allocate and initialize random states
+    int num_pixels = cam.image_width * cam.image_height;
+    curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
+    init_random2<<<gridSize, blockSize.y>>>(seed, d_states, cam.image_width, cam.image_height, pixels_per_block);
+
+    // Launch the kernel
+    rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_states, d_cam, d_image, d_world);
+    checkCuda(cudaGetLastError());
+
+
+
+
+
+
    
-    int threads = 16;  // Adjust based on your GPU's capabilities
-    dim3 blockSize(threads, threads);
-    int blocks_x = (cam.image_width + blockSize.x - 1) / blockSize.x;
-    int blocks_y = (cam.image_height + blockSize.y - 1) / blockSize.y;
-    dim3 gridSize(blocks_x, blocks_y);
+    // int threads = 16;  // Adjust based on your GPU's capabilities
+    // dim3 blockSize(threads, threads);
+    // int blocks_x = (cam.image_width + blockSize.x - 1) / blockSize.x;
+    // int blocks_y = (cam.image_height + blockSize.y - 1) / blockSize.y;
+    // dim3 gridSize(blocks_x, blocks_y);
 
-    int num_threads = threads * threads * blocks_x * blocks_y;
-    curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_threads * sizeof(curandState_t));  // random calculations in GPU
-    init_random<<<gridSize, blockSize>>>(seed, d_states);
+    // int num_threads = threads * threads * blocks_x * blocks_y;
+    // curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_threads * sizeof(curandState_t));  // random calculations in GPU
+    // init_random<<<gridSize, blockSize>>>(seed, d_states);
 
-    const int batch_size = 32;
-    int total_samples = cam.samples_per_pixel;
-    int num_batches = (total_samples + batch_size - 1) / batch_size;
-    for (int batch = 0; batch < num_batches; ++batch) {
-        int samples_in_batch = min(batch_size, total_samples - batch * batch_size);
+    // size_t shared_mem_size = blockSize.x * blockSize.y * 3 * sizeof(float);
+    // rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_states, d_cam, d_image, d_world);
+    // checkCuda(cudaGetLastError());
+    // checkCuda(cudaDeviceSynchronize());
 
-        // Set the number of samples to process in this batch
-        cam.samples_per_pixel = samples_in_batch;
-        memoryManager.copyToDevice(d_cam, &cam);
 
-        // Launch the kernel
-        rayTracer_kernel_batched<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
-        checkCuda(cudaGetLastError());
+    // const int batch_size = 32;
+    // int total_samples = cam.samples_per_pixel;
+    // int num_batches = (total_samples + batch_size - 1) / batch_size;
+    // for (int batch = 0; batch < num_batches; ++batch) {
+    //     int samples_in_batch = min(batch_size, total_samples - batch * batch_size);
+
+    //     // Set the number of samples to process in this batch
+    //     cam.samples_per_pixel = samples_in_batch;
+    //     memoryManager.copyToDevice(d_cam, &cam);
+
+    //     // Launch the kernel
+    //     // rayTracer_kernel_batched<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
+    //     size_t shared_mem_size = blockDim.x * blockDim.y * 3 * sizeof(float);
+    //     rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_states, d_cam, d_image, d_world);
+    //     checkCuda(cudaGetLastError());
         
-    }
-    // Restore the original samples per pixel and update scaling
-    cam.samples_per_pixel = total_samples;
-    cam.pixel_sample_scale = 1.0f / (float)total_samples;
+    // }
+    // // Restore the original samples per pixel and update scaling
+    // cam.samples_per_pixel = total_samples;
+    // cam.pixel_sample_scale = 1.0f / (float)total_samples;
 
     // Set up block and grid sizes
     dim3 blockSize1(16, 16);
