@@ -1220,7 +1220,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
    
     hittable*   d_hittables_list    = memoryManager.deferDeviceAllocation<hittable>();
     hittable*   d_world             = memoryManager.deferDeviceAllocation<hittable>();
-    // BVHNode*    bvh_nodes           = memoryManager.deferDeviceAllocation<BVHNode>();
+   
     switch (cam.scene)  
     {
     case 1:

@@ -1,7 +1,5 @@
 #pragma once
 
-
-
 class AaBb {
     public:
         interval x, y, z;

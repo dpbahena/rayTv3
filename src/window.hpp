@@ -104,13 +104,23 @@
         int numDisplays = SDL_GetNumVideoDisplays();
         if (numDisplays > 1) {
             std::cout  << "Number of Displays : " << SDL_GetNumVideoDisplays() << std::endl;
-            SDL_GetDisplayBounds(numDisplays > 1 ? 0 : 1, &secondDisplayBounds); // Index 1 represents the second display
-                
-            width = secondDisplayBounds.w;
-            height = secondDisplayBounds.h;
-            // full screen
-            x_winPos = secondDisplayBounds.x;
-            y_winPos = secondDisplayBounds.y;
+            SDL_GetDisplayBounds(numDisplays > 1 ? 1 : 3, &secondDisplayBounds); // Index 1 represents the second display
+
+
+            // Set desired width and height
+            width = 400;
+            height = 280;
+
+            // Center the window in the second display
+            x_winPos = secondDisplayBounds.x + (secondDisplayBounds.w - width) / 2;
+            y_winPos = secondDisplayBounds.y + (secondDisplayBounds.h - height) / 2;   
+
+            //* full screen
+            // width = secondDisplayBounds.w;
+            // height = secondDisplayBounds.h;
+            // // full screen
+            // x_winPos = secondDisplayBounds.x;
+            // y_winPos = secondDisplayBounds.y;
 
             
 
