@@ -15,7 +15,6 @@
 __device__ inline glm::vec3 random_on_hemisphere(curandStatePhilox4_32_10_t* rngState,const glm::vec3& normal);
 __device__ inline glm::vec3 random_in_unit_sphere(curandStatePhilox4_32_10_t* rngState);
 __device__ inline glm::vec3 random_vector_in_range(curandStatePhilox4_32_10_t* rngState, float min, float max);
-__device__ inline glm::vec3 random_vector(curandState_t* states,  int i, int j);
 __device__ inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n);
 __device__ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_over_etat);
 __device__ inline glm::vec3 random_in_unit_disk(curandStatePhilox4_32_10_t* rngState);
@@ -349,17 +348,6 @@ inline bool near_zero(const glm::vec3 v) {
     return (fabs(v.x) < s) && (fabs(v.y) < s) && (fabs(v.z) < s);
 }
 
-// __device__
-// inline glm::vec3 sample_square(curandState_t* states_x, curandState_t* states_y, int idx) {
-//     curandState_t x = states_x[idx];
-//     curandState_t y = states_y[idx];
-    
-//     auto a = random_float(&x) - 0.5f;  
-//     auto b = random_float(&y) - 0.5f;
-//     states_x[idx] = x; // save back the value
-//     states_y[idx] = y; // save back the value
-//     return glm::vec3(a, b, 0.0f);
-// }
 
 __device__
 inline glm::vec3 sample_square(curandStatePhilox4_32_10_t* rngState) {
@@ -448,18 +436,7 @@ inline glm::vec3 random_vector_in_range(curandStatePhilox4_32_10_t* rngState, fl
   
     return glm::vec3(a, b, c);
 }
-// __device__
-// inline glm::vec3 random_vector(curandState_t* states,  int i, int j){
-//     curandState_t x = states[i];
-//     curandState_t y = states[j];
-//     float a = random_float(&x);
-//     float b = random_float(&y);
-//     float c = random_float(&x); //a * b;
-//     states[i] = x; // save value back
-//     states[j] = y;
-//     return glm::vec3(a, b, c);
 
-// }
 
 __device__ inline float random_float_in_range(curandStatePhilox4_32_10_t* rngState, float a, float b) {
     // return a + (b - a) * curand_uniform_float(state);  // this does not include b  e.g -1 to 1.0  it does not include 1.0
@@ -550,224 +527,7 @@ unsigned long long seed = static_cast<unsigned long long>(
     std::chrono::high_resolution_clock::now().time_since_epoch().count()
 );
 
-__global__ void init_random(unsigned int seed, curandState_t* states){
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    curand_init(seed, idx, 0, &states[idx]);
-}
 
-__global__ void init_random2(unsigned long long seed, curandState_t* states, int image_width, int image_height, int pixels_per_block){
-    int pixel_x = blockIdx.x;
-    int pixel_y = blockIdx.y * pixels_per_block + threadIdx.y;
-
-    if (pixel_x >= image_width || pixel_y >= image_height)
-        return;
-
-    int idx = pixel_y * image_width + pixel_x;
-    curand_init(seed, idx, 0, &states[idx]);
-    // curand_init(seed + 1, idx, 0, &states_y[idx]); // use a different seed for y
-}
-
-
-// __global__ void init_random(
-//     unsigned int seed,
-//     curandState_t* states,
-//     int image_width,
-//     int image_height
-// ) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= image_width || j >= image_height)
-//         return;
-
-//     int pixel_index = j * image_width + i;
-
-//     // Initialize the random state
-//     curand_init(seed, pixel_index, 0, &states[pixel_index]);
-// }
-
-
-// __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, uint32_t* image, hittable* world) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= cam->image_width || j >= cam->image_height) return;
-    
-//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
-//     for (int sample = 0; sample < cam->samples_per_pixel; sample++){
-//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-//         color  += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
-//     }
-    
-//     color *= cam->pixel_sample_scale;
-//     image[cam->image_width * j + i] = colorToUint32_t(color);  
-// }
-
-// __global__ void rayTracer_kernel(curandState_t* states, Camera* cam, float* image, hittable* world) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-//     int sample = blockIdx.z * blockDim.z + threadIdx.z;
-//     if (i >= cam->image_width || j >= cam->image_height || sample >= cam->samples_per_pixel) return;
-//     // compute unique thread index for random states
-//     int pixel_index = j * cam->image_width + i;
-//     // int thread_index = pixel_index * cam->samples_per_pixel + sample;
-//     // Initialize the random state for this thread
-//     // curandState_t local_state = states[thread_index];
-    
-//     ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-//     //* Compute the color for this sample
-//     glm::vec3 sample_color = ray_color(states, i, j, cam->max_depth, cam->background, r, world);
-    
-//     int image_base_index = pixel_index * 3;  // multiple * 3 for RGB components
-//     atomicAdd(&image[image_base_index + 0], sample_color.r);
-//     atomicAdd(&image[image_base_index + 1], sample_color.g);
-//     atomicAdd(&image[image_base_index + 2], sample_color.b);
-
-//     //* Update the random state
-//     // states[thread_index] = local_state;
-
-//     // color *= cam->pixel_sample_scale;
-//     // image[cam->image_width * j + i] = colorToUint32_t(color);  
-// }
-
-
-// __global__ void rayTracer_kernel_shared(curandState_t* states, Camera* cam, float* image, hittable* world) {
-//     // Define block and thread indices
-//     int tx = threadIdx.x;
-//     int ty = threadIdx.y;
-//     int bx = blockIdx.x * blockDim.x;
-//     int by = blockIdx.y * blockDim.y;
-
-//     // Calculate pixel coordinates
-//     int i = bx + tx;
-//     int j = by + ty;
-
-//     if (i >= cam->image_width || j >= cam->image_height)
-//         return;
-
-//     // Shared memory for accumulating colors
-//     extern __shared__ float shared_colors[];
-
-//     // Each pixel has 3 color components (R, G, B)
-//     int local_idx = (ty * blockDim.x + tx) * 3;
-//     shared_colors[local_idx + 0] = 0.0f;
-//     shared_colors[local_idx + 1] = 0.0f;
-//     shared_colors[local_idx + 2] = 0.0f;
-
-//     __syncthreads();
-
-//     // Calculate global thread index for random state
-//     int idx = j * cam->image_width + i;
-
-//     // Total threads in the block
-//     int total_threads_in_block = blockDim.x * blockDim.y;
-//     int thread_id_in_block = ty * blockDim.x + tx;
-
-//     // Distribute samples among threads
-//     int samples_per_thread = cam->samples_per_pixel / total_threads_in_block;
-//     int leftover_samples = cam->samples_per_pixel % total_threads_in_block;
-
-//     // Assign leftover samples to first 'leftover_samples' threads
-//     if (thread_id_in_block < leftover_samples)
-//         samples_per_thread++;
-
-//     // Accumulate color contributions
-//     for (int s = 0; s < samples_per_thread; ++s) {
-//         // Generate ray and compute color
-//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center,
-//                         cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
-//                         cam->defocus_disk_u, cam->defocus_disk_v);
-//         glm::vec3 color = ray_color(states, i, j, cam->max_depth, cam->background, r, world);
-
-//         // Accumulate color in shared memory
-//         atomicAdd(&shared_colors[local_idx + 0], color.r);
-//         atomicAdd(&shared_colors[local_idx + 1], color.g);
-//         atomicAdd(&shared_colors[local_idx + 2], color.b);
-//     }
-
-//     __syncthreads();
-
-//     // Only one thread per pixel writes back to global memory
-//     if (thread_id_in_block == 0) {
-//         int pixel_index = j * cam->image_width + i;
-//         int image_base_index = pixel_index * 3;
-
-//         image[image_base_index + 0] += shared_colors[local_idx + 0];
-//         image[image_base_index + 1] += shared_colors[local_idx + 1];
-//         image[image_base_index + 2] += shared_colors[local_idx + 2];
-//     }
-// }
-
-// good and fast but still missing dots
-// __global__ void rayTracer_kernel_shared2(curandState_t* states, Camera* cam, float* image, hittable* world, unsigned long long seed) {
-//     // Number of threads assigned to each pixel
-//     const int threads_per_pixel = blockDim.x;  // e.g., 32
-//     // Number of pixels processed per block
-//     const int pixels_per_block = blockDim.y;   // e.g., 8
-
-//     // Thread index within the pixel
-//     int thread_in_pixel = threadIdx.x;         // 0 to threads_per_pixel - 1
-//     // Pixel index within the block
-//     int pixel_in_block = threadIdx.y;          // 0 to pixels_per_block - 1
-
-//     // Compute global pixel coordinates
-//     int pixel_x = blockIdx.x;
-//     int pixel_y = blockIdx.y * pixels_per_block + pixel_in_block;
-
-//     if (pixel_x >= cam->image_width || pixel_y >= cam->image_height)
-//         return;
-
-//     // Index for random states
-//     int idx = pixel_y * cam->image_width + pixel_x;
-
-//     // Shared memory index for this pixel
-//     extern __shared__ float shared_colors[];
-//     int shared_mem_idx = pixel_in_block * 3;
-
-//     // Initialize shared memory for the pixel (one thread does this)
-//     if (thread_in_pixel == 0) {
-//         shared_colors[shared_mem_idx + 0] = 0.0f;
-//         shared_colors[shared_mem_idx + 1] = 0.0f;
-//         shared_colors[shared_mem_idx + 2] = 0.0f;
-//     }
-//     __syncthreads();
-
-//     // Calculate samples per thread
-//     int samples_per_thread = cam->samples_per_pixel / threads_per_pixel;
-//     int leftover_samples = cam->samples_per_pixel % threads_per_pixel;
-//     if (thread_in_pixel < leftover_samples)
-//         samples_per_thread++;
-
-//     // Unique sequence for RNG
-//     unsigned long long sequence = ((unsigned long long)pixel_y * gridDim.x + pixel_x) * blockDim.x + thread_in_pixel;    
-
-//     // Accumulate color contributions
-//     glm::vec3 color(0.0f);
-//     for (int s = 0; s < samples_per_thread; ++s) {
-//         // Generate ray and compute color
-//         ray r = get_ray(states, idx, pixel_x, pixel_y, cam->pixel00_loc, cam->center,
-//                         cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
-//                         cam->defocus_disk_u, cam->defocus_disk_v);
-//         color += ray_color(states, pixel_x, pixel_y, cam->max_depth, cam->background, r, world);
-//     }
-
-//     // Accumulate color in shared memory using atomic operations (on shared memory)
-//     atomicAdd(&shared_colors[shared_mem_idx + 0], color.r);
-//     atomicAdd(&shared_colors[shared_mem_idx + 1], color.g);
-//     atomicAdd(&shared_colors[shared_mem_idx + 2], color.b);
-
-//     __syncthreads();
-
-//     // One thread per pixel writes the accumulated color back to global memory
-//     if (thread_in_pixel == 0) {
-//         int pixel_index = pixel_y * cam->image_width + pixel_x;
-//         int image_base_index = pixel_index * 3;
-
-//         image[image_base_index + 0] += shared_colors[shared_mem_idx + 0];
-//         image[image_base_index + 1] += shared_colors[shared_mem_idx + 1];
-//         image[image_base_index + 2] += shared_colors[shared_mem_idx + 2];
-//     }
-// }
 
 __global__ void rayTracer_kernel_shared(
     Camera* cam,
@@ -853,111 +613,6 @@ __global__ void rayTracer_kernel_shared(
         image[image_base_index + 2] += shared_colors[shared_mem_idx + 2];
     }
 }
-
-
-// __global__ void rayTracer_kernel_no_atomic(curandState_t* states, Camera* cam, float* image, hittable* world) {
-//     // Calculate pixel coordinates
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= cam->image_width || j >= cam->image_height)
-//         return;
-
-//     int pixel_index = j * cam->image_width + i;
-//     int image_base_index = pixel_index * 3;
-
-//     glm::vec3 color = glm::vec3(0.0f);
-
-//     int idx = pixel_index;
-
-//     // Each thread processes all samples for its pixel
-//     for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
-//         // Generate ray and compute color
-//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center,
-//                         cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
-//                         cam->defocus_disk_u, cam->defocus_disk_v);
-//         color += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
-//     }
-
-//     // Write the color to the image buffer without atomic operations
-//     image[image_base_index + 0] = color.r;
-//     image[image_base_index + 1] = color.g;
-//     image[image_base_index + 2] = color.b;
-// }
-
-
-// __global__ void rayTracer_kernel_batched(curandState_t* states, Camera* cam, float* image, hittable* world) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= cam->image_width || j >= cam->image_height)
-//         return;
-
-//     int pixel_index = j * cam->image_width + i;
-
-//     glm::vec3 color = glm::vec3(0.0f);
-
-//     // Process samples in a loop
-//     for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
-//         // Generate ray and compute color
-//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-//         color += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
-//     }
-//     // Write the color to the image buffer
-//     int image_base_index = pixel_index * 3;
-
-//     atomicAdd(&image[image_base_index + 0], color.r);
-//     atomicAdd(&image[image_base_index + 1], color.g);
-//     atomicAdd(&image[image_base_index + 2], color.b);
-// }
-
-// __global__ void rayTracer_kernel_no_batches(
-//     curandState_t* states,
-//     Camera* cam,
-//     float* image,
-//     hittable* world
-// ) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-//     if (i >= cam->image_width || j >= cam->image_height)
-//         return;
-
-//     int pixel_index = j * cam->image_width + i;
-
-//     glm::vec3 color = glm::vec3(0.0f);
-
-//     // Process samples in a loop
-//     for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
-//         // Generate ray and compute color
-//         ray r = get_ray(
-//             states,
-//             i, j,
-//             cam->pixel00_loc,
-//             cam->center,
-//             cam->pixel_delta_u,
-//             cam->pixel_delta_v,
-//             cam->defocus_angle,
-//             cam->defocus_disk_u,
-//             cam->defocus_disk_v
-//         );
-
-//         color += ray_color(
-//             states,
-//             i, j,
-//             cam->max_depth,
-//             cam->background,
-//             r,
-//             world
-//         );
-//     }
-//     // Write the color to the image buffer
-//     int image_base_index = pixel_index * 3;
-//     image[image_base_index + 0] = color.r;
-//     image[image_base_index + 1] = color.g;
-//     image[image_base_index + 2] = color.b;
-    
-// }
 
 
 __global__ void addToColorBuffer(float* data, uint32_t* image, int width, int height, float scale){
@@ -1703,60 +1358,12 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     // Calculate shared memory size
     size_t shared_mem_size = pixels_per_block * 3 * sizeof(float);
 
-    // Allocate and initialize random states
-    // int num_pixels = cam.image_width * cam.image_height;
-    // curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
-    // curandState_t* d_states_y = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
-    // init_random2<<<gridSize, blockSize.y>>>(seed, d_states, cam.image_width, cam.image_height, pixels_per_block);
+    
 
     // Launch the kernel
     rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_cam, d_image, d_world, seed);
     checkCuda(cudaGetLastError());
-    checkCuda(cudaDeviceSynchronize());
-
-
-
-
-
-
-
-   
-    // int threads = 16;  // Adjust based on your GPU's capabilities
-    // dim3 blockSize(threads, threads);
-    // int blocks_x = (cam.image_width + blockSize.x - 1) / blockSize.x;
-    // int blocks_y = (cam.image_height + blockSize.y - 1) / blockSize.y;
-    // dim3 gridSize(blocks_x, blocks_y);
-
-    // int num_threads = threads * threads * blocks_x * blocks_y;
-    // curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_threads * sizeof(curandState_t));  // random calculations in GPU
-    // init_random<<<gridSize, blockSize>>>(seed, d_states);
-
-    // size_t shared_mem_size = blockSize.x * blockSize.y * 3 * sizeof(float);
-    // rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_states, d_cam, d_image, d_world);
-    // checkCuda(cudaGetLastError());
     // checkCuda(cudaDeviceSynchronize());
-
-
-    // const int batch_size = 32;
-    // int total_samples = cam.samples_per_pixel;
-    // int num_batches = (total_samples + batch_size - 1) / batch_size;
-    // for (int batch = 0; batch < num_batches; ++batch) {
-    //     int samples_in_batch = min(batch_size, total_samples - batch * batch_size);
-
-    //     // Set the number of samples to process in this batch
-    //     cam.samples_per_pixel = samples_in_batch;
-    //     memoryManager.copyToDevice(d_cam, &cam);
-
-    //     // Launch the kernel
-    //     // rayTracer_kernel_batched<<<gridSize, blockSize>>>(d_states, d_cam, d_image, d_world);
-    //     size_t shared_mem_size = blockDim.x * blockDim.y * 3 * sizeof(float);
-    //     rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_states, d_cam, d_image, d_world);
-    //     checkCuda(cudaGetLastError());
-        
-    // }
-    // // Restore the original samples per pixel and update scaling
-    // cam.samples_per_pixel = total_samples;
-    // cam.pixel_sample_scale = 1.0f / (float)total_samples;
 
     // Set up block and grid sizes
     dim3 blockSize1(16, 16);
