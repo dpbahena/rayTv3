@@ -12,19 +12,20 @@
 #define MAX_STACK_SIZE 20
 
 
-__device__ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal);
-__device__ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j);
-__device__ inline glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max);
+__device__ inline glm::vec3 random_on_hemisphere(curandStatePhilox4_32_10_t* rngState,const glm::vec3& normal);
+__device__ inline glm::vec3 random_in_unit_sphere(curandStatePhilox4_32_10_t* rngState);
+__device__ inline glm::vec3 random_vector_in_range(curandStatePhilox4_32_10_t* rngState, float min, float max);
 __device__ inline glm::vec3 random_vector(curandState_t* states,  int i, int j);
 __device__ inline glm::vec3 reflect(const glm::vec3& v, const glm::vec3& n);
 __device__ inline glm::vec3 refract(const glm::vec3& uv, const glm::vec3& n, float etai_over_etat);
-__device__ inline glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j);
-__device__ inline glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
-__device__ inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j);
+__device__ inline glm::vec3 random_in_unit_disk(curandStatePhilox4_32_10_t* rngState);
+__device__ inline glm::vec3 defocus_disk_sample(curandStatePhilox4_32_10_t* rngState, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v);
+__device__ inline glm::vec3 random_unit_vector(curandStatePhilox4_32_10_t* rngState);
 __device__ inline bool      near_zero(const glm::vec3 v);
 __device__ inline float     reflectance(float cosine, float refraction_index);
-__device__ inline float     random_float(curandState_t* state);
-__device__ inline float     random_float_in_range(curandState_t* state, float a, float b);
+__device__ inline float     random_float(curandStatePhilox4_32_10_t* state);
+__device__ inline float     random_float_in_range(curandStatePhilox4_32_10_t* rngState, float a, float b);
+__device__ inline glm::vec3 sample_square(curandStatePhilox4_32_10_t* rngState);
 
 // host function declarations
 inline hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& a, const glm::vec3& b, material* mat);
@@ -241,8 +242,8 @@ hittable createBVH(HybridMemoryManager& memoryManager, hittable* object) {
 
 
 __device__
-static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, lambertian_data& lambertian, curandState_t* states,  int i, int j) {
-    auto scatter_direction = rec.normal + random_unit_vector(states,  i, j);
+static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, lambertian_data& lambertian, curandStatePhilox4_32_10_t& rngState) {
+    auto scatter_direction = rec.normal + random_unit_vector(&rngState);
 
     // Catch degenerate scatter direction
     if (near_zero(scatter_direction))
@@ -256,18 +257,17 @@ static bool lambertian_scatter(const ray& r_in, const hit_record& rec, glm::vec3
 }
 
 __device__
-static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, metal_data& metal, curandState_t* states,  int i, int j) {
+static bool metal_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, metal_data& metal, curandStatePhilox4_32_10_t& rngState) {
     glm::vec3 reflected = reflect(r_in.direction, rec.normal);
-    reflected = glm::normalize(reflected) + (metal.fuzz * random_unit_vector(states,  i, j));
+    reflected = glm::normalize(reflected) + (metal.fuzz * random_unit_vector(&rngState));
     scattered = ray(rec.p, reflected, r_in.time());
     attenuation = metal.albedo;
-    // attenuation = metal.tex->value(rec.u, rec.v, rec.p);
 
     return (glm::dot(scattered.direction, rec.normal) > 0);
 }
 
 __device__
-static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, dielectric_data& dielectric, curandState_t* states,  int i, int j) {
+static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, dielectric_data& dielectric, curandStatePhilox4_32_10_t& rngState) {
     attenuation = glm::vec3(1.0, 1.0, 1.0);
     float ri = rec.front_face ? (1.0f / dielectric.refraction_index) : dielectric.refraction_index;
 
@@ -278,14 +278,11 @@ static bool dielectric_scatter(const ray& r_in, const hit_record& rec, glm::vec3
     bool cannot_refract = ri * sin_theta > 1.0f;
     glm::vec3 direction;
 
-    curandState_t x = states[i];  // for random data
-
-    if (cannot_refract || reflectance(cos_theta, ri) > random_float(&x) )
+    
+    if (cannot_refract || reflectance(cos_theta, ri) > random_float(&rngState) )
         direction = reflect(unit_direction, rec.normal);
     else   
         direction = refract(unit_direction, rec.normal, ri);
-    
-    states[i] = x; // save back value
 
     scattered = ray(rec.p, direction, r_in.time());
     return true;
@@ -297,8 +294,8 @@ static glm::vec3 emitted(float u, float v, const glm::vec3& p, diffuseLight_data
 }
 
 __device__ 
-static bool isotropic_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, isotropic_data& isotropic, curandState_t* states,  int i, int j){
-    scattered = ray(rec.p, random_unit_vector(states,  i, j), r_in.time());
+static bool isotropic_scatter(const ray& r_in, const hit_record& rec, glm::vec3& attenuation, ray& scattered, isotropic_data& isotropic, curandStatePhilox4_32_10_t& rngState){
+    scattered = ray(rec.p, random_unit_vector(&rngState), r_in.time());
      attenuation = isotropic.tex->solidColor.value(rec.u, rec.v, rec.p);
     return true;
 }
@@ -336,13 +333,13 @@ inline float reflectance(float cosine, float refraction_index){
 }
 
 __device__ 
-inline float random_float(curandState_t* state){
-    return curand_uniform_double(state);
+inline float random_float(curandStatePhilox4_32_10_t* rngState){
+    return curand_uniform(rngState);
 }
 
 __device__ 
-inline glm::vec3 random_unit_vector(curandState_t* states, int i, int j){
-    auto p = random_in_unit_sphere(states, i, j);
+inline glm::vec3 random_unit_vector(curandStatePhilox4_32_10_t* rngState){
+    auto p = random_in_unit_sphere(rngState);
     return glm::normalize(p);
 }
 
@@ -352,14 +349,24 @@ inline bool near_zero(const glm::vec3 v) {
     return (fabs(v.x) < s) && (fabs(v.y) < s) && (fabs(v.z) < s);
 }
 
+// __device__
+// inline glm::vec3 sample_square(curandState_t* states_x, curandState_t* states_y, int idx) {
+//     curandState_t x = states_x[idx];
+//     curandState_t y = states_y[idx];
+    
+//     auto a = random_float(&x) - 0.5f;  
+//     auto b = random_float(&y) - 0.5f;
+//     states_x[idx] = x; // save back the value
+//     states_y[idx] = y; // save back the value
+//     return glm::vec3(a, b, 0.0f);
+// }
+
 __device__
-inline glm::vec3 sample_square(curandState_t* states, int &i, int &j) {
-    curandState_t x = states[i];
-    curandState_t y = states[j];
-    auto a = random_float(&x) - 0.5f;
-    auto b = random_float(&y) - 0.5f;
-    states[i] = x; // save back the value
-    states[j] = y;
+inline glm::vec3 sample_square(curandStatePhilox4_32_10_t* rngState) {
+    
+    auto a = random_float(rngState) - 0.5f;  
+    auto b = random_float(rngState) - 0.5f;
+    
     return glm::vec3(a, b, 0.0f);
 }
 
@@ -397,8 +404,8 @@ inline uint32_t colorToUint32_t(glm::vec3& c)
 }
 
 __device__
-inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const glm::vec3& normal) {
-    glm::vec3 on_unit_sphere = random_unit_vector(states, i, j);
+inline glm::vec3 random_on_hemisphere(curandStatePhilox4_32_10_t* rngState,const glm::vec3& normal) {
+    glm::vec3 on_unit_sphere = random_unit_vector(rngState);
     if (glm::dot(on_unit_sphere, normal) > 0.0f) // In the same hemisphere as the normal
         return on_unit_sphere;
     else
@@ -406,9 +413,9 @@ inline glm::vec3 random_on_hemisphere(curandState_t* states,  int i, int j,const
 }
 
 __device__
-inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j) {
+inline glm::vec3 random_in_unit_sphere(curandStatePhilox4_32_10_t* rngState) {
     while (true) {
-        glm::vec3 p = random_vector_in_range(states, i, j, -1.0f ,1.0f);
+        glm::vec3 p = random_vector_in_range(rngState, -1.0f ,1.0f);
         if (glm::dot(p,p) < 1.0f){
             return p;
         }
@@ -416,52 +423,47 @@ inline glm::vec3 random_in_unit_sphere(curandState_t* states,  int i, int j) {
 }
 
 __device__
-inline glm::vec3 random_in_unit_disk(curandState_t* states,  int i, int j){
-    curandState_t x = states[i];
-    curandState_t y = states[j];
+inline glm::vec3 random_in_unit_disk(curandStatePhilox4_32_10_t* rngState){
+        
     while (true) {
-        auto p = glm::vec3(random_float_in_range(&x, -1, 1), random_float_in_range(&y, -1, 1), 0);
+        auto p = glm::vec3(random_float_in_range(rngState, -1, 1), random_float_in_range(rngState, -1, 1), 0);
         if (glm::dot(p,p) < 1.0f)
             return p;
     }
 }
 
  __device__
-inline glm::vec3 defocus_disk_sample(curandState_t* states,  int i, int j, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
+inline glm::vec3 defocus_disk_sample(curandStatePhilox4_32_10_t* rngState, glm::vec3& center, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
     // returns a random point in the camera defocus disk
-    glm::vec3 p = random_in_unit_disk(states, i, j);
+    glm::vec3 p = random_in_unit_disk(rngState);
     return center + p.x * defocusDisk_u + p.y * defocusDisk_v;
 }
 
 __device__
-inline glm::vec3 random_vector_in_range(curandState_t* states,  int i, int j, float min, float max){
-    curandState_t x = states[i];
-    curandState_t y = states[j];
-    float a = random_float_in_range(&x, min, max);
-    float b = random_float_in_range(&y, min, max);
-    float c = random_float_in_range(&x, min, max);
-
-    // float c = a * b;
-    states[i] = x; // save value back
-    states[j] = y;
+inline glm::vec3 random_vector_in_range(curandStatePhilox4_32_10_t* rngState, float min, float max){
+    
+    float a = random_float_in_range(rngState, min, max);
+    float b = random_float_in_range(rngState, min, max);
+    float c = random_float_in_range(rngState, min, max);
+  
     return glm::vec3(a, b, c);
 }
-__device__
-inline glm::vec3 random_vector(curandState_t* states,  int i, int j){
-    curandState_t x = states[i];
-    curandState_t y = states[j];
-    float a = random_float(&x);
-    float b = random_float(&y);
-    float c = random_float(&x); //a * b;
-    states[i] = x; // save value back
-    states[j] = y;
-    return glm::vec3(a, b, c);
+// __device__
+// inline glm::vec3 random_vector(curandState_t* states,  int i, int j){
+//     curandState_t x = states[i];
+//     curandState_t y = states[j];
+//     float a = random_float(&x);
+//     float b = random_float(&y);
+//     float c = random_float(&x); //a * b;
+//     states[i] = x; // save value back
+//     states[j] = y;
+//     return glm::vec3(a, b, c);
 
-}
+// }
 
-__device__ inline float random_float_in_range(curandState_t* state, float a, float b) {
+__device__ inline float random_float_in_range(curandStatePhilox4_32_10_t* rngState, float a, float b) {
     // return a + (b - a) * curand_uniform_float(state);  // this does not include b  e.g -1 to 1.0  it does not include 1.0
-    return a + (b - a) * (curand_uniform_double(state) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
+    return a + (b - a) * (curand_uniform(rngState) - 0.5) * 2.0;  // this approach includes the upper limit   -1 to 1.0  it includes 1.0
 }
 
 /**
@@ -472,7 +474,7 @@ __device__ inline int random_int(curandState_t* state, int a, int b) {
 }
 
 __device__
-inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const glm::vec3& background, const ray &r, const hittable* world) {
+inline glm::vec3 ray_color(curandStatePhilox4_32_10_t& rngState, int depth, const glm::vec3& background, const ray &r, const hittable* world) {
     ray cur_ray = r;
     glm::vec3 cur_attenuation = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -480,9 +482,8 @@ inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const
     // Loop through the ray bounces up to the specified depth
     for (int k = 0; k < depth; k++){
         hit_record rec;
-        curandState_t x = state[i];
-        float randNumber = random_float(&x);
-        state[i] = x;  // saves the random back
+        
+        float randNumber = random_float(&rngState);
         //* Check if the ray hits anything; if not, add the background color and return;
         if(!world->hittableList.hit(cur_ray, interval(0.001f, FLT_MAX), rec, randNumber )){
             final_color += cur_attenuation * background;
@@ -502,13 +503,13 @@ inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const
         bool did_scatter = false;
         //* Scatter based on material type
         if (rec.mat->type == Type::METAL){
-            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, state, i, j);
+            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, rngState);
         } else if (rec.mat->type == Type::LAMBERTIAN){
-            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, state, i, j);
+            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, rngState);
         } else if (rec.mat->type == Type::DIELECTRIC){
-            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, state, i, j);    
+            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, rngState);    
         } else if (rec.mat->type == Type::ISOTROPIC){
-            did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, state, i, j);    
+            did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, rngState);    
         }
         //* If scattering did not occur, return the accumulated color
         if(!did_scatter) {
@@ -526,24 +527,26 @@ inline glm::vec3 ray_color(curandState_t* state,  int i, int j, int depth, const
 
 
 __device__
-inline ray get_ray(curandState_t* states, int &i, int &j, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v) {
+inline ray get_ray(curandStatePhilox4_32_10_t& rngState, glm::vec3& pixel00_loc, glm::vec3& cameraCenter, glm::vec3& delta_u, glm::vec3& delta_v, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v, int i, int j) {
     /* Construct a camara ray originating from the defocus disk and directed at a randdomly sampled point around the pixel locations i, j */
-    auto offset = sample_square(states, i, j);
+    
+        
+    auto offset = sample_square(&rngState);
     auto pixel_sample = pixel00_loc 
                         + ((i + offset.x) * delta_u)
                         + ((j + offset.y) * delta_v);
     
-    auto ray_origin =  (defocusAngle <= 0) ? cameraCenter : defocus_disk_sample(states, i, j, cameraCenter, defocusDisk_u, defocusDisk_v);
+    auto ray_origin =  (defocusAngle <= 0) ? cameraCenter : defocus_disk_sample(&rngState, cameraCenter, defocusDisk_u, defocusDisk_v);
     auto ray_direction = pixel_sample - ray_origin;
-    auto x = states[i];
-    auto ray_time = random_float(&x);
-    states[i] = x; // put value back after using it
+    
+    auto ray_time = random_float(&rngState);
+    
 
     return ray(ray_origin, ray_direction, ray_time);
 }
 
 // Use high-resolution clock to generate a seed
-unsigned int seed = static_cast<unsigned int>(
+unsigned long long seed = static_cast<unsigned long long>(
     std::chrono::high_resolution_clock::now().time_since_epoch().count()
 );
 
@@ -552,7 +555,7 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
     curand_init(seed, idx, 0, &states[idx]);
 }
 
-__global__ void init_random2(unsigned int seed, curandState_t* states, int image_width, int image_height, int pixels_per_block){
+__global__ void init_random2(unsigned long long seed, curandState_t* states, int image_width, int image_height, int pixels_per_block){
     int pixel_x = blockIdx.x;
     int pixel_y = blockIdx.y * pixels_per_block + threadIdx.y;
 
@@ -561,6 +564,7 @@ __global__ void init_random2(unsigned int seed, curandState_t* states, int image
 
     int idx = pixel_y * image_width + pixel_x;
     curand_init(seed, idx, 0, &states[idx]);
+    // curand_init(seed + 1, idx, 0, &states_y[idx]); // use a different seed for y
 }
 
 
@@ -694,32 +698,99 @@ __global__ void init_random2(unsigned int seed, curandState_t* states, int image
 //     }
 // }
 
-__global__ void rayTracer_kernel_shared(curandState_t* states, Camera* cam, float* image, hittable* world) {
-    // Number of threads assigned to each pixel
-    const int threads_per_pixel = blockDim.x;  // e.g., 32
-    // Number of pixels processed per block
-    const int pixels_per_block = blockDim.y;   // e.g., 8
+// good and fast but still missing dots
+// __global__ void rayTracer_kernel_shared2(curandState_t* states, Camera* cam, float* image, hittable* world, unsigned long long seed) {
+//     // Number of threads assigned to each pixel
+//     const int threads_per_pixel = blockDim.x;  // e.g., 32
+//     // Number of pixels processed per block
+//     const int pixels_per_block = blockDim.y;   // e.g., 8
 
-    // Thread index within the pixel
-    int thread_in_pixel = threadIdx.x;         // 0 to threads_per_pixel - 1
-    // Pixel index within the block
-    int pixel_in_block = threadIdx.y;          // 0 to pixels_per_block - 1
+//     // Thread index within the pixel
+//     int thread_in_pixel = threadIdx.x;         // 0 to threads_per_pixel - 1
+//     // Pixel index within the block
+//     int pixel_in_block = threadIdx.y;          // 0 to pixels_per_block - 1
 
-    // Compute global pixel coordinates
+//     // Compute global pixel coordinates
+//     int pixel_x = blockIdx.x;
+//     int pixel_y = blockIdx.y * pixels_per_block + pixel_in_block;
+
+//     if (pixel_x >= cam->image_width || pixel_y >= cam->image_height)
+//         return;
+
+//     // Index for random states
+//     int idx = pixel_y * cam->image_width + pixel_x;
+
+//     // Shared memory index for this pixel
+//     extern __shared__ float shared_colors[];
+//     int shared_mem_idx = pixel_in_block * 3;
+
+//     // Initialize shared memory for the pixel (one thread does this)
+//     if (thread_in_pixel == 0) {
+//         shared_colors[shared_mem_idx + 0] = 0.0f;
+//         shared_colors[shared_mem_idx + 1] = 0.0f;
+//         shared_colors[shared_mem_idx + 2] = 0.0f;
+//     }
+//     __syncthreads();
+
+//     // Calculate samples per thread
+//     int samples_per_thread = cam->samples_per_pixel / threads_per_pixel;
+//     int leftover_samples = cam->samples_per_pixel % threads_per_pixel;
+//     if (thread_in_pixel < leftover_samples)
+//         samples_per_thread++;
+
+//     // Unique sequence for RNG
+//     unsigned long long sequence = ((unsigned long long)pixel_y * gridDim.x + pixel_x) * blockDim.x + thread_in_pixel;    
+
+//     // Accumulate color contributions
+//     glm::vec3 color(0.0f);
+//     for (int s = 0; s < samples_per_thread; ++s) {
+//         // Generate ray and compute color
+//         ray r = get_ray(states, idx, pixel_x, pixel_y, cam->pixel00_loc, cam->center,
+//                         cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
+//                         cam->defocus_disk_u, cam->defocus_disk_v);
+//         color += ray_color(states, pixel_x, pixel_y, cam->max_depth, cam->background, r, world);
+//     }
+
+//     // Accumulate color in shared memory using atomic operations (on shared memory)
+//     atomicAdd(&shared_colors[shared_mem_idx + 0], color.r);
+//     atomicAdd(&shared_colors[shared_mem_idx + 1], color.g);
+//     atomicAdd(&shared_colors[shared_mem_idx + 2], color.b);
+
+//     __syncthreads();
+
+//     // One thread per pixel writes the accumulated color back to global memory
+//     if (thread_in_pixel == 0) {
+//         int pixel_index = pixel_y * cam->image_width + pixel_x;
+//         int image_base_index = pixel_index * 3;
+
+//         image[image_base_index + 0] += shared_colors[shared_mem_idx + 0];
+//         image[image_base_index + 1] += shared_colors[shared_mem_idx + 1];
+//         image[image_base_index + 2] += shared_colors[shared_mem_idx + 2];
+//     }
+// }
+
+__global__ void rayTracer_kernel_shared(
+    Camera* cam,
+    float* image,
+    hittable* world,
+    unsigned long long seed)
+{
+    // Thread indices
+    int thread_in_pixel = threadIdx.x;  // Threads per pixel
+    int pixel_in_block = threadIdx.y;   // Pixels per block
+
+    // Compute pixel coordinates
     int pixel_x = blockIdx.x;
-    int pixel_y = blockIdx.y * pixels_per_block + pixel_in_block;
+    int pixel_y = blockIdx.y * blockDim.y + pixel_in_block;
 
     if (pixel_x >= cam->image_width || pixel_y >= cam->image_height)
         return;
 
-    // Index for random states
-    int idx = pixel_y * cam->image_width + pixel_x;
-
-    // Shared memory index for this pixel
+    // Shared memory index
     extern __shared__ float shared_colors[];
     int shared_mem_idx = pixel_in_block * 3;
 
-    // Initialize shared memory for the pixel (one thread does this)
+    // Initialize shared memory
     if (thread_in_pixel == 0) {
         shared_colors[shared_mem_idx + 0] = 0.0f;
         shared_colors[shared_mem_idx + 1] = 0.0f;
@@ -727,30 +798,52 @@ __global__ void rayTracer_kernel_shared(curandState_t* states, Camera* cam, floa
     }
     __syncthreads();
 
-    // Calculate samples per thread
-    int samples_per_thread = cam->samples_per_pixel / threads_per_pixel;
-    int leftover_samples = cam->samples_per_pixel % threads_per_pixel;
+    // Samples per thread
+    int samples_per_thread = cam->samples_per_pixel / blockDim.x;
+    int leftover_samples = cam->samples_per_pixel % blockDim.x;
     if (thread_in_pixel < leftover_samples)
         samples_per_thread++;
 
-    // Accumulate color contributions
+    // Unique sequence for RNG (now correctly used)
+    unsigned long long sequence = ((unsigned long long)pixel_y * gridDim.x + pixel_x) * blockDim.x + thread_in_pixel;
+    // Total random numbers per sample (adjust based on actual usage)
+    const int N_per_sample = 256; // estimate or calculate precisely
+
+    // Accumulate color
     glm::vec3 color(0.0f);
+    int sample_base = thread_in_pixel * samples_per_thread;
     for (int s = 0; s < samples_per_thread; ++s) {
-        // Generate ray and compute color
-        ray r = get_ray(states, pixel_x, pixel_y, cam->pixel00_loc, cam->center,
-                        cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle,
-                        cam->defocus_disk_u, cam->defocus_disk_v);
-        color += ray_color(states, pixel_x, pixel_y, cam->max_depth, cam->background, r, world);
+        int sample_index = sample_base + s;
+
+        //* Initialize RNG state once per sample
+        curandStatePhilox4_32_10_t rngState;
+        curand_init(seed, sequence, sample_index * N_per_sample, &rngState);
+
+        // Generate ray using the sequence from the kernel
+        ray r = get_ray(
+            rngState,
+            cam->pixel00_loc,
+            cam->center,
+            cam->pixel_delta_u,
+            cam->pixel_delta_v,
+            cam->defocus_angle,
+            cam->defocus_disk_u,
+            cam->defocus_disk_v,
+            pixel_x,
+            pixel_y);
+
+        // Compute color
+        color += ray_color(rngState, cam->max_depth, cam->background, r, world);
     }
 
-    // Accumulate color in shared memory using atomic operations (on shared memory)
+    // Accumulate color in shared memory
     atomicAdd(&shared_colors[shared_mem_idx + 0], color.r);
     atomicAdd(&shared_colors[shared_mem_idx + 1], color.g);
     atomicAdd(&shared_colors[shared_mem_idx + 2], color.b);
 
     __syncthreads();
 
-    // One thread per pixel writes the accumulated color back to global memory
+    // Write back to global memory
     if (thread_in_pixel == 0) {
         int pixel_index = pixel_y * cam->image_width + pixel_x;
         int image_base_index = pixel_index * 3;
@@ -793,30 +886,30 @@ __global__ void rayTracer_kernel_shared(curandState_t* states, Camera* cam, floa
 // }
 
 
-__global__ void rayTracer_kernel_batched(curandState_t* states, Camera* cam, float* image, hittable* world) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+// __global__ void rayTracer_kernel_batched(curandState_t* states, Camera* cam, float* image, hittable* world) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (i >= cam->image_width || j >= cam->image_height)
-        return;
+//     if (i >= cam->image_width || j >= cam->image_height)
+//         return;
 
-    int pixel_index = j * cam->image_width + i;
+//     int pixel_index = j * cam->image_width + i;
 
-    glm::vec3 color = glm::vec3(0.0f);
+//     glm::vec3 color = glm::vec3(0.0f);
 
-    // Process samples in a loop
-    for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
-        // Generate ray and compute color
-        ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
-        color += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
-    }
-    // Write the color to the image buffer
-    int image_base_index = pixel_index * 3;
+//     // Process samples in a loop
+//     for (int sample = 0; sample < cam->samples_per_pixel; ++sample) {
+//         // Generate ray and compute color
+//         ray r = get_ray(states, i, j, cam->pixel00_loc, cam->center, cam->pixel_delta_u, cam->pixel_delta_v, cam->defocus_angle, cam->defocus_disk_u, cam->defocus_disk_v);
+//         color += ray_color(states, i, j, cam->max_depth, cam->background, r, world);
+//     }
+//     // Write the color to the image buffer
+//     int image_base_index = pixel_index * 3;
 
-    atomicAdd(&image[image_base_index + 0], color.r);
-    atomicAdd(&image[image_base_index + 1], color.g);
-    atomicAdd(&image[image_base_index + 2], color.b);
-}
+//     atomicAdd(&image[image_base_index + 0], color.r);
+//     atomicAdd(&image[image_base_index + 1], color.g);
+//     atomicAdd(&image[image_base_index + 2], color.b);
+// }
 
 // __global__ void rayTracer_kernel_no_batches(
 //     curandState_t* states,
@@ -1613,11 +1706,14 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     // Allocate and initialize random states
     int num_pixels = cam.image_width * cam.image_height;
     curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
+    // curandState_t* d_states_y = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
     init_random2<<<gridSize, blockSize.y>>>(seed, d_states, cam.image_width, cam.image_height, pixels_per_block);
 
     // Launch the kernel
-    rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_states, d_cam, d_image, d_world);
+    rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_cam, d_image, d_world, seed);
     checkCuda(cudaGetLastError());
+    checkCuda(cudaDeviceSynchronize());
+
 
 
 

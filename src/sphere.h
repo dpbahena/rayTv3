@@ -7,7 +7,7 @@
 
 
 
-__device__ inline float     random_float(curandState_t* state);
+// __device__ inline float     random_float(curandState_t* state);
 
 __device__ static bool box_compare(const hittable& a, const hittable& b, int axis_index);
 __device__ static bool box_x_compare (const hittable& a, const hittable& b);

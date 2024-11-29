@@ -1,0 +1,323 @@
+You make an excellent point, and I appreciate you bringing this to my attention. The use of loops like in random_in_unit_sphere, where the number of random numbers consumed can vary per call, complicates our use of the counter-based Philox RNG. This is because the Philox RNG relies on knowing the exact number of random numbers per sample to avoid overlapping sequences, which isn't feasible when the number varies unpredictably.
+
+To handle this situation effectively, we need a random number generation method that accommodates variable consumption per sample without risking sequence overlaps.
+
+Proposed Solution: Switch to Per-Thread Random States
+Instead of using the counter-based Philox RNG, we can switch back to using per-thread random states (curandState_t). This approach allows each thread to maintain its own RNG state, handling variable random number consumption naturally.
+
+Advantages of this approach:
+
+Handles Variable Random Numbers: Each thread's RNG state progresses independently, so variable consumption doesn't affect other threads.
+Simplifies RNG Management: No need to calculate or overestimate N_per_sample.
+Thread Safety: Each thread's RNG state is isolated, preventing race conditions.Implementing the Solution
+
+1. Initialize the RNG State per Thread in the Kernel
+Modify the kernel to initialize a curandState_t per thread:
+
+#include <curand_kernel.h>
+
+__global__ void rayTracer_kernel_shared(
+    Camera* cam,
+    float* image,
+    hittable* world,
+    unsigned long long seed)
+{
+    // Thread indices
+    int thread_in_pixel = threadIdx.x;  // Threads per pixel
+    int pixel_in_block = threadIdx.y;   // Pixels per block
+
+    // Compute pixel coordinates
+    int pixel_x = blockIdx.x;
+    int pixel_y = blockIdx.y * blockDim.y + pixel_in_block;
+
+    if (pixel_x >= cam->image_width || pixel_y >= cam->image_height)
+        return;
+
+    // Shared memory index
+    extern __shared__ float shared_colors[];
+    int shared_mem_idx = pixel_in_block * 3;
+
+    // Initialize shared memory
+    if (thread_in_pixel == 0) {
+        shared_colors[shared_mem_idx + 0] = 0.0f;
+        shared_colors[shared_mem_idx + 1] = 0.0f;
+        shared_colors[shared_mem_idx + 2] = 0.0f;
+    }
+    __syncthreads();
+
+    // Samples per thread
+    int samples_per_thread = cam->samples_per_pixel / blockDim.x;
+    int leftover_samples = cam->samples_per_pixel % blockDim.x;
+    if (thread_in_pixel < leftover_samples)
+        samples_per_thread++;
+
+    // Unique sequence for RNG
+    unsigned long long sequence = ((unsigned long long)pixel_y * gridDim.x + pixel_x) * blockDim.x + thread_in_pixel;
+
+    // Initialize RNG state per thread
+    curandState_t rngState;
+    curand_init(seed, sequence, 0, &rngState);
+
+    // Accumulate color
+    glm::vec3 color(0.0f);
+
+    for (int s = 0; s < samples_per_thread; ++s) {
+        // Generate ray
+        ray r = get_ray(
+            rngState,
+            cam->pixel00_loc,
+            cam->center,
+            cam->pixel_delta_u,
+            cam->pixel_delta_v,
+            cam->defocus_angle,
+            cam->defocus_disk_u,
+            cam->defocus_disk_v,
+            pixel_x,
+            pixel_y);
+
+        // Compute color
+        color += ray_color(
+            rngState,
+            r,
+            world,
+            cam->background,
+            cam->max_depth);
+    }
+
+    // Accumulate color in shared memory
+    atomicAdd(&shared_colors[shared_mem_idx + 0], color.r);
+    atomicAdd(&shared_colors[shared_mem_idx + 1], color.g);
+    atomicAdd(&shared_colors[shared_mem_idx + 2], color.b);
+
+    __syncthreads();
+
+    // Write back to global memory
+    if (thread_in_pixel == 0) {
+        int pixel_index = pixel_y * cam->image_width + pixel_x;
+        int image_base_index = pixel_index * 3;
+
+        image[image_base_index + 0] += shared_colors[shared_mem_idx + 0];
+        image[image_base_index + 1] += shared_colors[shared_mem_idx + 1];
+        image[image_base_index + 2] += shared_colors[shared_mem_idx + 2];
+    }
+}
+
+Notes:
+
+curand_init Parameters:
+seed: The base seed for all RNG states.
+sequence: A unique value per thread to ensure different sequences.
+offset: Set to 0 since the per-thread RNG state handles progression.
+2. Modify get_ray Function
+Update get_ray to accept curandState_t& rngState:
+
+__device__ ray get_ray(
+    curandState_t& rngState,
+    glm::vec3& pixel00_loc,
+    glm::vec3& cameraCenter,
+    glm::vec3& delta_u,
+    glm::vec3& delta_v,
+    float& defocusAngle,
+    glm::vec3& defocusDisk_u,
+    glm::vec3& defocusDisk_v,
+    int pixel_x,
+    int pixel_y)
+{
+    // Generate random numbers for antialiasing offsets
+    float rand1 = curand_uniform(&rngState) - 0.5f;  // Offset for x
+    float rand2 = curand_uniform(&rngState) - 0.5f;  // Offset for y
+
+    // Compute pixel sample with antialiasing offsets
+    glm::vec3 pixel_sample = pixel00_loc 
+                            + ((pixel_x + rand1) * delta_u)
+                            + ((pixel_y + rand2) * delta_v);
+
+    // Determine ray origin
+    glm::vec3 ray_origin;
+    if (defocusAngle <= 0.0f) {
+        ray_origin = cameraCenter;
+    } else {
+        // Pass rngState to defocus_disk_sample
+        ray_origin = defocus_disk_sample(
+            rngState, defocusDisk_u, defocusDisk_v, cameraCenter);
+    }
+
+    // Compute ray direction
+    glm::vec3 ray_direction = pixel_sample - ray_origin;
+
+    // Generate random number for ray_time (if needed)
+    float ray_time = curand_uniform(&rngState);  // For motion blur, if applicable
+
+    return ray(ray_origin, ray_direction, ray_time);
+}
+
+3. Update ray_color Function
+Ensure ray_color accepts curandState_t& rngState:
+
+__device__ inline glm::vec3 ray_color(
+    curandState_t& rngState,
+    const ray& r,
+    const hittable* world,
+    const glm::vec3& background,
+    int depth)
+{
+    ray cur_ray = r;
+    glm::vec3 cur_attenuation(1.0f);
+    glm::vec3 final_color(0.0f);
+
+    for (int k = 0; k < depth; ++k) {
+        hit_record rec;
+
+        // Generate a random number for any stochastic processes
+        float randNumber = curand_uniform(&rngState);
+
+        // Check if the ray hits anything
+        if (!world->hittableList.hit(cur_ray, interval(0.001f, FLT_MAX), rec, randNumber)) {
+            final_color += cur_attenuation * background;
+            return final_color;
+        }
+
+        // Handle emitted light from the material
+        glm::vec3 color_from_emission(0.0f);
+        if (rec.mat->type == Type::DIFFUSE) {
+            color_from_emission = emitted(rec.u, rec.v, rec.p, rec.mat->diffuseLight);
+        }
+        final_color += cur_attenuation * color_from_emission;
+
+        // Prepare to handle scattering
+        ray scattered;
+        glm::vec3 attenuation;
+        bool did_scatter = false;
+
+        // Scatter based on material type, passing rngState
+        if (rec.mat->type == Type::METAL){
+            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, rngState);
+        } else if (rec.mat->type == Type::LAMBERTIAN){
+            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, rngState);
+        } else if (rec.mat->type == Type::DIELECTRIC){
+            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, rngState);    
+        } else if (rec.mat->type == Type::ISOTROPIC){
+            did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, rngState);    
+        }
+
+        if (!did_scatter) {
+            return final_color;
+        }
+
+        // Update the current ray and attenuation for the next bounce
+        cur_ray = scattered;
+        cur_attenuation *= attenuation;
+    }
+
+    return final_color;
+}
+
+4. Update Material Scatter Functions
+For instance, lambertian_scatter:
+
+__device__ bool lambertian_scatter(
+    const ray& r_in,
+    const hit_record& rec,
+    glm::vec3& attenuation,
+    ray& scattered,
+    const lambertian& mat,
+    curandState_t& rngState)
+{
+    // Generate random direction using rngState
+    glm::vec3 scatter_direction = rec.normal + random_unit_vector(rngState);
+
+    // If scatter_direction is near zero, set it to rec.normal
+    if (near_zero(scatter_direction)) {
+        scatter_direction = rec.normal;
+    }
+
+    scattered = ray(rec.p, scatter_direction, r_in.time());
+    attenuation = mat.albedo;
+
+    return true;
+}
+
+5. Update Random Number Generation Functions
+For example, random_in_unit_sphere:
+
+__device__ inline glm::vec3 random_in_unit_sphere(curandState_t& rngState) {
+    while (true) {
+        glm::vec3 p = random_vector_in_range(rngState, -1.0f, 1.0f);
+        if (glm::dot(p, p) < 1.0f) {
+            return p;
+        }
+    }
+}
+
+__device__ inline glm::vec3 random_vector_in_range(curandState_t& rngState, float min, float max) {
+    float x = min + (max - min) * curand_uniform(&rngState);
+    float y = min + (max - min) * curand_uniform(&rngState);
+    float z = min + (max - min) * curand_uniform(&rngState);
+    return glm::vec3(x, y, z);
+}
+
+Notes:
+
+The use of while (true) in random_in_unit_sphere naturally consumes a variable number of random numbers, which is handled gracefully since each thread maintains its own RNG state.
+
+Benefits of This Approach
+Handles Variable Random Numbers per Sample:
+
+Each thread's RNG state progresses independently, accommodating loops and conditional random number consumption without sequence overlaps.
+Simplifies RNG Management:
+
+No need to calculate or overestimate N_per_sample. The RNG state naturally tracks the progression.
+Thread Safety:
+
+Each thread's RNG state is independent, preventing race conditions and ensuring reproducible results.
+Performance:
+
+The overhead of maintaining curandState_t per thread is minimal compared to the overall computational workload.
+Addressing Potential Concerns
+Memory Usage
+Per-Thread RNG State:
+The memory overhead is low, as curandState_t is a small structure.
+For modern GPUs with thousands of threads, the total memory usage remains acceptable.
+Initialization Overhead
+Initializing curandState_t:
+The initialization is performed once per thread at the beginning of the kernel.
+The time taken is negligible compared to the total rendering time.
+
+Testing and Validation
+Implement the Changes:
+
+Update the kernel and all relevant functions as described.
+Compile and Run:
+
+Ensure that the code compiles without errors.
+Run test renders to verify correctness.
+Compare Results:
+
+Check that the visual output matches expectations.
+Verify that antialiasing and other stochastic effects appear correct.
+Performance Profiling:
+
+Use profiling tools to confirm that the performance gains from shared memory are maintained.
+Ensure that there are no significant slowdowns due to RNG state management.
+
+Conclusion
+By switching back to per-thread random states (curandState_t), we effectively handle the variable random number consumption inherent in functions like random_in_unit_sphere. This approach maintains the integrity of the random number sequences and ensures high-quality rendering without sacrificing the performance benefits of your shared memory implementation.
+
+Please implement these changes, and feel free to reach out if you have any questions or need further assistance. I'm here to help you achieve the best possible performance and visual quality for your ray tracer.
+
+Summary of Steps:
+Initialize curandState_t per Thread in the Kernel:
+
+Use a unique sequence per thread to ensure independent RNG states.
+Pass rngState to All Functions Needing Random Numbers:
+
+Update function signatures to accept curandState_t& rngState.
+Use rngState Consistently:
+
+Generate random numbers using curand_uniform, curand_normal, etc., with rngState.
+Avoid Reinitializing rngState:
+
+Initialize it once per thread; do not reinitialize in sub-functions.
+Test and Validate:
+
+Ensure that rendering results are correct and performance benefits are maintained.
