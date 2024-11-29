@@ -117,7 +117,7 @@
             //* full screen
             width = secondDisplayBounds.w;
             height = secondDisplayBounds.h;
-            // full screen
+    
             x_winPos = secondDisplayBounds.x;
             y_winPos = secondDisplayBounds.y;
 

@@ -1693,7 +1693,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 
      // Define threads per pixel and pixels per block
     const int threads_per_pixel = 16; //8 16;  // Adjust as needed
-    const int pixels_per_block =  8;//8;    // Adjust as needed
+    const int pixels_per_block =  4;//8;    // Adjust as needed
 
     // Set up block and grid sizes
     dim3 blockSize(threads_per_pixel, pixels_per_block);
@@ -1704,10 +1704,10 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     size_t shared_mem_size = pixels_per_block * 3 * sizeof(float);
 
     // Allocate and initialize random states
-    int num_pixels = cam.image_width * cam.image_height;
-    curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
+    // int num_pixels = cam.image_width * cam.image_height;
+    // curandState_t* d_states = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
     // curandState_t* d_states_y = memoryManager.allocateDevice<curandState_t>(num_pixels * sizeof(curandState_t));
-    init_random2<<<gridSize, blockSize.y>>>(seed, d_states, cam.image_width, cam.image_height, pixels_per_block);
+    // init_random2<<<gridSize, blockSize.y>>>(seed, d_states, cam.image_width, cam.image_height, pixels_per_block);
 
     // Launch the kernel
     rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_cam, d_image, d_world, seed);
