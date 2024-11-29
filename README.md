@@ -99,7 +99,7 @@ I started with Chapter 13 defocus Blur
 ## BVH mix (boxes and sphere conglomerates only)
 ### RTX-3060  510.7 secs    
 ### RTX4090:   94.2 secs (200 x 50 samples)
-### RTX4090: 4871.7 sec or 1::21::11 (10000 x 40 samples/ depth)
+### RTX4090: 4871.7 sec or 1::21::11 (10000 x 40 samples/ depth)  NOT SHARED MEMORY
 ![Screenshot of the project](output_samples/NWfinalscene.png)
 
 ## compiler uses
@@ -107,6 +107,11 @@ I started with Chapter 13 defocus Blur
 ### Play with that number interactively to gain speed
 
 
+# SHARED MEMORY and curandStatePhilox4_32_10_t* rngState
+##  RTX4090:  2004.21493 sec or 00:33:24    10000 X 40 SAMPLES/depth
+
+(4871.7 - 2004.2 ) / 4871.7 =  58.9% faster than not using shared memory!
+![Screenshot of the project](output_samples/NWfinalscene.png)
 
 
 
