@@ -276,7 +276,7 @@ void bvhNode_data::build_bvh() {
 
 
 __device__ __host__
-bool hitBvhTransverse(const ray& r, interval ray_t, hit_record& rec, BVHNode* nodes, hittable* objects, float randNumber)  {
+bool hitBvhTransverse(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber)  {
     
     const BVHNode* current = nodes;  // Start at the root node
     bool hit_anything = false;
@@ -351,9 +351,84 @@ bool hitBvhTransverse(const ray& r, interval ray_t, hit_record& rec, BVHNode* no
 }
 
 __device__ __host__
+bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber/* , int* stack */) {
+    // Use a small stack allocated in registers
+    int stack[14];
+    int stackPtr = -1;
+
+    // Start with the root node
+    int currentIndex = 0;
+    bool hit_anything = false;
+    hit_record temp_rec;
+
+    while (true) {
+        const BVHNode* current = &nodes[currentIndex];
+
+        if (current->bbox.hit(r, ray_t)) {
+            if (current->is_leaf) {
+                // Process leaf node
+                for (size_t i = current->start; i < current->end; ++i) {
+                    const hittable* obj = &objects[i];
+                    if (obj->type == Type::QUAD){
+                        if (obj->quad.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    
+                    } else if (obj->type == Type::SPHERE){
+                        if (obj->sphere.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } else if (obj->type == Type::ROTATE_Y){
+                        if (obj->rotateY.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } else if (obj->type == Type::TRANSLATE){
+                        if (obj->translate.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } else if (obj->type == Type::MEDIUM) {
+                        if (obj->constantMedium.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } else if (obj->type == Type::LIST) {
+                        if (obj->hittableList.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    }
+                    
+                }
+                if (stackPtr < 0) break;
+                currentIndex = stack[stackPtr--];
+            } else {
+                // Push right child to stack and proceed to left child
+                stack[++stackPtr] = current->right_child_index;
+                currentIndex = current->left_child_index;
+            }
+        } else {
+            if (stackPtr < 0) break;
+            currentIndex = stack[stackPtr--];
+        }
+    }
+    return hit_anything;
+}
+
+__device__ __host__
 bool bvhNode_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {
 
     return hitBvhTransverse(r, ray_t, rec, nodes, objects, randNumber);
+    // return hit_optimized(r, ray_t, rec, nodes, objects, randNumber);
 }
 
 
