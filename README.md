@@ -109,6 +109,7 @@ I started with Chapter 13 defocus Blur
 
 # SHARED MEMORY and curandStatePhilox4_32_10_t* rngState
 ##  RTX4090:  2004.21493 sec or 00:33:24    10000 X 40 SAMPLES/depth
+##  RTX4090:   54.6 secs                       200 x 50 samples
 
 (4871.7 - 2004.2 ) / 4871.7 =  58.9% faster than not using shared memory!
 ![Screenshot of the project](output_samples/NWfinalscene.png)
