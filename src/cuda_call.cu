@@ -849,7 +849,7 @@ void quads(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittabl
 
     /* Quads */
     hittable hittable_obj;
-    hittable_obj = hittable::make_quad(glm::vec3(-3.0f, -2.0f, 5.0f), glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 4.0f,  0.0f), left_red);
+    hittable_obj = hittable::make_triangle(glm::vec3(-3.0f, -2.0f, 5.0f), glm::vec3(0.0f, 0.0f, -4.0f), glm::vec3(0.0f, 4.0f,  0.0f), left_red);
     h_hittables_list.push_back(hittable_obj);
     hittable_obj = hittable::make_quad(glm::vec3(-2.0f, -2.0f, 0.0f), glm::vec3(4.0f, 0.0f, -0.0f), glm::vec3(0.0f, 4.0f,  0.0f), back_green);
     h_hittables_list.push_back(hittable_obj);

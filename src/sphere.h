@@ -89,6 +89,15 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
 
             }
         }
+        if (objects[i].type == Type::TRI) {
+            if (objects[i].triangle.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
+
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+
+            }
+        }
         if (objects[i].type == Type::ROTATE_Y) {
             if (objects[i].rotateY.hit(r, interval(ray_t.min, closest_so_far), temp_rec, randNumber)){
 
@@ -144,6 +153,7 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
     
     return hit_anything;
 }
+
 
 __global__
 void build_bvh_kernel(BVHNode* nodes, hittable* objects, size_t objects_size) {
@@ -458,6 +468,70 @@ bool quad_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     return true;
 }
 
+/**
+ * * Given the hit point in plane coordinates,
+ * @return false if it is outside the primitive.
+ * @return true and set the hit record UV coordinates
+ */
+__device__ __host__
+bool quad_data::is_interior(float a, float b, hit_record& rec) const {
+    interval unit_interval = interval(0, 1);
+    if (!unit_interval.contains(a) || !unit_interval.contains(b)) return false;
+    rec.u = a;
+    rec.v = b;
+    return true;
+}
+
+//* Compute the bounding box of all four vertices
+__device__ __host__
+void quad_data::set_boundig_box() {
+    auto bbox_diagonal1 = AaBb(Q, Q + u + v);
+    auto bbox_diagonal2 = AaBb(Q + u, Q + v);
+    bbox = AaBb(bbox_diagonal1, bbox_diagonal2);
+}
+
+__device__ __host__
+bool triangle_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
+    auto denom = glm::dot(normal, r.direction);
+
+    //* No hit if the ray is parallel to the plane
+    if (fabsf(denom) < 1e-8 ) return false;
+    //* Return false if th ehit point parameter t is outside the ray interval
+    auto t = (D - glm::dot(normal, r.origin)) / denom;
+    if (!ray_t.contains(t)) return false;
+
+    //* Determine if the hit point lies within the planar shape using its plane coordinates
+    auto intersection = r.at(t);
+    glm::vec3 planar_hitpt_vector = intersection - Q;
+    auto alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v));
+    auto beta = glm::dot(w, glm::cross(u, planar_hitpt_vector));
+    if (!is_interior(alpha, beta, rec)) return false;
+  
+    //* Ray hits the 2D shape, set the rest of the hit record and return true
+    rec.t = t;
+    rec.p = intersection;
+    rec.mat = mat;
+    rec.set_face_normal(r, normal);
+
+    return true;
+}
+
+__device__ __host__
+void triangle_data::set_boundig_box() {
+   
+    bbox = AaBb(Q, Q + u + v).pad();
+}
+
+__device__ __host__
+bool triangle_data::is_interior(float a, float b, hit_record& rec) const {
+    // interval unit_interval = interval(0, 1);
+    // if (!unit_interval.contains(a) || !unit_interval.contains(b)) return false;
+    if (( a < 0) || (b < 0) || (a + b > 1)) return false;
+    rec.u = a;
+    rec.v = b;
+    return true;
+}
+
 __device__ __host__
 bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber)  const {
     //* Move the ray backwards by the offset
@@ -640,31 +714,6 @@ AaBb constantMedium_data::bounding_box() const {
     return bbox;
 }
 
-
-/**
- * * Given the hit point in plane coordinates,
- * @return false if it is outside the primitive.
- * @return true and set the hit record UV coordinates
- */
-__device__ __host__
-bool quad_data::is_interior(float a, float b, hit_record& rec) const {
-    interval unit_interval = interval(0, 1);
-    if (!unit_interval.contains(a) || !unit_interval.contains(b)) return false;
-    rec.u = a;
-    rec.v = b;
-    return true;
-}
-
-//* Compute the bounding box of all four vertices
-__device__ __host__
-void quad_data::set_boundig_box() {
-    auto bbox_diagonal1 = AaBb(Q, Q + u + v);
-    auto bbox_diagonal2 = AaBb(Q + u, Q + v);
-    bbox = AaBb(bbox_diagonal1, bbox_diagonal2);
-}
-
-
-
 __device__ __host__
 glm::vec3 checkerTexture_data::value(float u, float v, const glm::vec3& p) const {
     auto xInteger = int(floor(inv_scale * p.x));
@@ -698,20 +747,20 @@ glm::vec3 imageTexture_data::value(float u, float v, const glm::vec3& p) const {
 __device__ __host__
     glm::vec3 noiseTexture_data::value(glm::vec3 albedo, float u, float v, const glm::vec3& p) {
        
-        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.noise(scale * p);
-        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.trilinear_noise_smoothing(p);
-        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.hermitian_noise_smoothing(scale * p);
-        //* 5.5 Random vectors Lattice points         
-        // return glm::vec3(1.0f, 1.0f, 1.0f) * 0.5f * (1.0f + noisy.perlin_noise_smoothing(scale * p) );
-        //* 5.6 Turbolence introduction
-        // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.turbolence(p, 7);
-        //* 5.7 Marble texture
-        // return glm::vec3(0.5f, .5f, 0.5f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
-        return albedo * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
+    // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.noise(scale * p);
+    // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.trilinear_noise_smoothing(p);
+    // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.hermitian_noise_smoothing(scale * p);
+    //* 5.5 Random vectors Lattice points         
+    // return glm::vec3(1.0f, 1.0f, 1.0f) * 0.5f * (1.0f + noisy.perlin_noise_smoothing(scale * p) );
+    //* 5.6 Turbolence introduction
+    // return glm::vec3(1.0f, 1.0f, 1.0f) * noisy.turbolence(p, 7);
+    //* 5.7 Marble texture
+    // return glm::vec3(0.5f, .5f, 0.5f) * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
+    return albedo * (1.0f + sinf(scale * p.z + 10 * noisy.turbolence(p, 7)));
 
 
-        
-    }
+    
+}
 
 /**
  * @return the address of the three RGB bytes of the pixel at x, y.

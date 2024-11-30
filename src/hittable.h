@@ -84,6 +84,28 @@ struct quad_data {
     
 };
 
+//* Triangle struct
+struct triangle_data {
+    glm::vec3 Q;
+    glm::vec3 u, v, w;
+    glm::vec3 normal;
+    float D;
+    
+    material* mat;
+    AaBb bbox;
+    
+    __device__ __host__
+    AaBb bounding_box() const {return bbox;}
+    __device__ __host__
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const;
+    __device__ __host__
+    bool is_interior(float a, float b, hit_record& rec) const;
+    __device__ __host__
+    void set_boundig_box();
+    
+};
+
+
 struct hittable;  // predeclare the existance of a hittable struct
 // Define a struct of a list of hittables
 struct hittableList_data {
@@ -92,7 +114,7 @@ struct hittableList_data {
     AaBb bbox;
     __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
-    
+    bool ah();
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
 };
@@ -166,6 +188,7 @@ struct hittable {
         rotateY_data rotateY;
         constantMedium_data constantMedium;
         bvhNode_data bvhNode;
+        triangle_data triangle;
     };
 
     // default constructor
@@ -219,6 +242,24 @@ struct hittable {
 
         return obj;
     }
+
+    //* Triangle Constructor
+    static hittable make_triangle(const glm::vec3& Q, const glm::vec3& u, const glm::vec3& v, material* mat){
+        hittable obj;
+        obj.type = Type::TRI;
+        obj.triangle.Q = Q;
+        obj.triangle.u = u;
+        obj.triangle.v = v;
+        obj.triangle.mat = mat;
+        auto n = glm::cross(u, v);
+        obj.triangle.normal = glm::normalize(n);
+        obj.triangle.D = glm::dot(obj.triangle.normal, obj.triangle.Q);
+        obj.triangle.w = n / glm::dot(n, n);
+        obj.triangle.set_boundig_box();
+
+        return obj;
+    }
+
 
     //* hittable list constructor
     static hittable make_hittableList() {
