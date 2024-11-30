@@ -276,7 +276,7 @@ void bvhNode_data::build_bvh() {
 
 
 __device__ __host__
-bool hitBvhTransverse(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber)  {
+bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber)  {
     
     const BVHNode* current = nodes;  // Start at the root node
     bool hit_anything = false;
@@ -351,7 +351,7 @@ bool hitBvhTransverse(const ray& r, interval ray_t, hit_record& rec, const  BVHN
 }
 
 __device__ __host__
-bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber/* , int* stack */) {
+bool hitBvhTraverse_stack(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber/* , int* stack */) {
     // Use a small stack allocated in registers
     int stack[14];
     int stackPtr = -1;
@@ -427,8 +427,8 @@ bool hit_optimized(const ray& r, interval ray_t, hit_record& rec, const  BVHNode
 __device__ __host__
 bool bvhNode_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {
 
-    return hitBvhTransverse(r, ray_t, rec, nodes, objects, randNumber);
-    // return hit_optimized(r, ray_t, rec, nodes, objects, randNumber);
+    return hitBvhTraverse_stackless(r, ray_t, rec, nodes, objects, randNumber);
+    // return hitBvhTraverse_stack(r, ray_t, rec, nodes, objects, randNumber);
 }
 
 
