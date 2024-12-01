@@ -176,8 +176,8 @@ inline hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& 
 inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builder, glm::vec3 offset) {
     // Allocate raw memory for 6 hittable objects
     int number_of_triangles = builder.indices.size();
-    hittable* sides = static_cast<hittable*>(::operator new[](sizeof(hittable) * number_of_triangles)); //  1 object for now
-    memoryManager.host_allocations.push_back(sides); // Track allocation for cleanup    
+    hittable* triangles = static_cast<hittable*>(::operator new[](sizeof(hittable) * number_of_triangles)); //  1 object for now
+    memoryManager.host_allocations.push_back(triangles); // Track allocation for cleanup    
     AaBb bbox;
 
 
@@ -196,11 +196,11 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
         auto QV = V - Q;
         auto color = builder.indices[i].color;
         auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, color));
-        new (&sides[i]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
-        bbox = AaBb(bbox, sides[i].triangle.bounding_box());
+        new (&triangles[i]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
+        bbox = AaBb(bbox, triangles[i].triangle.bounding_box());
     }
 
-    auto model = memoryManager.allocateHost<hittable>(hittable::make_hittableList(sides, number_of_triangles)); 
+    auto model = memoryManager.allocateHost<hittable>(hittable::make_hittableList(triangles, number_of_triangles)); 
     model->hittableList.bbox = bbox;
     return model;
 }
