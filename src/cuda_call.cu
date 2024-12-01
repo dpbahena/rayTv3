@@ -173,7 +173,7 @@ inline hittable* createBox(HybridMemoryManager& memoryManager, const glm::vec3& 
  * @param b 
  * @param mat 
  */
-inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builder, glm::vec3 offset) {
+inline hittable* createModel(HybridMemoryManager& memoryManager, Builder0& builder, glm::vec3 offset) {
     // Allocate raw memory for 6 hittable objects
     int number_of_triangles = builder.indices.size();
     hittable* triangles = static_cast<hittable*>(::operator new[](sizeof(hittable) * number_of_triangles)); //  1 object for now
@@ -204,6 +204,49 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
     model->hittableList.bbox = bbox;
     return model;
 }
+
+/**
+ * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
+ * 
+ * @param sides 
+ * @param a 
+ * @param b 
+ * @param mat 
+ */
+inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builder, glm::vec3 offset, glm::vec3 scale) {
+    // Allocate raw memory for 6 hittable objects
+    int number_of_triangles = builder.indices.size() / 3;
+    hittable* triangles = static_cast<hittable*>(::operator new[](sizeof(hittable) * number_of_triangles)); //  1 object for now
+    memoryManager.host_allocations.push_back(triangles); // Track allocation for cleanup    
+    AaBb bbox;
+
+
+    for (auto& v : builder.vertices){
+        v.position += offset;
+        v.position *= scale;
+    }
+    int j = 0;
+    for (int i = 0; i < builder.indices.size() ; i+=3, j++){
+        int q = builder.indices[i + 0];
+        int u = builder.indices[i + 1];
+        int v = builder.indices[i + 2];
+        auto Q = glm::vec3(builder.vertices[q].position);
+        auto U = glm::vec3(builder.vertices[u].position);
+        auto V = glm::vec3(builder.vertices[v].position);
+        auto QU = U - Q;
+        auto QV = V - Q;
+        auto color = builder.vertices[q].color;
+        auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, color));
+        new (&triangles[j]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
+        bbox = AaBb(bbox, triangles[j].triangle.bounding_box());
+    }
+
+    auto model = memoryManager.allocateHost<hittable>(hittable::make_hittableList(triangles, number_of_triangles)); 
+    model->hittableList.bbox = bbox;
+    return model;
+}
+
+
 
 /**
  * @brief Generates a collection of spheres with randomized positions 
@@ -940,7 +983,7 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
     
     std::vector<hittable> h_hittables_list;
     
-    Builder builder;
+    Builder0 builder;
     builder.vertices.push_back({{-0.3f, 0.25f, -0.3}});
     builder.vertices.push_back({{0.3f, 0.25f, -0.3}});
     builder.vertices.push_back({{0.3f, 0.25f, 0.3}});
@@ -973,6 +1016,55 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
     auto offset = glm::vec3(0.0, 0.25, 0.0);
     auto obj1 = createModel(memoryManager, builder, offset);
     h_hittables_list.push_back(*obj1);
+
+    // ground
+    auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
+    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
+    h_hittables_list.push_back(hittable_obj);
+
+    auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
+    hittable_obj = hittable::make_sphere(glm::vec3(2.5f, 1.0f, 0.0f), 1.0f, silver);
+    h_hittables_list.push_back(hittable_obj);
+
+
+    
+    size_t number_of_hittables = h_hittables_list.size();
+
+    memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
+    memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
+     
+
+    hittable h_world = hittable::make_hittableList(d_hittable_list, number_of_hittables);
+    memoryManager.allocateDeferred(d_world, 1);
+    memoryManager.copyToDevice(d_world, &h_world, 1);
+    
+}
+
+
+void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
+
+    cam.vfov = 20.0f;
+    cam.lookfrom = glm::vec3( 4.0f, 3.0f,  5.0f);
+    cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
+    cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
+    cam.defocus_angle = 0.6f;
+    cam.focus_dist = 10.0f;
+    cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
+    cam.initialize();
+   
+    
+    std::vector<hittable> h_hittables_list;
+    
+    Builder builder;
+    // createModelFromFile(builder, "images/cube.obj");
+    createModelFromFile(builder, "images/monkey.obj");
+    
+    auto offset = glm::vec3(0.0, 1.0, 0.0);
+    auto scale = glm::vec3(.5);
+    auto obj1 = createModel(memoryManager, builder, offset, scale);
+    auto bvh1 = createBVH(memoryManager, obj1);
+    h_hittables_list.push_back(bvh1);
 
     // ground
     auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
@@ -1462,6 +1554,10 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     case 11:
         printf("triangles --->\t");
         triangles(cam, memoryManager, d_hittables_list, d_world);
+        break;
+    case 12:
+        printf("loading models --->\t");
+        loadingModels(cam, memoryManager, d_hittables_list, d_world);
         break;
     default:
         break;

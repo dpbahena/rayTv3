@@ -34,9 +34,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/libraries/stb
+    ${CMAKE_SOURCE_DIR}/libraries/tinyobject
 )
 
-# Suppress specific CUDA warning #20012 and enable relocatable device code
+# Suppress specific CUDA warning and enable relocatable device code
 target_compile_options(${PROJECT_NAME} PRIVATE 
     $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=20012>
     $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=550>

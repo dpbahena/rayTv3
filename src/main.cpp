@@ -37,8 +37,8 @@ int main(int arg, char** argv) {
      
     } else {  // default valules
         cam.samples_per_pixel = 5;
-        cam.max_depth = 2;
-        cam.scene = 10;
+        cam.max_depth = 3;
+        cam.scene = 12;
         cam.ends = false; // true ends program after first run
         printf("Using default values:  ./rayTracer 100 40 1 \n");
         printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <scene: 1-10\n");
@@ -78,7 +78,7 @@ int main(int arg, char** argv) {
                         win.closeWindow();
                         break;
                     case SDLK_SPACE: // redraw display
-                        cam.scene = (cam.scene % 11) + 1;  //* Cycle between 1, 2, 3, etc or n
+                        cam.scene = (cam.scene % 12) + 1;  //* Cycle between 1, 2, 3, etc or n
                         rendered = false;
                     default:
                         break;

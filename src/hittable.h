@@ -8,19 +8,50 @@
 #include <thrust/sort.h>
 
 
-struct Vertex {
+struct Vertex0 {
     glm::vec3 point;
 };
-
 struct Face {
     uint32_t indices[3];
     glm::vec3 color;
 };
 
-struct Builder {
-  std::vector<Vertex> vertices;
+struct Builder0 {
+  std::vector<Vertex0> vertices;
   std::vector<Face> indices;
 };
+
+
+struct Vertex {
+    glm::vec3 position;
+    glm::vec3 color;
+    glm::vec3 normal{};
+    glm::vec2 uv{};     // short of 2-Dimensional texture coordinates
+    size_t material_id;
+
+    bool operator==(const Vertex &other) const {
+        return position == other.position && color == other.color && normal == other.normal && uv == other.uv && material_id == other.material_id;
+    }
+};
+
+
+
+struct Builder {
+    std::vector<Vertex> vertices{};
+    std::vector<uint32_t> indices{};
+    std::vector<uint32_t> textureBuffer;
+    // Extent2D extent;
+
+    void loadModel(const std::string &filepath);
+    void loadTexture(const std::string &filepath);
+};
+
+// from https:://stackoverflow.com/a/57595105
+    template <typename T, typename... Rest>
+    void hashCombine(std::size_t& seed, const T& v, const Rest&... rest) {
+        seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        (hashCombine(seed, rest), ...);
+    };
 
 
 struct alignas(16) BVHNode {

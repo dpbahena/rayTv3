@@ -2,8 +2,9 @@
 #pragma once
 
 #include "hittable.h"
-// #include "texture.h"
-// #include "interval.h"
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+#include <glm/gtx/hash.hpp>
 
 
 
@@ -187,7 +188,9 @@ void build_bvh_kernel(BVHNode* nodes, hittable* objects, size_t objects_size) {
                 bbox = AaBb(bbox, (objects + i)->sphere.bounding_box());
             } else if (objects[i].type == Type::QUAD) {
                 bbox = AaBb(bbox, (objects + i)->quad.bounding_box());
-            }else if (objects[i].type == Type::ROTATE_Y) {
+            } else if (objects[i].type == Type::TRI) {
+                bbox = AaBb(bbox, (objects + i)->triangle.bounding_box()); 
+            } else if (objects[i].type == Type::ROTATE_Y) {
                 bbox = AaBb(bbox, (objects + i)->rotateY.bounding_box());
             } else if (objects[i].type == Type::TRANSLATE) {
                 bbox = AaBb(bbox, (objects + i)->translate.bounding_box());
@@ -306,6 +309,12 @@ bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, con
                             rec = temp_rec;
                         }
                     
+                    } else if (obj->type == Type::TRI){
+                        if (obj->triangle.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
                     } else if (obj->type == Type::SPHERE){
                         if (obj->sphere.hit(r, ray_t, temp_rec)) {
                             hit_anything = true;
@@ -385,7 +394,12 @@ bool hitBvhTraverse_stack(const ray& r, interval ray_t, hit_record& rec, const  
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;
                         }
-                    
+                    } else if (obj->type == Type::TRI){
+                        if (obj->triangle.hit(r, ray_t, temp_rec)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
                     } else if (obj->type == Type::SPHERE){
                         if (obj->sphere.hit(r, ray_t, temp_rec)) {
                             hit_anything = true;
@@ -884,3 +898,118 @@ hittable* box( const glm::vec3& a, const glm::vec3& b, material* mat) {
     return sides;
 }
 
+
+namespace std {
+    template <>
+    struct hash<Vertex> {
+        size_t operator()(Vertex const &vertex) const {
+            size_t seed = 0;
+            hashCombine(seed, vertex.position, vertex.color, vertex.normal, vertex.uv, vertex.material_id);
+            return seed;
+        }
+
+    };
+}
+
+static void createModelFromFile(Builder& builder, const std::string &filepath, const std::string& texturePath= "") {
+    builder.loadModel(filepath);
+    // builder.loadTexture(texturePath);
+}
+
+void Builder::loadModel(const std::string &filepath) {
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+
+        // Extract base path for the mtl file
+        std::string mtl_basepath = filepath.substr(0, filepath.find_last_of("/\\") + 1); // Include trailing slash
+
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filepath.c_str(), mtl_basepath.c_str())) {
+            throw std::runtime_error("Failed to load OBJ file: " + warn + err);
+        }
+
+        if (!warn.empty()) {
+            std::cout << "Warning: " << warn << std::endl;
+        }
+        if (!err.empty()) {
+            std::cout << "Error: " << err << std::endl;
+        }
+
+        vertices.clear();
+        indices.clear();
+        
+        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+        for (const auto &shape : shapes) {
+            size_t index_offset = 0;
+            for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                int fv = shape.mesh.num_face_vertices[f];
+                int material_id = shape.mesh.material_ids[f];
+
+                // std::cout << "Processing face " << f << " with material ID " << material_id << std::endl;
+
+                for (int v = 0; v < fv; v++) { // Change size_t to int
+                    tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+                    Vertex vertex{};
+                    if (idx.vertex_index >= 0) {
+                        vertex.position = {
+                            attrib.vertices[3 * idx.vertex_index + 0],  
+                            attrib.vertices[3 * idx.vertex_index + 1],
+                            attrib.vertices[3 * idx.vertex_index + 2]
+                        };
+                        // std::cout << "Vertex position: (" 
+                        //         << vertex.position.x << ", " 
+                        //         << vertex.position.y << ", " 
+                        //         << vertex.position.z << ")" << std::endl;
+                    }
+
+                    if (idx.normal_index >= 0) {
+                        vertex.normal = {
+                            attrib.normals[3 * idx.normal_index + 0],
+                            attrib.normals[3 * idx.normal_index + 1],
+                            attrib.normals[3 * idx.normal_index + 2]
+                        };
+                        // std::cout << "Vertex normal: ("
+                        //         << vertex.normal.x << ", "
+                        //         << vertex.normal.y << ", "
+                        //         << vertex.normal.z << ")" << std::endl;
+                    }
+                    if (idx.texcoord_index >= 0) {
+                        vertex.uv = {
+                            attrib.texcoords[2 * idx.texcoord_index + 0],
+                            attrib.texcoords[2 * idx.texcoord_index + 1],
+                        };
+                        // std::cout << "Vertex UV: ("
+                        //         << vertex.uv.x << ", "
+                        //         << vertex.uv.y << ")" << std::endl;
+                    }
+
+                    vertex.material_id = material_id; // Correctly assign material ID based on the face
+                    // std::cout << "Assigned material ID: " << vertex.material_id << std::endl;
+
+                    if (uniqueVertices.count(vertex) == 0) {
+                        uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                        vertices.push_back(vertex);
+                    }
+
+                    indices.push_back(uniqueVertices[vertex]);
+                }
+                index_offset += fv;
+            }
+        }
+
+      
+        // Debug: Print color values before assignment
+        for (auto& vertex : vertices) {
+            if (vertex.material_id >= 0 && static_cast<size_t>(vertex.material_id) < materials.size()) {
+                const auto &material = materials[vertex.material_id];
+                // std::cout << "Assigning color (" << material.diffuse[0] << ", " << material.diffuse[1] << ", " << material.diffuse[2] << ") to vertex at position (" << vertex.position.x << ", " << vertex.position.y << ", " << vertex.position.z << ")" << std::endl;
+                vertex.color = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+                // printf("Vertex color: {%f, %f, %f}\n", vertex.color.r, vertex.color.g, vertex.color.b);
+            } else {
+                // Handle the case where material_id is out of bounds
+                vertex.color = glm::vec3(1.0f, 0.0f, 1.0f); // Default color (e.g., magenta) to indicate an error
+            }
+        }
+    }
