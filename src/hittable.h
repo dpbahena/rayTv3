@@ -8,6 +8,21 @@
 #include <thrust/sort.h>
 
 
+struct Vertex {
+    glm::vec3 point;
+};
+
+struct Face {
+    uint32_t indices[3];
+    glm::vec3 color;
+};
+
+struct Builder {
+  std::vector<Vertex> vertices;
+  std::vector<Face> indices;
+};
+
+
 struct alignas(16) BVHNode {
     AaBb bbox;
     int left_child_index;     // Index of left child in the BVH array (-1 if it's a leaf)

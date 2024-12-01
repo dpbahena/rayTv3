@@ -78,7 +78,7 @@ int main(int arg, char** argv) {
                         win.closeWindow();
                         break;
                     case SDLK_SPACE: // redraw display
-                        cam.scene = (cam.scene % 10) + 1;  //* Cycle between 1, 2, 3, etc or n
+                        cam.scene = (cam.scene % 11) + 1;  //* Cycle between 1, 2, 3, etc or n
                         rendered = false;
                     default:
                         break;
