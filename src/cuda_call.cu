@@ -268,6 +268,9 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
     memoryManager.host_allocations.push_back(triangles); // Track allocation for cleanup    
     AaBb bbox;
 
+    // Map to store materials to avoid duplications
+    std::unordered_map<int, material*> materialMap;
+    texture* deffuseTex;
 
     for (auto& v : builder.vertices){
         v.position += offset;
@@ -278,17 +281,44 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
         int q = builder.indices[i + 0];
         int u = builder.indices[i + 1];
         int v = builder.indices[i + 2];
-        auto Q = glm::vec3(builder.vertices[q].position);
-        auto U = glm::vec3(builder.vertices[u].position);
-        auto V = glm::vec3(builder.vertices[v].position);
+
+        const auto& vertex0 = builder.vertices[q];
+        const auto& vertex1 = builder.vertices[u];
+        const auto& vertex2 = builder.vertices[v];
+
+
+        auto Q = glm::vec3(vertex0.position);
+        auto U = glm::vec3(vertex1.position);
+        auto V = glm::vec3(vertex2.position);
         auto QU = U - Q;
         auto QV = V - Q;
-        auto color = builder.vertices[q].color;
-        if(!tex){
-            auto modeltex = builder.materialList[0].diffuseTexture;
-            tex = createTextureFromModel(memoryManager, modeltex);
+
+        // get material ID
+        int material_id = vertex0.material_id;
+        // Ensure all vertices have the same material ID
+        if (vertex1.material_id != material_id || vertex2.material_id != material_id) {
+            std::cerr << "Warning: Triangle vertices have different material IDs." << std::endl;
         }
-        auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
+        
+         else {
+            // create material from builder materialls
+            if (material_id >= 0 && material_id < builder.materialList.size()) {
+                const auto& builderMaterial = builder.materialList[material_id];
+
+                if (builderMaterial.diffuseTexture.bdata) {
+                    
+                    auto textureData = builderMaterial.diffuseTexture;
+                    deffuseTex = createTextureFromModel(memoryManager, textureData);
+
+                } else {
+                    // use diffuse color as solid color texture
+                    auto color = vertex0.color;
+                    deffuseTex = createTexture(memoryManager, Type::SOLID, color);
+                }
+            }
+        }
+
+        auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, deffuseTex);
         new (&triangles[j]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
         bbox = AaBb(bbox, triangles[j].triangle.bounding_box());
     }
@@ -1100,7 +1130,7 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     cam.lookfrom = glm::vec3( -2.0f, 3.0f,  5.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
-    cam.defocus_angle = 0.6f;
+    cam.defocus_angle = 0.0f;
     cam.focus_dist = 10.0f;
     cam.background = glm::vec3(0.70f, 0.80f, 1.00f);
     cam.initialize();
@@ -1110,10 +1140,11 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     
     Builder builder;
     createModelFromFile(builder, "images/woodFloor.obj");
+    // createModelFromFile(builder, "images/woodedcube.obj");
     // createModelFromFile(builder, "images/monkey.obj");
     
     auto offset = glm::vec3(0.0, 0.0, 0.0);
-    auto scale = glm::vec3(2.0);
+    auto scale = glm::vec3(7.0);
     // auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/WoodFloor043_4K-JPG/WoodFloor043.png");
     auto obj1 = createModel(memoryManager, builder, offset, scale);
     auto bvh1 = createBVH(memoryManager, obj1);
