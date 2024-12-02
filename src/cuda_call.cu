@@ -295,28 +295,25 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
 
         // get material ID
         int material_id = vertex0.material_id;
-        // Ensure all vertices have the same material ID
-        if (vertex1.material_id != material_id || vertex2.material_id != material_id) {
+        const auto& builderMaterial = builder.materialList[material_id]; 
+        if (vertex1.material_id != material_id || vertex2.material_id != material_id){
             std::cerr << "Warning: Triangle vertices have different material IDs." << std::endl;
         }
-        
-         else {
-            // create material from builder materialls
-            if (material_id >= 0 && material_id < builder.materialList.size()) {
-                const auto& builderMaterial = builder.materialList[material_id];
 
-                if (builderMaterial.diffuseTexture.bdata) {
-                    
-                    auto textureData = builderMaterial.diffuseTexture;
-                    deffuseTex = createTextureFromModel(memoryManager, textureData);
+                
+        if (builderMaterial.diffuseTexture.bdata && material_id >= 0 && material_id < builder.materialList.size()){
+            auto textureData = builderMaterial.diffuseTexture;
+            deffuseTex = createTextureFromModel(memoryManager, textureData); 
 
-                } else {
-                    // use diffuse color as solid color texture
-                    auto color = vertex0.color;
-                    deffuseTex = createTexture(memoryManager, Type::SOLID, color);
-                }
-            }
-        }
+        } else if(tex){
+
+            deffuseTex = tex;
+
+        } else {
+            auto color = vertex0.color;
+            deffuseTex = createTexture(memoryManager, Type::SOLID, color);
+
+        } 
 
         auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, deffuseTex);
         new (&triangles[j]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
@@ -1126,8 +1123,8 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
 
 void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
-    cam.vfov = 60.0f;
-    cam.lookfrom = glm::vec3( -2.0f, 3.0f,  5.0f);
+    cam.vfov = 70.0f;
+    cam.lookfrom = glm::vec3( -0.0f, 3.0f,  5.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.0f;
@@ -1137,27 +1134,53 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
    
     
     std::vector<hittable> h_hittables_list;
-    
+    glm::vec3 offset, scale;
+    hittable* obj1, bvh1;
     Builder builder;
+    texture* tex;
+
+
     createModelFromFile(builder, "images/woodFloor.obj");
-    // createModelFromFile(builder, "images/woodedcube.obj");
-    // createModelFromFile(builder, "images/monkey.obj");
+    offset = glm::vec3(0.0, 0.0, 0.0);
+    scale = glm::vec3(7.0);
+    obj1 = createModel(memoryManager, builder, offset, scale);
+    bvh1 = createBVH(memoryManager, obj1);
+    h_hittables_list.push_back(bvh1);
     
-    auto offset = glm::vec3(0.0, 0.0, 0.0);
-    auto scale = glm::vec3(7.0);
-    // auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/WoodFloor043_4K-JPG/WoodFloor043.png");
-    auto obj1 = createModel(memoryManager, builder, offset, scale);
-    auto bvh1 = createBVH(memoryManager, obj1);
+    createModelFromFile(builder, "images/brickCube.obj");
+    offset = glm::vec3(-3.0, 1.0, -2.0);
+    scale = glm::vec3(1.0);
+    obj1 = createModel(memoryManager, builder, offset, scale);
+    bvh1 = createBVH(memoryManager, obj1);
     h_hittables_list.push_back(bvh1);
 
-    // ground
-    // tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
-    // auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
-    // auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
-    // h_hittables_list.push_back(createBVH(memoryManager, &hittable_obj));
+
+    createModelFromFile(builder, "images/cube.obj");
+    offset = glm::vec3(4.0, 1.0, 5.0);
+    scale = glm::vec3(0.5);
+    // auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/WoodFloor043_4K-JPG/WoodFloor043_4K-JPG_Color.jpg");
+    obj1 = createModel(memoryManager, builder, offset, scale);
+    bvh1 = createBVH(memoryManager, obj1);
+    h_hittables_list.push_back(bvh1);
+
+    createModelFromFile(builder, "images/monkey.obj");
+    offset = glm::vec3(4.0, 3.0, 5.0);
+    scale = glm::vec3(0.5);
+    tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/Metal024_4K-JPG/Metal024_4K-JPG_Color.jpg");
+    // tex = createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 2.0, .2));
+    obj1 = createModel(memoryManager, builder, offset, scale, tex);
+    bvh1 = createBVH(memoryManager, obj1);
+    h_hittables_list.push_back(bvh1);
+
+
+    // // ground
+    tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
+    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
+    h_hittables_list.push_back(createBVH(memoryManager, &hittable_obj));
 
     auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
-    auto hittable_obj = hittable::make_sphere(glm::vec3(2.5f, 1.0f, 0.0f), 1.0f, silver);
+    hittable_obj = hittable::make_sphere(glm::vec3(1.0f, 1.0f, 0.0f), 1.0f, silver);
     h_hittables_list.push_back(createBVH(memoryManager, &hittable_obj));
 
 

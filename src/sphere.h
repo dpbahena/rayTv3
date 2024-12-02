@@ -1173,14 +1173,11 @@ static void createModelFromFile(Builder& builder, const std::string &filepath, c
             material.name = mat.name;
             material.diffuseColor = glm::vec3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
             material.diffuseTexName = mat.diffuse_texname.c_str();              // map_Kd
-            printf("Color: %s\n", material.diffuseTexName);
             material.roughnessTexName = mat.specular_highlight_texname.c_str(); // map_Ns
-            printf("rough: %s\n", material.roughnessTexName);
             material.normalTexName = mat.bump_texname.c_str();                  // map_Bump
-            printf("normal: %s\n", material.normalTexName);
-
+            
             // load textures if filenames are provided
-            if (material.diffuseTexName){
+            if (material.diffuseTexName && *material.diffuseTexName != '\0'){
                 auto image = rtw_image(material.diffuseTexName);
                 material.diffuseTexture.bdata = image.imageData();
                 material.diffuseTexture.width = image.width();
@@ -1190,7 +1187,7 @@ static void createModelFromFile(Builder& builder, const std::string &filepath, c
 
                 // material.diffuseTexture = loadTexture(material.diffuseTexName);
             }
-            if (material.roughnessTexName){
+            if (material.roughnessTexName && *material.roughnessTexName != '\0'){
                 auto image = rtw_image(material.diffuseTexName);
                 material.roughnessTexture.bdata = image.imageData();
                 material.roughnessTexture.width = image.width();
@@ -1200,7 +1197,7 @@ static void createModelFromFile(Builder& builder, const std::string &filepath, c
 
                 // material.roughnessTexture = loadTexture(material.roughnessTexName);
             }
-            if (material.normalTexName){
+            if (material.normalTexName && *material.normalTexName != '\0'){
                 auto image = rtw_image(material.diffuseTexName);
                 material.normalTexture.bdata = image.imageData();
                 material.normalTexture.width = image.width();

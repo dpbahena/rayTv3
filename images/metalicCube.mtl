@@ -1,0 +1,12 @@
+# Blender 4.3.0 MTL File: 'metalicCube.blend'
+# www.blender.org
+
+newmtl Material
+Ns 1000.000000
+Ka 0.809091 0.809091 0.809091
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 3
+map_Kd /home/dario/learning/rayTv3/texture/Metal024_4K-JPG/Metal024_4K-JPG_Color.jpg

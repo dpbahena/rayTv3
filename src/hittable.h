@@ -47,11 +47,11 @@ struct Vertex {
 // };
 
 struct Texture {
-    unsigned char* bdata;
-    int width;
-    int height;
-    int scanline;
-    int pixel_size;
+    unsigned char* bdata{};
+    int width{};
+    int height{};
+    int scanline{};
+    int pixel_size{};
 };
 
 struct Material {
