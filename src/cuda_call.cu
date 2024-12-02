@@ -1058,7 +1058,8 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     
     Builder builder;
     // createModelFromFile(builder, "images/cube.obj");
-    createModelFromFile(builder, "images/monkey.obj");
+    // createModelFromFile(builder, "images/monkey.obj");
+    createModelFromFile(builder, "images/woodedcube.obj");
     
     auto offset = glm::vec3(0.0, 1.0, 0.0);
     auto scale = glm::vec3(.5);
