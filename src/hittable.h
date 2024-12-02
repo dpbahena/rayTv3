@@ -6,7 +6,12 @@
 #include "aabb.h"
 #include <curand_kernel.h>
 #include <thrust/sort.h>
+#include <rtw_stb_image.h>
 
+typedef struct  {
+        uint32_t  width;
+        uint32_t height;
+} Extent2D;
 
 struct Vertex0 {
     glm::vec3 point;
@@ -34,16 +39,61 @@ struct Vertex {
     }
 };
 
+// struct Texture {
+//     std::vector<uint32_t> data;
+//     int width;
+//     int height;
+
+// };
+
+struct Texture {
+    unsigned char* bdata;
+    int width;
+    int height;
+    int scanline;
+    int pixel_size;
+};
+
+struct Material {
+    std::string name;
+    glm::vec3 diffuseColor;
+    // std::string diffuseTexName;   // map_Kd
+    // std::string roughnessTexName; // map_Ns (used for roughness in your case)
+    // std::string normalTexName;    // map_Bump
+    const char* diffuseTexName;   // map_Kd
+    const char* roughnessTexName; // map_Ns (used for roughness in your case)
+    const char* normalTexName;    // map_Bump
+    
+    
+    // Add handles or IDs for loaded textures if needed
+    Texture diffuseTexture;
+    Texture roughnessTexture;
+    Texture normalTexture;
+    // unsigned char* r_diffuseTexture;
+    // unsigned char* r_roughnessTexture;
+    // unsigned char* r_normalTexture;
+
+    // rtw_image r_diffuseTexture;
+    // rtw_image r_roughnessTexture;
+    // rtw_image r_normalTexture;
+};
 
 
-struct Builder {
-    std::vector<Vertex> vertices{};
-    std::vector<uint32_t> indices{};
-    std::vector<uint32_t> textureBuffer;
-    // Extent2D extent;
+class Builder {
+    public:
+        std::vector<Vertex> vertices{};
+        std::vector<uint32_t> indices{};
+        std::vector<uint32_t> textureBuffer;
+        std::vector<Material> materialList; // list of Materials
+        glm::uvec2 extent;
+        // Extent2D extent;
 
-    void loadModel(const std::string &filepath);
-    void loadTexture(const std::string &filepath);
+        void loadModel(const std::string &filepath);
+        Texture loadTexture(const std::string &filepath);
+
+    private:
+        std::string resolvePath(const std::string& baseDir, const std::string& relativePath);
+    
 };
 
 // from https:://stackoverflow.com/a/57595105

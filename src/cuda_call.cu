@@ -95,6 +95,18 @@ texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 
     return d_texture;
 }
 
+texture* createTextureFromModel(HybridMemoryManager& memoryManager, Texture& tex) {
+
+    texture* d_texture = memoryManager.allocateDevice<texture>();
+    int size = tex.width * tex.height *  tex.pixel_size;
+    unsigned char* d_bdata = memoryManager.allocateDevice<unsigned char>(size);
+    memoryManager.copyToDevice(d_bdata, tex.bdata, size);
+    auto h_image = texture::image_texture(d_bdata, tex.width, tex.height, tex.scanline, tex.pixel_size);
+    memoryManager.copyToDevice(d_texture, &h_image);
+
+    return d_texture;
+}
+
 material* createMaterial(HybridMemoryManager& memoryManager, Type type, texture* tex, glm::vec3 color = glm::vec3(0.0f), float fuzz = 0.0f, float refraction_index = 0.0f){
     material* d_mat = memoryManager.allocateDevice<material>();
     
@@ -213,7 +225,43 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder0& build
  * @param b 
  * @param mat 
  */
-inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builder, glm::vec3 offset, glm::vec3 scale) {
+// inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builder, glm::vec3 offset, glm::vec3 scale=glm::vec3(1.0f), texture* tex=nullptr) {
+//     // Allocate raw memory for 6 hittable objects
+//     int number_of_triangles = builder.indices.size() / 3;
+//     hittable* triangles = static_cast<hittable*>(::operator new[](sizeof(hittable) * number_of_triangles)); //  1 object for now
+//     memoryManager.host_allocations.push_back(triangles); // Track allocation for cleanup    
+//     AaBb bbox;
+
+
+//     for (auto& v : builder.vertices){
+//         v.position += offset;
+//         v.position *= scale;
+//     }
+//     int j = 0;
+//     for (int i = 0; i < builder.indices.size() ; i+=3, j++){
+//         int q = builder.indices[i + 0];
+//         int u = builder.indices[i + 1];
+//         int v = builder.indices[i + 2];
+//         auto Q = glm::vec3(builder.vertices[q].position);
+//         auto U = glm::vec3(builder.vertices[u].position);
+//         auto V = glm::vec3(builder.vertices[v].position);
+//         auto QU = U - Q;
+//         auto QV = V - Q;
+//         auto color = builder.vertices[q].color;
+//         if(!tex){
+//             tex = createTexture(memoryManager, Type::SOLID, color);
+//         }
+//         auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
+//         new (&triangles[j]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
+//         bbox = AaBb(bbox, triangles[j].triangle.bounding_box());
+//     }
+
+//     auto model = memoryManager.allocateHost<hittable>(hittable::make_hittableList(triangles, number_of_triangles)); 
+//     model->hittableList.bbox = bbox;
+//     return model;
+// }
+
+inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builder, glm::vec3 offset, glm::vec3 scale=glm::vec3(1.0f), texture* tex=nullptr) {
     // Allocate raw memory for 6 hittable objects
     int number_of_triangles = builder.indices.size() / 3;
     hittable* triangles = static_cast<hittable*>(::operator new[](sizeof(hittable) * number_of_triangles)); //  1 object for now
@@ -236,7 +284,11 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
         auto QU = U - Q;
         auto QV = V - Q;
         auto color = builder.vertices[q].color;
-        auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, color));
+        if(!tex){
+            auto modeltex = builder.materialList[0].diffuseTexture;
+            tex = createTextureFromModel(memoryManager, modeltex);
+        }
+        auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
         new (&triangles[j]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
         bbox = AaBb(bbox, triangles[j].triangle.bounding_box());
     }
@@ -1044,8 +1096,8 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
 
 void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
-    cam.vfov = 20.0f;
-    cam.lookfrom = glm::vec3( 4.0f, 3.0f,  5.0f);
+    cam.vfov = 60.0f;
+    cam.lookfrom = glm::vec3( -2.0f, 3.0f,  5.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.6f;
@@ -1057,24 +1109,25 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     std::vector<hittable> h_hittables_list;
     
     Builder builder;
-    // createModelFromFile(builder, "images/cube.obj");
-    createModelFromFile(builder, "images/monkey.obj");
+    createModelFromFile(builder, "images/woodFloor.obj");
+    // createModelFromFile(builder, "images/monkey.obj");
     
-    auto offset = glm::vec3(0.0, 1.0, 0.0);
-    auto scale = glm::vec3(.5);
+    auto offset = glm::vec3(0.0, 0.0, 0.0);
+    auto scale = glm::vec3(2.0);
+    // auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/WoodFloor043_4K-JPG/WoodFloor043.png");
     auto obj1 = createModel(memoryManager, builder, offset, scale);
     auto bvh1 = createBVH(memoryManager, obj1);
     h_hittables_list.push_back(bvh1);
 
     // ground
-    auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
-    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
-    h_hittables_list.push_back(hittable_obj);
+    // tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
+    // auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
+    // auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
+    // h_hittables_list.push_back(createBVH(memoryManager, &hittable_obj));
 
     auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
-    hittable_obj = hittable::make_sphere(glm::vec3(2.5f, 1.0f, 0.0f), 1.0f, silver);
-    h_hittables_list.push_back(hittable_obj);
+    auto hittable_obj = hittable::make_sphere(glm::vec3(2.5f, 1.0f, 0.0f), 1.0f, silver);
+    h_hittables_list.push_back(createBVH(memoryManager, &hittable_obj));
 
 
     

@@ -914,18 +914,240 @@ namespace std {
 static void createModelFromFile(Builder& builder, const std::string &filepath, const std::string& texturePath= "") {
     builder.loadModel(filepath);
     // builder.loadTexture(texturePath);
+    
 }
 
-void Builder::loadModel(const std::string &filepath) {
+// void Builder::loadModel(const std::string &filepath) {
+//         tinyobj::attrib_t attrib;
+//         std::vector<tinyobj::shape_t> shapes;
+//         std::vector<tinyobj::material_t> materials;
+//         std::string warn, err;
+
+//         // Extract base path for the mtl file
+//         std::string mtl_basepath = filepath.substr(0, filepath.find_last_of("/\\") + 1); // Include trailing slash
+
+//         if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filepath.c_str(), mtl_basepath.c_str())) {
+//             throw std::runtime_error("Failed to load OBJ file: " + warn + err);
+//         }
+
+//         if (!warn.empty()) {
+//             std::cout << "Warning: " << warn << std::endl;
+//         }
+//         if (!err.empty()) {
+//             std::cout << "Error: " << err << std::endl;
+//         }
+
+//         vertices.clear();
+//         indices.clear();
+        
+//         std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+//         for (const auto &shape : shapes) {
+//             size_t index_offset = 0;
+//             for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+//                 int fv = shape.mesh.num_face_vertices[f];
+//                 int material_id = shape.mesh.material_ids[f];
+
+//                 // std::cout << "Processing face " << f << " with material ID " << material_id << std::endl;
+
+//                 for (int v = 0; v < fv; v++) { // Change size_t to int
+//                     tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+//                     Vertex vertex{};
+//                     if (idx.vertex_index >= 0) {
+//                         vertex.position = {
+//                             attrib.vertices[3 * idx.vertex_index + 0],  
+//                             attrib.vertices[3 * idx.vertex_index + 1],
+//                             attrib.vertices[3 * idx.vertex_index + 2]
+//                         };
+//                         // std::cout << "Vertex position: (" 
+//                         //         << vertex.position.x << ", " 
+//                         //         << vertex.position.y << ", " 
+//                         //         << vertex.position.z << ")" << std::endl;
+//                     }
+
+//                     if (idx.normal_index >= 0) {
+//                         vertex.normal = {
+//                             attrib.normals[3 * idx.normal_index + 0],
+//                             attrib.normals[3 * idx.normal_index + 1],
+//                             attrib.normals[3 * idx.normal_index + 2]
+//                         };
+//                         // std::cout << "Vertex normal: ("
+//                         //         << vertex.normal.x << ", "
+//                         //         << vertex.normal.y << ", "
+//                         //         << vertex.normal.z << ")" << std::endl;
+//                     }
+//                     if (idx.texcoord_index >= 0) {
+//                         vertex.uv = {
+//                             attrib.texcoords[2 * idx.texcoord_index + 0],
+//                             attrib.texcoords[2 * idx.texcoord_index + 1],
+//                         };
+//                         // std::cout << "Vertex UV: ("
+//                         //         << vertex.uv.x << ", "
+//                         //         << vertex.uv.y << ")" << std::endl;
+//                     }
+
+//                     vertex.material_id = material_id; // Correctly assign material ID based on the face
+//                     // std::cout << "Assigned material ID: " << vertex.material_id << std::endl;
+
+//                     if (uniqueVertices.count(vertex) == 0) {
+//                         uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+//                         vertices.push_back(vertex);
+//                     }
+
+//                     indices.push_back(uniqueVertices[vertex]);
+//                 }
+//                 index_offset += fv;
+//             }
+//         }
+
+      
+//         // Debug: Print color values before assignment
+//         for (auto& vertex : vertices) {
+//             if (/* vertex.material_id >= 0 && */ static_cast<size_t>(vertex.material_id) < materials.size()) {
+//                 const auto &material = materials[vertex.material_id];
+//                 // std::cout << "Assigning color (" << material.diffuse[0] << ", " << material.diffuse[1] << ", " << material.diffuse[2] << ") to vertex at position (" << vertex.position.x << ", " << vertex.position.y << ", " << vertex.position.z << ")" << std::endl;
+//                 vertex.color = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+//                 // printf("Vertex color: {%f, %f, %f}\n", vertex.color.r, vertex.color.g, vertex.color.b);
+//             } else {
+//                 // Handle the case where material_id is out of bounds
+//                 vertex.color = glm::vec3(1.0f, 0.0f, 1.0f); // Default color (e.g., magenta) to indicate an error
+//             }
+//         }
+//     }
+
+// void Builder::loadModel(const std::string &filepath) {
+//         tinyobj::attrib_t attrib;
+//         std::vector<tinyobj::shape_t> shapes;
+//         std::vector<tinyobj::material_t> tinyMaterials;
+//         std::string warn, err;
+
+//         // Extract base path for the mtl file
+//         std::string mtl_basepath = filepath.substr(0, filepath.find_last_of("/\\") + 1); // Include trailing slash
+
+//         if (!tinyobj::LoadObj(&attrib, &shapes, &tinyMaterials, &warn, &err, filepath.c_str(), mtl_basepath.c_str())) {
+//             throw std::runtime_error("Failed to load OBJ file: " + warn + err);
+//         }
+
+//         if (!warn.empty()) {
+//             std::cout << "Warning: " << warn << std::endl;
+//         }
+//         if (!err.empty()) {
+//             std::cout << "Error: " << err << std::endl;
+//         }
+
+//         vertices.clear();
+//         indices.clear();
+//         materialList.clear();
+
+        
+
+//          // Mat to store materials to by their IDs 
+//         std::unordered_map<int, Material> materialMap;
+//         // Iterate over materials to extract texture filenames
+//         for (size_t i = 0; i < tinyMaterials.size(); i++){
+//             const auto &mat = tinyMaterials[i];
+//             Material material;
+//             material.name = mat.name;
+//             material.diffuseColor = glm::vec3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+//             material.diffuseTexName = mat.diffuse_texname;              // map_Kd
+//             material.roughnessTexName = mat.specular_highlight_texname; // map_Ns
+//             material.normalTexName = mat.bump_texname;                  // map_Bump
+
+//             // load textures if filenames are provided
+//             if (!material.diffuseTexName.empty()){
+//                 material.diffuseTexture = loadTexture(material.diffuseTexName);
+//             }
+//             if (!material.roughnessTexName.empty()){
+//                 material.roughnessTexture = loadTexture(material.roughnessTexName);
+//             }
+//             if (!material.normalTexName.empty()){
+//                 material.normalTexture = loadTexture(material.normalTexName);
+//             }
+
+//             materialMap[i] = material;
+//             materialList.push_back(material);
+
+//         }
+        
+//         std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+//         for (const auto &shape : shapes) {
+//             size_t index_offset = 0;
+//             for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+//                 int fv = shape.mesh.num_face_vertices[f];
+//                 int material_id = shape.mesh.material_ids[f];
+
+//                 // Loop over vertices in the face
+//                 for (int v = 0; v < fv; v++) { // Change size_t to int
+//                     tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+//                     Vertex vertex{};
+//                     if (idx.vertex_index >= 0) {
+//                         vertex.position = {
+//                             attrib.vertices[3 * idx.vertex_index + 0],  
+//                             attrib.vertices[3 * idx.vertex_index + 1],
+//                             attrib.vertices[3 * idx.vertex_index + 2]
+//                         };
+//                     }
+
+//                     // Normals
+//                     if (idx.normal_index >= 0) {
+//                         vertex.normal = {
+//                             attrib.normals[3 * idx.normal_index + 0],
+//                             attrib.normals[3 * idx.normal_index + 1],
+//                             attrib.normals[3 * idx.normal_index + 2]
+//                         };
+//                     }
+
+//                     // Texture coordinates
+//                     if (idx.texcoord_index >= 0) {
+//                         vertex.uv = {
+//                             attrib.texcoords[2 * idx.texcoord_index + 0],
+//                             attrib.texcoords[2 * idx.texcoord_index + 1],
+//                         };
+//                         // std::cout << "Vertex UV: ("
+//                         //         << vertex.uv.x << ", "
+//                         //         << vertex.uv.y << ")" << std::endl;
+//                     }
+
+//                     vertex.material_id = material_id; // Correctly assign material ID based on the face
+//                     // std::cout << "Assigned material ID: " << vertex.material_id << std::endl;
+
+//                     if (uniqueVertices.count(vertex) == 0) {
+//                         uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+//                         vertices.push_back(vertex);
+//                     }
+
+//                     indices.push_back(uniqueVertices[vertex]);
+//                 }
+//                 index_offset += fv;
+//             }
+//         }
+
+//        //* Assign colors and materials to vertices
+
+//         for (auto& vertex : vertices) {
+//             int material_id = vertex.material_id;
+//             if (materialMap.find(material_id) != materialMap.end()) {
+//                 const auto& material = materialMap[material_id];
+//                 vertex.color = material.diffuseColor;        
+                
+//             } else {
+//                 // Handle the case where material_id is out of bounds
+//                 vertex.color = glm::vec3(1.0f, 0.0f, 1.0f); // Default color (e.g., magenta) to indicate an error
+//             }
+//         }
+//     }
+
+    void Builder::loadModel(const std::string &filepath) {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
+        std::vector<tinyobj::material_t> tinyMaterials;
         std::string warn, err;
 
         // Extract base path for the mtl file
         std::string mtl_basepath = filepath.substr(0, filepath.find_last_of("/\\") + 1); // Include trailing slash
 
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filepath.c_str(), mtl_basepath.c_str())) {
+        if (!tinyobj::LoadObj(&attrib, &shapes, &tinyMaterials, &warn, &err, filepath.c_str(), mtl_basepath.c_str())) {
             throw std::runtime_error("Failed to load OBJ file: " + warn + err);
         }
 
@@ -938,6 +1160,57 @@ void Builder::loadModel(const std::string &filepath) {
 
         vertices.clear();
         indices.clear();
+        materialList.clear();
+
+        
+
+         // Mat to store materials to by their IDs 
+        std::unordered_map<int, Material> materialMap;
+        // Iterate over materials to extract texture filenames
+        for (size_t i = 0; i < tinyMaterials.size(); i++){
+            const auto &mat = tinyMaterials[i];
+            Material material;
+            material.name = mat.name;
+            material.diffuseColor = glm::vec3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+            material.diffuseTexName = mat.diffuse_texname.c_str();              // map_Kd
+            material.roughnessTexName = mat.specular_highlight_texname.c_str(); // map_Ns
+            material.normalTexName = mat.bump_texname.c_str();                  // map_Bump
+
+            // load textures if filenames are provided
+            if (!material.diffuseTexName){
+                auto image = rtw_image(material.diffuseTexName);
+                material.diffuseTexture.bdata = image.imageData();
+                material.diffuseTexture.width = image.width();
+                material.diffuseTexture.height = image.height();
+                material.diffuseTexture.scanline = image.scanLineSize();
+                material.diffuseTexture.pixel_size = image.pixelSize();
+
+                // material.diffuseTexture = loadTexture(material.diffuseTexName);
+            }
+            if (!material.roughnessTexName){
+                auto image = rtw_image(material.diffuseTexName);
+                material.roughnessTexture.bdata = image.imageData();
+                material.roughnessTexture.width = image.width();
+                material.roughnessTexture.height = image.height();
+                material.roughnessTexture.scanline = image.scanLineSize();
+                material.roughnessTexture.pixel_size = image.pixelSize();
+
+                // material.roughnessTexture = loadTexture(material.roughnessTexName);
+            }
+            if (!material.normalTexName){
+                auto image = rtw_image(material.diffuseTexName);
+                material.normalTexture.bdata = image.imageData();
+                material.normalTexture.width = image.width();
+                material.normalTexture.height = image.height();
+                material.normalTexture.scanline = image.scanLineSize();
+                material.normalTexture.pixel_size = image.pixelSize();
+                // material.normalTexture = loadTexture(material.normalTexName);
+            }
+
+            materialMap[i] = material;
+            materialList.push_back(material);
+
+        }
         
         std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
@@ -947,8 +1220,7 @@ void Builder::loadModel(const std::string &filepath) {
                 int fv = shape.mesh.num_face_vertices[f];
                 int material_id = shape.mesh.material_ids[f];
 
-                // std::cout << "Processing face " << f << " with material ID " << material_id << std::endl;
-
+                // Loop over vertices in the face
                 for (int v = 0; v < fv; v++) { // Change size_t to int
                     tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
                     Vertex vertex{};
@@ -958,23 +1230,18 @@ void Builder::loadModel(const std::string &filepath) {
                             attrib.vertices[3 * idx.vertex_index + 1],
                             attrib.vertices[3 * idx.vertex_index + 2]
                         };
-                        // std::cout << "Vertex position: (" 
-                        //         << vertex.position.x << ", " 
-                        //         << vertex.position.y << ", " 
-                        //         << vertex.position.z << ")" << std::endl;
                     }
 
+                    // Normals
                     if (idx.normal_index >= 0) {
                         vertex.normal = {
                             attrib.normals[3 * idx.normal_index + 0],
                             attrib.normals[3 * idx.normal_index + 1],
                             attrib.normals[3 * idx.normal_index + 2]
                         };
-                        // std::cout << "Vertex normal: ("
-                        //         << vertex.normal.x << ", "
-                        //         << vertex.normal.y << ", "
-                        //         << vertex.normal.z << ")" << std::endl;
                     }
+
+                    // Texture coordinates
                     if (idx.texcoord_index >= 0) {
                         vertex.uv = {
                             attrib.texcoords[2 * idx.texcoord_index + 0],
@@ -999,17 +1266,106 @@ void Builder::loadModel(const std::string &filepath) {
             }
         }
 
-      
-        // Debug: Print color values before assignment
+       //* Assign colors and materials to vertices
+
         for (auto& vertex : vertices) {
-            if (vertex.material_id >= 0 && static_cast<size_t>(vertex.material_id) < materials.size()) {
-                const auto &material = materials[vertex.material_id];
-                // std::cout << "Assigning color (" << material.diffuse[0] << ", " << material.diffuse[1] << ", " << material.diffuse[2] << ") to vertex at position (" << vertex.position.x << ", " << vertex.position.y << ", " << vertex.position.z << ")" << std::endl;
-                vertex.color = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
-                // printf("Vertex color: {%f, %f, %f}\n", vertex.color.r, vertex.color.g, vertex.color.b);
+            int material_id = vertex.material_id;
+            if (materialMap.find(material_id) != materialMap.end()) {
+                const auto& material = materialMap[material_id];
+                vertex.color = material.diffuseColor;        
+                
             } else {
                 // Handle the case where material_id is out of bounds
                 vertex.color = glm::vec3(1.0f, 0.0f, 1.0f); // Default color (e.g., magenta) to indicate an error
             }
         }
     }
+
+
+    // Texture Builder::loadTexture(const std::string &filepath) {
+    //     int texWidth, texHeight, texChannels;
+    //     stbi_uc* dataImage = stbi_load(filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    //     size_t imageSize = texWidth * texHeight;
+    //     if (!dataImage){
+    //         std::cerr << "Error Loading Image: " << stbi_failure_reason() << std::endl;
+    //         return Texture{};
+    //     }
+
+    //     Texture texture;
+    //     texture.width = texWidth;
+    //     texture.height = texHeight;
+    //     texture.data.reserve(imageSize);
+    //     // textureBuffer.clear();
+    //     // extent.width = texWidth;
+    //     // extent.height = texHeight;
+
+    //     // textureBuffer.reserve(imageSize);
+        
+
+
+
+    //     for (size_t i = 0; i < imageSize; ++i){
+    //         unsigned char r = dataImage[i * 4 + 0];
+    //         unsigned char g = dataImage[i * 4 + 1];
+    //         unsigned char b = dataImage[i * 4 + 2];
+    //         unsigned char a = dataImage[i * 4 + 3];
+
+    //         uint32_t pixel = (a << 24) | (r << 16) | (g << 8) | b;  //ARGB8888 format
+    //         // uint32_t pixel = (r << 24) | (g << 16) | (b << 8) | a;    // RGBA8888 format
+
+    //         texture.data.push_back(pixel);
+    //     }
+    //     stbi_image_free(dataImage); 
+    //     return texture;
+    // }
+
+
+    // Function to resolve relative paths
+    std::string Builder::resolvePath(const std::string& baseDir, const std::string& relativePath){
+        if (relativePath.empty()) return "";
+        if (relativePath[0] == '/' || relativePath[1]== ':') {
+            // Absolute path
+            return relativePath;
+        } else {
+            // relative path
+            return baseDir + "/" + relativePath;
+        }
+    }
+
+
+
+
+
+    // void Builder::loadTexture(const std::string &filepath) {
+    //     int texWidth, texHeight, texChannels;
+    //     stbi_uc* dataImage = stbi_load(filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    //     size_t imageSize = texWidth * texHeight;
+    //     if (!dataImage){
+    //         std::cerr << "Error Loading Image: " << stbi_failure_reason() << std::endl;
+    //         return;
+    //     }
+
+    //     textureBuffer.clear();
+    //     extent.width = texWidth;
+    //     extent.height = texHeight;
+
+    //     textureBuffer.reserve(imageSize);
+        
+
+
+
+    //     for (size_t i = 0; i < imageSize; ++i){
+    //         unsigned char r = dataImage[i * 4 + 0];
+    //         unsigned char g = dataImage[i * 4 + 1];
+    //         unsigned char b = dataImage[i * 4 + 2];
+    //         unsigned char a = dataImage[i * 4 + 3];
+
+    //         uint32_t pixel = (a << 24) | (r << 16) | (g << 8) | b;  //ARGB8888 format
+    //         // uint32_t pixel = (r << 24) | (g << 16) | (b << 8) | a;    // RGBA8888 format
+
+    //         textureBuffer.push_back(pixel);
+    //     }
+    //     stbi_image_free(dataImage); 
+    // }
+
+
