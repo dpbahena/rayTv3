@@ -186,6 +186,8 @@ struct triangle_data {
     glm::vec3 u, v, w;
     glm::vec3 normal;
     float D;
+
+    glm::vec2 uv0, uv1, uv2;  // uv coordinates
     
     material* mat;
     AaBb bbox;

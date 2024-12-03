@@ -517,9 +517,19 @@ bool triangle_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     //* Determine if the hit point lies within the planar shape using its plane coordinates
     auto intersection = r.at(t);
     glm::vec3 planar_hitpt_vector = intersection - Q;
-    auto alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v));
-    auto beta = glm::dot(w, glm::cross(u, planar_hitpt_vector));
+    
+    //* Compute barycentric coordinates -------------------------------------------------> new
+    denom = glm::dot(w, glm::cross(u, v));
+    float alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v)) / denom;
+    float beta  = glm::dot(w, glm::cross(u, planar_hitpt_vector)) / denom;
+    float gamma = 1.0f - alpha - beta;
+    // auto alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v));
+    // auto beta = glm::dot(w, glm::cross(u, planar_hitpt_vector));
     if (!is_interior(alpha, beta, rec)) return false;
+
+    // Set UV coordinates in hit_record;
+    rec.u = alpha * uv0.x + beta * uv1.x + gamma * uv2.x;
+    rec.v = alpha * uv0.y + beta * uv1.y + gamma * uv2.y;
   
     //* Ray hits the 2D shape, set the rest of the hit record and return true
     rec.t = t;

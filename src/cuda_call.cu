@@ -317,6 +317,10 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
 
         auto mat = createMaterial(memoryManager, Type::LAMBERTIAN, deffuseTex);
         new (&triangles[j]) hittable(hittable::make_triangle(Q, QU, QV, mat)); 
+        triangles[j].triangle.uv0 = vertex0.uv;
+        triangles[j].triangle.uv1 = vertex1.uv;
+        triangles[j].triangle.uv2 = vertex2.uv;
+
         bbox = AaBb(bbox, triangles[j].triangle.bounding_box());
     }
 
