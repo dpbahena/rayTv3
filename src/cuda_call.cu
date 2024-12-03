@@ -1124,7 +1124,7 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
 void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 70.0f;
-    cam.lookfrom = glm::vec3( -0.0f, 3.0f,  5.0f);
+    cam.lookfrom = glm::vec3( -2.0f, 3.0f,  5.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.0f;
