@@ -507,7 +507,6 @@ void quad_data::set_boundig_box() {
 __device__ __host__
 bool triangle_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     auto denom = glm::dot(normal, r.direction);
-
     //* No hit if the ray is parallel to the plane
     if (fabsf(denom) < 1e-8 ) return false;
     //* Return false if th ehit point parameter t is outside the ray interval
@@ -515,27 +514,65 @@ bool triangle_data::hit(const ray& r, interval ray_t, hit_record& rec)  const {
     if (!ray_t.contains(t)) return false;
 
     //* Determine if the hit point lies within the planar shape using its plane coordinates
-    auto intersection = r.at(t);
-    glm::vec3 planar_hitpt_vector = intersection - Q;
-    
-    //* Compute barycentric coordinates -------------------------------------------------> new
-    denom = glm::dot(w, glm::cross(u, v));
-    float alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v)) / denom;
-    float beta  = glm::dot(w, glm::cross(u, planar_hitpt_vector)) / denom;
-    float gamma = 1.0f - alpha - beta;
-    // auto alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v));
-    // auto beta = glm::dot(w, glm::cross(u, planar_hitpt_vector));
-    if (!is_interior(alpha, beta, rec)) return false;
+    // auto intersection = r.at(t);
 
-    // Set UV coordinates in hit_record;
-    rec.u = alpha * uv0.x + beta * uv1.x + gamma * uv2.x;
-    rec.v = alpha * uv0.y + beta * uv1.y + gamma * uv2.y;
+    // glm::vec3 planar_hitpt_vector = intersection - Q;
+    
+    // //* Compute barycentric coordinates -------------------------------------------------> new
+    // auto denominator = glm::dot(w, glm::cross(u, v));
+    // float alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v)) / denominator;
+    // float beta  = glm::dot(w, glm::cross(u, planar_hitpt_vector)) / denominator;
+    // float gamma = 1.0f - alpha - beta;
+    // // auto alpha = glm::dot(w, glm::cross(planar_hitpt_vector, v));
+    // // auto beta = glm::dot(w, glm::cross(u, planar_hitpt_vector));
+    // if (!is_interior(alpha, beta, rec)) return false;
+
+    // // Set UV coordinates in hit_record;
+    // rec.u = alpha * uv0.x + beta * uv1.x + gamma * uv2.x;
+    // rec.v = alpha * uv0.y + beta * uv1.y + gamma * uv2.y;
   
-    //* Ray hits the 2D shape, set the rest of the hit record and return true
+    // //* Ray hits the 2D shape, set the rest of the hit record and return true
+    // rec.t = t;
+    // rec.p = intersection;
+    // rec.mat = mat;
+    // rec.set_face_normal(r, normal);
+
+    glm::vec3 P = r.at(t);
+
+    // Compute vectors
+    glm::vec3 v0 = u;       // Edge from vertex0 to vertex1
+    glm::vec3 v1 = v;       // Edge from vertex0 to vertex2
+    glm::vec3 v2 = P - Q;   // Vector from vertex0 to intersection point
+
+    // Compute dot products
+    float d00 = glm::dot(v0, v0);
+    float d01 = glm::dot(v0, v1);
+    float d11 = glm::dot(v1, v1);
+    float d20 = glm::dot(v2, v0);
+    float d21 = glm::dot(v2, v1);
+
+    // Compute denominator
+    float denom_bary = d00 * d11 - d01 * d01;
+    if (fabsf(denom_bary) < 1e-8) return false;
+
+    // Compute barycentric coordinates
+    float v_coord = (d11 * d20 - d01 * d21) / denom_bary;
+    float w_coord = (d00 * d21 - d01 * d20) / denom_bary;
+    float u_coord = 1.0f - v_coord - w_coord;
+
+    // Check if point is inside triangle
+    if (u_coord < 0 || v_coord < 0 || w_coord < 0) return false;
+
+    // Set hit record
     rec.t = t;
-    rec.p = intersection;
+    rec.p = P;
     rec.mat = mat;
     rec.set_face_normal(r, normal);
+
+    // Interpolate UV coordinates
+    rec.u = u_coord * uv0.x + v_coord * uv1.x + w_coord * uv2.x;
+    rec.v = u_coord * uv0.y + v_coord * uv1.y + w_coord * uv2.y;
+
 
     return true;
 }

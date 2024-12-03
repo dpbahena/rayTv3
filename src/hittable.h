@@ -212,7 +212,6 @@ struct hittableList_data {
     AaBb bbox;
     __device__ __host__
     bool hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const;
-    bool ah();
     __device__ __host__
     AaBb bounding_box() const {return bbox;}
 };
