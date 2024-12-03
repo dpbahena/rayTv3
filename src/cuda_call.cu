@@ -1129,8 +1129,8 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
 
 void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
-    cam.vfov = 50.0f;
-    cam.lookfrom = glm::vec3( 0.0f, 3.0f,  9.0f);
+    cam.vfov = 90.0f;
+    cam.lookfrom = glm::vec3( 0.0f, 3.0f,  -10.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.1f;
@@ -1196,7 +1196,20 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     hittable_obj = hittable::make_sphere(glm::vec3(1.0f, 1.0f, 0.0f), 1.0f, silver);
     h_hittables_list.push_back(createBVH(memoryManager, &hittable_obj));
 
+    auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
+    hittable_obj = hittable::make_sphere(glm::vec3(-2.5f, 3.0, -2.0), 1.0, glass);
+    h_hittables_list.push_back(hittable_obj);
 
+    auto a = glm::vec3(0, 0, 0);
+    auto b = glm::vec3(8, 8, 8);
+    auto blue  = createTexture(memoryManager, Type::SOLID, glm::vec3(0.0, 0.0, 1.00));
+    auto blueMat = createMaterial(memoryManager, Type::METAL, blue);
+
+
+    auto conglomerate = createConglomerate(memoryManager, a, b, blueMat, 1000 );
+    // auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
+    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(0, 6, 0)));
+    h_hittables_list.push_back(*translated);
     
     size_t number_of_hittables = h_hittables_list.size();
 
