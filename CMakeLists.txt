@@ -42,6 +42,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=20012>
     $<$<COMPILE_LANGUAGE:CUDA>:-diag-suppress=550>
     $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=60>
+    # $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>
     # $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=65>
     # $<$<COMPILE_LANGUAGE:CUDA>:-rdc=true>
     # $<$<COMPILE_LANGUAGE:CUDA>:-G -g>

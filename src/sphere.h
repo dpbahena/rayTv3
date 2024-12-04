@@ -159,7 +159,7 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
 __global__
 void build_bvh_kernel(BVHNode* nodes, hittable* objects, size_t objects_size) {
     int index = 0;  // Tracks the next available index in the nodes array
-    const int MAX = 15;
+    const int MAX = 12;
     StackNode traversalStack[MAX];
     int top = -1;
 
@@ -288,6 +288,7 @@ void bvhNode_data::build_bvh() {
 }
 
 
+
 __device__ __host__
 bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber)  {
     
@@ -375,90 +376,156 @@ bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, con
     return hit_anything;
 }
 
-__device__ __host__
-bool hitBvhTraverse_stack(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber/* , int* stack */) {
-    // Use a small stack allocated in registers
-    int stack[14];
-    int stackPtr = -1;
 
-    // Start with the root node
-    int currentIndex = 0;
-    bool hit_anything = false;
-    hit_record temp_rec;
+// __device__ __host__
+// bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, 
+//                               const BVHNode* __restrict__ nodes, 
+//                               const hittable* __restrict__ objects, 
+//                               float randNumber) {
+//     const BVHNode* current = nodes;  // Start at the root node
+//     bool hit_anything = false;
+//     hit_record temp_rec;
 
-    while (true) {
-        const BVHNode* current = &nodes[currentIndex];
+//     while (current != nullptr) {
+//         bool bbox_hit = current->bbox.hit(r, ray_t);
+//         if (bbox_hit && current->is_leaf) {
+//             // Directly loop over the objects in the leaf node
+//             const hittable* start = objects + current->start;
+//             const hittable* end = objects + current->end;
 
-        if (current->bbox.hit(r, ray_t)) {
-            if (current->is_leaf) {
-                // Process leaf node
-                for (size_t i = current->start; i < current->end; ++i) {
-                    const hittable* obj = &objects[i];
-                    if (obj->type == Type::QUAD){
-                        if (obj->quad.hit(r, ray_t, temp_rec)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::TRI){
-                        if (obj->triangle.hit(r, ray_t, temp_rec)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::SPHERE){
-                        if (obj->sphere.hit(r, ray_t, temp_rec)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::ROTATE_Y){
-                        if (obj->rotateY.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::TRANSLATE){
-                        if (obj->translate.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::MEDIUM) {
-                        if (obj->constantMedium.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::LIST) {
-                        if (obj->hittableList.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::BVH) { // --------------------------------> added  see if no issues
-                        if (obj->bvhNode.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    }
+//             for (const hittable* obj = start; obj < end; ++obj) {
+//                 switch (obj->type) {
+//                     case Type::QUAD:
+//                         hit_anything |= obj->quad.hit(r, ray_t, temp_rec);
+//                         break;
+//                     case Type::TRI:
+//                         hit_anything |= obj->triangle.hit(r, ray_t, temp_rec);
+//                         break;
+//                     case Type::SPHERE:
+//                         hit_anything |= obj->sphere.hit(r, ray_t, temp_rec);
+//                         break;
+//                     case Type::ROTATE_Y:
+//                         hit_anything |= obj->rotateY.hit(r, ray_t, temp_rec, randNumber);
+//                         break;
+//                     case Type::TRANSLATE:
+//                         hit_anything |= obj->translate.hit(r, ray_t, temp_rec, randNumber);
+//                         break;
+//                     case Type::MEDIUM:
+//                         hit_anything |= obj->constantMedium.hit(r, ray_t, temp_rec, randNumber);
+//                         break;
+//                     case Type::LIST:
+//                         hit_anything |= obj->hittableList.hit(r, ray_t, temp_rec, randNumber);
+//                         break;
+//                     case Type::BVH:
+//                         hit_anything |= obj->bvhNode.hit(r, ray_t, temp_rec, randNumber);
+//                         break;
+//                 }
+//                 if (hit_anything) {
+//                     ray_t.max = temp_rec.t;
+//                     rec = temp_rec;
+//                 }
+//             }
+
+//             // Move to the next node using the rope index
+//             current = (current->rope_index != -1) ? nodes + current->rope_index : nullptr;
+
+//         } else if (bbox_hit) {
+//             // Move to the left child
+//             current = nodes + current->left_child_index;
+
+//         } else {
+//             // No intersection; follow the rope
+//             current = (current->rope_index != -1) ? nodes + current->rope_index : nullptr;
+//         }
+//     }
+//     return hit_anything;
+// }
+
+
+// __device__ __host__
+// bool hitBvhTraverse_stack(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber/* , int* stack */) {
+//     // Use a small stack allocated in registers
+//     int stack[14];
+//     int stackPtr = -1;
+
+//     // Start with the root node
+//     int currentIndex = 0;
+//     bool hit_anything = false;
+//     hit_record temp_rec;
+
+//     while (true) {
+//         const BVHNode* current = &nodes[currentIndex];
+
+//         if (current->bbox.hit(r, ray_t)) {
+//             if (current->is_leaf) {
+//                 // Process leaf node
+//                 for (size_t i = current->start; i < current->end; ++i) {
+//                     const hittable* obj = &objects[i];
+//                     if (obj->type == Type::QUAD){
+//                         if (obj->quad.hit(r, ray_t, temp_rec)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     } else if (obj->type == Type::TRI){
+//                         if (obj->triangle.hit(r, ray_t, temp_rec)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     } else if (obj->type == Type::SPHERE){
+//                         if (obj->sphere.hit(r, ray_t, temp_rec)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     } else if (obj->type == Type::ROTATE_Y){
+//                         if (obj->rotateY.hit(r, ray_t, temp_rec, randNumber)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     } else if (obj->type == Type::TRANSLATE){
+//                         if (obj->translate.hit(r, ray_t, temp_rec, randNumber)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     } else if (obj->type == Type::MEDIUM) {
+//                         if (obj->constantMedium.hit(r, ray_t, temp_rec, randNumber)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     } else if (obj->type == Type::LIST) {
+//                         if (obj->hittableList.hit(r, ray_t, temp_rec, randNumber)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     } else if (obj->type == Type::BVH) { // --------------------------------> added  see if no issues
+//                         if (obj->bvhNode.hit(r, ray_t, temp_rec, randNumber)) {
+//                             hit_anything = true;
+//                             ray_t.max = temp_rec.t;
+//                             rec = temp_rec;
+//                         }
+//                     }
                     
-                }
-                if (stackPtr < 0) break;
-                currentIndex = stack[stackPtr--];
-            } else {
-                // Push right child to stack and proceed to left child
-                stack[++stackPtr] = current->right_child_index;
-                currentIndex = current->left_child_index;
-            }
-        } else {
-            if (stackPtr < 0) break;
-            currentIndex = stack[stackPtr--];
-        }
-    }
-    return hit_anything;
-}
+//                 }
+//                 if (stackPtr < 0) break;
+//                 currentIndex = stack[stackPtr--];
+//             } else {
+//                 // Push right child to stack and proceed to left child
+//                 stack[++stackPtr] = current->right_child_index;
+//                 currentIndex = current->left_child_index;
+//             }
+//         } else {
+//             if (stackPtr < 0) break;
+//             currentIndex = stack[stackPtr--];
+//         }
+//     }
+//     return hit_anything;
+// }
 
 __device__ __host__
 bool bvhNode_data::hit(const ray& r, interval ray_t, hit_record& rec, float randNumber) const {
