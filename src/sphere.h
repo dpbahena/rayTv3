@@ -287,14 +287,66 @@ void bvhNode_data::build_bvh() {
     build_bvh_kernel<<<1, 1>>>(nodes, objects, objects_size);
 }
 
-
-
+typedef bool (*HitFunction)(const hittable*, const ray&, interval, hit_record&, float);
 __device__ __host__
+bool hitQuad(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->quad.hit(r, ray_t, rec);
+}
+__device__ __host__
+bool hitTri(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->triangle.hit(r, ray_t, rec);
+}
+__device__ __host__
+bool hitSphere(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->sphere.hit(r, ray_t, rec);
+}
+__device__ __host__
+bool hitRotate(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->rotateY.hit(r, ray_t, rec, randNumber);
+}
+__device__ __host__
+bool hitTranslate(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->translate.hit(r, ray_t, rec, randNumber);
+}
+__device__ __host__
+bool hitMedium(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->constantMedium.hit(r, ray_t, rec, randNumber);
+}
+__device__ __host__
+bool hitList(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->hittableList.hit(r, ray_t, rec, randNumber);
+}
+__device__ __host__
+bool hitBvh(const hittable* obj, const ray& r, interval ray_t, hit_record& rec, float randNumber){
+    return obj->bvhNode.hit(r, ray_t, rec, randNumber);
+}
+
+// Array of functions indexed by Type
+
+HitFunction hitFunctions_host[] = {
+    hitSphere, hitQuad, hitTri, hitList, hitBvh, hitTranslate, hitRotate, hitMedium
+};
+__device__ 
+HitFunction hitFunctions_device[] = {
+    hitSphere, hitQuad, hitTri, hitList, hitBvh, hitTranslate, hitRotate, hitMedium
+};
+
+// Wrapper to select the appropriate array
+__device__ __host__
+HitFunction* getHitFunctions() {
+#ifdef __CUDA_ARCH__
+    return hitFunctions_device;  // Device code
+#else
+    return hitFunctions_host;    // Host code
+#endif
+}
+
+__device__ __host__ __noinline__
 bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, const  BVHNode* __restrict__ nodes, const hittable* __restrict__ objects, float randNumber)  {
     
     const BVHNode* current = nodes;  // Start at the root node
     bool hit_anything = false;
-    hit_record temp_rec;
+    // hit_record temp_rec;
     
     while (current != nullptr) {
         if (current->bbox.hit(r, ray_t)) {
@@ -302,57 +354,62 @@ bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, con
                 // Loop over objects in the leaf node
                 for (size_t i = current->start; i < current->end; ++i) {
                     const hittable* obj = objects + i;
-                    
-                    if (obj->type == Type::QUAD){
-                        if (obj->quad.hit(r, ray_t, temp_rec)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    
-                    } else if (obj->type == Type::TRI){
-                        if (obj->triangle.hit(r, ray_t, temp_rec)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::SPHERE){
-                        if (obj->sphere.hit(r, ray_t, temp_rec)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::ROTATE_Y){
-                        if (obj->rotateY.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::TRANSLATE){
-                        if (obj->translate.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::MEDIUM) {
-                        if (obj->constantMedium.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::LIST) {
-                        if (obj->hittableList.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
-                    } else if (obj->type == Type::BVH) {  // --------------------------------> added  see if no issues
-                        if (obj->bvhNode.hit(r, ray_t, temp_rec, randNumber)) {
-                            hit_anything = true;
-                            ray_t.max = temp_rec.t;
-                            rec = temp_rec;
-                        }
+
+                    if (getHitFunctions()[(int)obj->type](obj, r, ray_t, rec, randNumber)) {
+                        hit_anything = true;
+                        ray_t.max = rec.t;
                     }
+                    
+                    // if (obj->type == Type::QUAD){
+                    //     if (obj->quad.hit(r, ray_t, temp_rec)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    
+                    // } else if (obj->type == Type::TRI){
+                    //     if (obj->triangle.hit(r, ray_t, temp_rec)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    // } else if (obj->type == Type::SPHERE){
+                    //     if (obj->sphere.hit(r, ray_t, temp_rec)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    // } else if (obj->type == Type::ROTATE_Y){
+                    //     if (obj->rotateY.hit(r, ray_t, temp_rec, randNumber)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    // } else if (obj->type == Type::TRANSLATE){
+                    //     if (obj->translate.hit(r, ray_t, temp_rec, randNumber)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    // } else if (obj->type == Type::MEDIUM) {
+                    //     if (obj->constantMedium.hit(r, ray_t, temp_rec, randNumber)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    // } else if (obj->type == Type::LIST) {
+                    //     if (obj->hittableList.hit(r, ray_t, temp_rec, randNumber)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    // } else if (obj->type == Type::BVH) {  // --------------------------------> added  see if no issues
+                    //     if (obj->bvhNode.hit(r, ray_t, temp_rec, randNumber)) {
+                    //         hit_anything = true;
+                    //         ray_t.max = temp_rec.t;
+                    //         rec = temp_rec;
+                    //     }
+                    // }
                 }
                 // Move to the next node via the rope
                 if (current->rope_index != -1/*  && current->rope_index != (current - nodes) */) {
