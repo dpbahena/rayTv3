@@ -345,6 +345,12 @@ bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, con
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;
                         }
+                    } else if (obj->type == Type::BVH) {  // --------------------------------> added  see if no issues
+                        if (obj->bvhNode.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
                     }
                 }
                 // Move to the next node via the rope
@@ -426,6 +432,12 @@ bool hitBvhTraverse_stack(const ray& r, interval ray_t, hit_record& rec, const  
                         }
                     } else if (obj->type == Type::LIST) {
                         if (obj->hittableList.hit(r, ray_t, temp_rec, randNumber)) {
+                            hit_anything = true;
+                            ray_t.max = temp_rec.t;
+                            rec = temp_rec;
+                        }
+                    } else if (obj->type == Type::BVH) { // --------------------------------> added  see if no issues
+                        if (obj->bvhNode.hit(r, ray_t, temp_rec, randNumber)) {
                             hit_anything = true;
                             ray_t.max = temp_rec.t;
                             rec = temp_rec;
@@ -605,13 +617,15 @@ bool translate_data::hit(const ray& r, interval ray_t, hit_record& rec, float ra
         hit_anything = object->sphere.hit(offset_r, ray_t, rec);
     } else if (object->type == Type::QUAD) {
         hit_anything = object->quad.hit(offset_r, ray_t, rec);
+    } else if (object->type == Type::TRI) {
+        hit_anything = object->triangle.hit(offset_r, ray_t, rec); 
     } else if (object->type == Type::ROTATE_Y) {
         hit_anything = object->rotateY.hit(offset_r, ray_t, rec, randNumber);
     } else if (object->type == Type::LIST) {
         hit_anything = object->hittableList.hit(offset_r, ray_t, rec, randNumber);
-    } else if (object->type == Type::TRANSLATE) {
-        hit_anything = object->translate.hit(offset_r, ray_t, rec, randNumber);
-    } 
+    } //else if (object->type == Type::TRANSLATE) {
+        // hit_anything = object->translate.hit(offset_r, ray_t, rec, randNumber);
+    // } 
     
     if (hit_anything) {
     
@@ -641,13 +655,17 @@ bool rotateY_data::hit(const ray& r, interval ray_t, hit_record& rec, float rand
         hit_anything = object->quad.hit(rotated_r, ray_t, rec);
     } else if (object->type == Type::SPHERE) {
         hit_anything = object->sphere.hit(rotated_r, ray_t, rec);
+    } else if (object->type == Type::TRI) {
+        hit_anything = object->triangle.hit(rotated_r, ray_t, rec); 
     } else if (object->type == Type::TRANSLATE) {
         hit_anything = object->translate.hit(rotated_r, ray_t, rec, randNumber);
     } else if (object->type == Type::LIST) {
         hit_anything = object->hittableList.hit(rotated_r, ray_t, rec, randNumber);
-    } else if (object->type == Type::ROTATE_Y) {
-        hit_anything = object->rotateY.hit(rotated_r, ray_t, rec, randNumber);
-    } 
+    } //else if (object->type == Type::BVH) {
+        //hit_anything = object->bvhNode.hit(rotated_r, ray_t, rec, randNumber);
+    //} else if (object->type == Type::ROTATE_Y) {
+      //  hit_anything = object->rotateY.hit(rotated_r, ray_t, rec, randNumber);
+   // } 
     if (hit_anything){
         //* Transform the intersection from object space back to world space
         rec.p       = glm::vec3(cos_theta * rec.p.x + sin_theta * rec.p.z, rec.p.y, -sin_theta * rec.p.x + cos_theta * rec.p.z);
@@ -874,76 +892,77 @@ static bool box_z_compare (const hittable& a, const hittable& b) {
 }
 
 
-/**
- * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
- * 
- * @param sides 
- * @param a 
- * @param b 
- * @param mat 
- */
-inline void box(std::vector<hittable>& sides, const glm::vec3& a, const glm::vec3& b, material* mat) {
+// /**
+//  * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
+//  * 
+//  * @param sides 
+//  * @param a 
+//  * @param b 
+//  * @param mat 
+//  */
+// inline void box(std::vector<hittable>& sides, const glm::vec3& a, const glm::vec3& b, material* mat) {
     
-    // construct the two opposite vertices with the minimum and maximum coordinates
-    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
-    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+//     // construct the two opposite vertices with the minimum and maximum coordinates
+//     auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+//     auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
 
-    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
-    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
-    auto dz = glm::vec3(0, 0, max.z - min.z);
+//     auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+//     auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+//     auto dz = glm::vec3(0, 0, max.z - min.z);
 
-    auto side1 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
-    auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
-    auto side3 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
-    auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
-    auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
-    auto side6 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+//     auto side1 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
+//     auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
+//     auto side3 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
+//     auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
+//     auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
+//     auto side6 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
 
-    sides.push_back(side1);
-    sides.push_back(side2);
-    sides.push_back(side3);
-    sides.push_back(side4);
-    sides.push_back(side5);
-    sides.push_back(side6);
+//     sides.push_back(side1);
+//     sides.push_back(side2);
+//     sides.push_back(side3);
+//     sides.push_back(side4);
+//     sides.push_back(side5);
+//     sides.push_back(side6);
     
-}
+// }
 
-/**
- * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
- * 
- * @param sides 
- * @param a 
- * @param b 
- * @param mat 
- */
-hittable* box( const glm::vec3& a, const glm::vec3& b, material* mat) {
+
+// /**
+//  * @brief Creates a vector of a 3D box (six sides) that contains the two opposites vertices a & b
+//  * 
+//  * @param sides 
+//  * @param a 
+//  * @param b 
+//  * @param mat 
+//  */
+// hittable* box( const glm::vec3& a, const glm::vec3& b, material* mat) {
     
-    auto sides = new hittable[6];
+//     auto sides = new hittable[6];
     
-    // construct the two opposite vertices with the minimum and maximum coordinates
-    auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
-    auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
+//     // construct the two opposite vertices with the minimum and maximum coordinates
+//     auto min = glm::vec3(fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z));
+//     auto max = glm::vec3(fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z));
 
-    auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
-    auto dy = glm::vec3(0, max.y - min.y, 0.0f);
-    auto dz = glm::vec3(0, 0, max.z - min.z);
+//     auto dx = glm::vec3(max.x - min.x, 0.0f, 0.0f);
+//     auto dy = glm::vec3(0, max.y - min.y, 0.0f);
+//     auto dz = glm::vec3(0, 0, max.z - min.z);
 
-    auto side0 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
-    auto side1 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
-    auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
-    auto side3 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
-    auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
-    auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
+//     auto side0 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, max.z),  dx,  dy, mat)); // front
+//     auto side1 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, max.z), -dz,  dy, mat)); // right
+//     auto side2 = hittable(hittable::make_quad(glm::vec3(max.x, min.y, min.z), -dx,  dy, mat)); // back
+//     auto side3 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dz,  dy, mat)); // left
+//     auto side4 = hittable(hittable::make_quad(glm::vec3(min.x, max.y, max.z),  dx, -dz, mat)); // top
+//     auto side5 = hittable(hittable::make_quad(glm::vec3(min.x, min.y, min.z),  dx,  dz, mat)); // bottom
 
-    sides[0] = side0;
-    sides[1] = side1;
-    sides[2] = side2;
-    sides[3] = side3;
-    sides[4] = side4;
-    sides[5] = side5;
+//     sides[0] = side0;
+//     sides[1] = side1;
+//     sides[2] = side2;
+//     sides[3] = side3;
+//     sides[4] = side4;
+//     sides[5] = side5;
 
-    return sides;
-}
+//     return sides;
+// }
 
 
 namespace std {

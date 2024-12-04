@@ -95,7 +95,7 @@ texture* createTexture(HybridMemoryManager& memoryManager, Type type, glm::vec3 
     return d_texture;
 }
 
-texture* createTextureFromModel(HybridMemoryManager& memoryManager, Texture& tex) {
+texture* getTextureFromModel(HybridMemoryManager& memoryManager, Texture& tex) {
 
     texture* d_texture = memoryManager.allocateDevice<texture>();
     int size = tex.width * tex.height *  tex.pixel_size;
@@ -305,13 +305,13 @@ inline hittable* createModel(HybridMemoryManager& memoryManager, Builder& builde
                 
         if (builderMaterial.diffuseTexture.bdata && material_id >= 0 && material_id < builder.materialList.size()){
             auto textureData = builderMaterial.diffuseTexture;
-            deffuseTex = createTextureFromModel(memoryManager, textureData); 
+            deffuseTex = getTextureFromModel(memoryManager, textureData); 
 
-        } else if(tex){
+        } else if(tex){ // provide texture not from model file
 
             deffuseTex = tex;
 
-        } else {
+        } else {    // just get the color of the model by vertex (if anything assigned to)
             auto color = vertex0.color;
             deffuseTex = createTexture(memoryManager, Type::SOLID, color);
 
@@ -1100,7 +1100,8 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
 
     auto offset = glm::vec3(0.0, 0.25, 0.0);
     auto obj1 = createModel(memoryManager, builder, offset);
-    h_hittables_list.push_back(*obj1);
+    auto bvh1 = createBVH(memoryManager, obj1);
+    h_hittables_list.push_back(bvh1);
 
     // ground
     auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
@@ -1130,7 +1131,7 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
 void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 90.0f;
-    cam.lookfrom = glm::vec3( 0.0f, 3.0f,  -10.0f);
+    cam.lookfrom = glm::vec3( 0.0f, 3.0f,  12.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.1f;
@@ -1170,20 +1171,37 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
 
     createModelFromFile(builder, "images/cube.obj");
     offset = glm::vec3(4.0, 1.0, 5.0);
+    // offset = glm::vec3(0.0);
     scale = glm::vec3(0.5);
     // auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/WoodFloor043_4K-JPG/WoodFloor043_4K-JPG_Color.jpg");
     obj1 = createModel(memoryManager, builder, offset, scale);
-    bvh1 = createBVH(memoryManager, obj1);
+    auto rotated = memoryManager.allocateHost<hittable>(hittable::make_rotateY(obj1, 45));  // apply rotation first
+    auto translate = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(0, 3, 0))); // then tranlation.
+    bvh1 = createBVH(memoryManager, rotated);    // last, convert to bvh the rotation/translation
     h_hittables_list.push_back(bvh1);
+    
+
+
 
     createModelFromFile(builder, "images/monkey.obj");
-    offset = glm::vec3(4.0, 3.0, 5.0);
-    scale = glm::vec3(0.5);
+    offset = glm::vec3(3.0, 2.0, 4.0);
+    scale = glm::vec3(1.0);
     tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/Metal024_4K-JPG/Metal024_4K-JPG_Color.jpg");
     // tex = createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 2.0, .2));
-    obj1 = createModel(memoryManager, builder, offset, scale, tex);
-    bvh1 = createBVH(memoryManager, obj1);
-    h_hittables_list.push_back(bvh1);
+    auto monkey = createModel(memoryManager, builder, offset, scale);
+
+    auto atex = texture::solid_texture(glm::vec3(0.0f, 0.0f, 0.0f)); 
+    texture* d_atex = memoryManager.allocateDevice<texture>();
+    memoryManager.copyToDevice(d_atex, &atex);
+    auto negro = material::isotropic_material(d_atex);
+    material* d_negro = memoryManager.allocateDevice<material>();
+    memoryManager.copyToDevice(d_negro, &negro);
+
+    auto smoke = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 0.01f,  d_negro));
+
+
+    // bvh1 = createBVH(memoryManager, smoke);
+    h_hittables_list.push_back(*smoke);
 
 
     // // ground
@@ -1200,15 +1218,15 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     hittable_obj = hittable::make_sphere(glm::vec3(-2.5f, 3.0, -2.0), 1.0, glass);
     h_hittables_list.push_back(hittable_obj);
 
+    
+    
     auto a = glm::vec3(0, 0, 0);
     auto b = glm::vec3(8, 8, 8);
     auto blue  = createTexture(memoryManager, Type::SOLID, glm::vec3(0.0, 0.0, 1.00));
-    auto blueMat = createMaterial(memoryManager, Type::METAL, blue);
-
-
+    auto blueMat = createMaterial(memoryManager, Type::METAL, blue, {}, 0.5);
     auto conglomerate = createConglomerate(memoryManager, a, b, blueMat, 1000 );
     // auto rotated    = memoryManager.allocateHost<hittable>(hittable::make_rotateY(conglomerate, 15));
-    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(0, 6, 0)));
+    auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(0, 3, -30)));
     h_hittables_list.push_back(*translated);
     
     size_t number_of_hittables = h_hittables_list.size();

@@ -21,6 +21,7 @@ struct Face {
     glm::vec3 color;
 };
 
+/* Get data from hard-coded vertices/indices*/
 struct Builder0 {
   std::vector<Vertex0> vertices;
   std::vector<Face> indices;
@@ -46,6 +47,7 @@ struct Vertex {
 
 // };
 
+/* Texture extracted from file */
 struct Texture {
     unsigned char* bdata{};
     int width{};
@@ -54,6 +56,7 @@ struct Texture {
     int pixel_size{};
 };
 
+/* Material extracted from file */
 struct Material {
     std::string name;
     glm::vec3 diffuseColor;
@@ -78,14 +81,14 @@ struct Material {
     // rtw_image r_normalTexture;
 };
 
-
+// Get data from from *.obj files (blender)
 class Builder {
     public:
         std::vector<Vertex> vertices{};
         std::vector<uint32_t> indices{};
         std::vector<uint32_t> textureBuffer;
         std::vector<Material> materialList; // list of Materials
-        glm::uvec2 extent;
+        // glm::uvec2 extent;
         // Extent2D extent;
 
         void loadModel(const std::string &filepath);
@@ -404,6 +407,9 @@ struct hittable {
             case Type::QUAD:
                 obj.translate.bbox = object->quad.bounding_box() + offset;
                 break;
+            case Type::TRI:
+                obj.translate.bbox = object->triangle.bounding_box() + offset;
+                break;
             case Type::ROTATE_Y:
                 obj.translate.bbox = object->rotateY.bounding_box() + offset;
                 break;
@@ -432,27 +438,37 @@ struct hittable {
         switch (object->type){
             case Type::SPHERE:
                 obj.rotateY.bbox = object->sphere.bounding_box();
-                obj.rotateY.calculateBbox();
+                // obj.rotateY.calculateBbox();
                 break;
             case Type::QUAD:
                 obj.rotateY.bbox = object->quad.bounding_box();
-                obj.rotateY.calculateBbox();
+                // obj.rotateY.calculateBbox();
+                break;
+            case Type::TRI:
+                obj.rotateY.bbox = object->triangle.bounding_box();
+                // obj.rotateY.calculateBbox();
                 break;
             case Type::TRANSLATE:
                 obj.rotateY.bbox = object->translate.bounding_box();
-                obj.rotateY.calculateBbox();
+                // obj.rotateY.calculateBbox();
                 break;
             case Type::LIST:
                 obj.rotateY.bbox = object->hittableList.bounding_box();
-                obj.rotateY.calculateBbox();
+                // obj.rotateY.calculateBbox();
                 break;
             case Type::MEDIUM:
                 obj.rotateY.bbox = object->constantMedium.bounding_box();
-                obj.rotateY.calculateBbox();
+                // obj.rotateY.calculateBbox();
                 break;
+            // case Type::BVH:
+            //     obj.rotateY.bbox = object->bvhNode.bounding_box();
+            //     obj.rotateY.calculateBbox();
+            //     break;
             default:
                 break;
         }
+
+        obj.rotateY.calculateBbox();
         
         return obj;
     }
