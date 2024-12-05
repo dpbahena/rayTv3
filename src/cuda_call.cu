@@ -639,11 +639,11 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     
     clock_t start, stop;
     start = clock();
-    int threadsx = 16;
-    int threadsy = 16;
+    int threadsx = 32;
+    int threadsy = 8;
     dim3 blockSize(threadsx, threadsy);
     int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
-    int blocks_y = (height + offset + blockSize.y - 1) / blockSize.y;
+    int blocks_y = (image_height + blockSize.y - 1) / blockSize.y;
     dim3 gridSize(blocks_x, blocks_y);
 
     //generate random seed to be used in rayTracer kernel
