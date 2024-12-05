@@ -529,7 +529,7 @@ __global__ void init_random(unsigned int seed, curandState_t* states){
 //     image[width * j + i] = colorToUint32_t(color);  
 // }
 
-__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world) {
+__global__ void rayTracer_kernel(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world, int offset) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -545,6 +545,22 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
+
+__global__ void rayTracer_kernel2(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world, int offset) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i >= width || j < offset || j >= (height + offset)) return;
+    
+    glm::vec3 color = {0.0f, 0.0f, 0.0f};
+    for (int sample = 0; sample < samples_per_pixel; sample++){
+        ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
+        color  += ray_color(states, i, j, depth, r, *world);
+    }
+    float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for a sume of pixel samples
+    color *= pixel_sample_scale;
+    image[width * j + i] = colorToUint32_t(color);  
+}
 void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, dielectric* &bubble, metal* &right, sphere* &spheres, hittable_list* &world){
 
     // allocate memory on the host
@@ -611,27 +627,35 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
    sphere* d_spheres;
    hittable_list* d_world;
    
+   
+
 
     init_objects(d_material_ground, d_material_center, d_material_left, d_material_bubble, d_material_right, d_spheres, d_world);
 
     checkCuda(cudaMalloc((void**)&d_image, image_width * image_height * sizeof(uint32_t)));
+
+    int height = image_height / 2;
+    int offset = height;
     
     clock_t start, stop;
     start = clock();
-    int threads = 16;
-    dim3 blockSize(threads, threads);
+    int threadsx = 16;
+    int threadsy = 16;
+    dim3 blockSize(threadsx, threadsy);
     int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
-    int blocks_y = (image_height + blockSize.y - 1) / blockSize.y;
+    int blocks_y = (height + offset + blockSize.y - 1) / blockSize.y;
     dim3 gridSize(blocks_x, blocks_y);
 
     //generate random seed to be used in rayTracer kernel
-    int num_threads = threads * threads * blocks_x * blocks_y;
+    int num_threads = threadsx * threadsy * blocks_x * blocks_y;
     
     checkCuda(cudaMalloc(&d_states, num_threads * sizeof(curandState_t)));
     init_random<<<gridSize, blockSize>>>(time(0) ^ getpid(), d_states);
     checkCuda(cudaDeviceSynchronize() );
 
-    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, image_height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world);
+    rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world, 0);
+    // checkCuda(cudaDeviceSynchronize());
+    rayTracer_kernel2<<<gridSize, blockSize>>>(d_states, max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world, offset);
     // checkCuda(cudaPeekAtLastError() );
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
