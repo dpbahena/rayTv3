@@ -4,9 +4,10 @@
 #include "material.h"
 #include "texture.h"
 #include "aabb.h"
+#include "rtw_stb_image.h"
 #include <curand_kernel.h>
 #include <thrust/sort.h>
-#include <rtw_stb_image.h>
+
 
 typedef struct  {
         uint32_t  width;
