@@ -545,6 +545,23 @@ __global__ void rayTracer_kernel(curandState_t* states, int depth, int width, in
     image[width * j + i] = colorToUint32_t(color);  
 }
 
+// __global__ void rayTracer_kernel2(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world, int offset) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+//     // Correct bounds for the bottom half
+//     if (i >= width || j < offset || j >= (offset + height)) return;
+    
+//     glm::vec3 color = {0.0f, 0.0f, 0.0f};
+//     for (int sample = 0; sample < samples_per_pixel; sample++) {
+//         ray r = get_ray(states, i, j, pixel00, cameraCenter, delta_u, delta_v, defocusAngle, defocusDisk_u, defocusDisk_v);
+//         color += ray_color(states, i, j, depth, r, *world);
+//     }
+//     float pixel_sample_scale = 1.0f / static_cast<float>(samples_per_pixel); // color scale factor for sum of pixel samples
+//     color *= pixel_sample_scale;
+//     image[width * j + i] = colorToUint32_t(color);
+// }
+
 
 __global__ void rayTracer_kernel2(curandState_t* states, int depth, int width, int height, glm::vec3 cameraCenter, glm::vec3 pixel00, glm::vec3 delta_u, glm::vec3 delta_v, int samples_per_pixel, float defocusAngle, glm::vec3 defocusDisk_u, glm::vec3 defocusDisk_v, uint32_t* image, hittable_list* world, int offset) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -615,6 +632,10 @@ void init_objects(lambertian* &ground, lambertian* &center, dielectric* &left, d
 
 void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm::vec3 center, glm::vec3 pixel00_loc, glm::vec3 pixel_delta_u, glm::vec3 pixel_delta_v, int samples_per_pixel, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v, uint32_t* colorBuffer)
 {  
+
+    int device_id = 1;  // For example, to pick GPU 1
+    cudaSetDevice(device_id);   
+
    // device variables
    uint32_t*   d_image;
    lambertian* d_material_ground;
@@ -654,8 +675,8 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     checkCuda(cudaDeviceSynchronize() );
 
     rayTracer_kernel<<<gridSize, blockSize>>>(d_states, max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world, 0);
-    // checkCuda(cudaDeviceSynchronize());
-    rayTracer_kernel2<<<gridSize, blockSize>>>(d_states, max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world, offset);
+    checkCuda(cudaDeviceSynchronize());
+    // rayTracer_kernel2<<<gridSize, blockSize>>>(d_states, max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image, d_world, offset);
     // checkCuda(cudaPeekAtLastError() );
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
@@ -677,3 +698,124 @@ void RayTracer::cudaCall(int image_width, int image_height, int max_depth,  glm:
     cudaFree(d_material_bubble);
     
 }
+
+
+// void RayTracer::cudaCall(int image_width, int image_height, int max_depth, glm::vec3 center, glm::vec3 pixel00_loc, glm::vec3 pixel_delta_u, glm::vec3 pixel_delta_v, int samples_per_pixel, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v, uint32_t* colorBuffer) {  
+//     uint32_t* d_image[2];
+//     curandState_t* d_states[2];
+//     hittable_list* d_world[2];
+//     sphere* d_spheres[2];
+//     lambertian* d_material_ground[2];
+//     lambertian* d_material_center[2];
+//     dielectric* d_material_left[2];
+//     dielectric* d_material_bubble[2];
+//     metal* d_material_right[2];
+
+//     int height = image_height / 2;
+
+//     for (int device = 0; device < 2; ++device) {
+//         cudaSetDevice(device);
+
+//         init_objects(d_material_ground[device], d_material_center[device], d_material_left[device], d_material_bubble[device], d_material_right[device], d_spheres[device], d_world[device]);
+
+//         checkCuda(cudaMalloc((void**)&d_image[device], image_width * height * sizeof(uint32_t)));
+
+//         int threadsx = 32;
+//         int threadsy = 8;
+//         dim3 blockSize(threadsx, threadsy);
+//         int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
+//         int blocks_y = (height + blockSize.y - 1) / blockSize.y;
+//         dim3 gridSize(blocks_x, blocks_y);
+
+//         int num_threads = threadsx * threadsy * blocks_x * blocks_y;
+
+//         checkCuda(cudaMalloc(&d_states[device], num_threads * sizeof(curandState_t)));
+//         init_random<<<gridSize, blockSize>>>(time(0) ^ getpid() ^ device, d_states[device]);
+//         checkCuda(cudaDeviceSynchronize());
+
+//         int offset = device * height;
+
+//         if (device == 0) {
+//             rayTracer_kernel<<<gridSize, blockSize>>>(d_states[device], max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image[device], d_world[device], 0);
+//         // } else {
+//             rayTracer_kernel2<<<gridSize, blockSize>>>(d_states[device], max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image[device], d_world[device], offset);
+//         }
+
+//         checkCuda(cudaDeviceSynchronize());
+//     }
+
+//     // Combine results
+//     for (int device = 0; device < 2; ++device) {
+//         cudaSetDevice(device);
+//         checkCuda(cudaMemcpy(colorBuffer + (device * image_width * height), d_image[device], image_width * height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+        
+//         // Free memory for the current device
+//         cudaFree(d_image[device]);
+//         cudaFree(d_states[device]);
+//         cudaFree(d_world[device]);
+//         cudaFree(d_spheres[device]);
+//         cudaFree(d_material_ground[device]);
+//         cudaFree(d_material_center[device]);
+//         cudaFree(d_material_left[device]);
+//         cudaFree(d_material_bubble[device]);
+//         cudaFree(d_material_right[device]);
+//     }
+// }
+
+
+// void RayTracer::cudaCall(int image_width, int image_height, int max_depth, glm::vec3 center, glm::vec3 pixel00_loc, glm::vec3 pixel_delta_u, glm::vec3 pixel_delta_v, int samples_per_pixel, float& defocusAngle, glm::vec3& defocusDisk_u, glm::vec3& defocusDisk_v, uint32_t* colorBuffer) {  
+//     // Device variables for both GPUs
+//     uint32_t* d_image[2];
+//     curandState_t* d_states[2];
+//     hittable_list* d_world[2];
+//     sphere* d_spheres[2];
+//     lambertian* d_material_ground[2];
+//     lambertian* d_material_center[2];
+//     dielectric* d_material_left[2];
+//     dielectric* d_material_bubble[2];
+//     metal* d_material_right[2];
+
+//     int height = image_height / 2;
+
+//     // Loop through each GPU
+//     for (int device = 0; device < 2; ++device) {
+//         cudaSetDevice(device);
+
+//         // Initialize objects and allocate memory on the current GPU
+//         init_objects(d_material_ground[device], d_material_center[device], d_material_left[device], d_material_bubble[device], d_material_right[device], d_spheres[device], d_world[device]);
+
+//         checkCuda(cudaMalloc((void**)&d_image[device], image_width * height * sizeof(uint32_t)));
+
+//         int threadsx = 32;
+//         int threadsy = 8;
+//         dim3 blockSize(threadsx, threadsy);
+//         int blocks_x = (image_width + blockSize.x - 1) / blockSize.x;
+//         int blocks_y = (height + blockSize.y - 1) / blockSize.y;
+//         dim3 gridSize(blocks_x, blocks_y);
+
+//         int num_threads = threadsx * threadsy * blocks_x * blocks_y;
+
+//         checkCuda(cudaMalloc(&d_states[device], num_threads * sizeof(curandState_t)));
+//         init_random<<<gridSize, blockSize>>>(time(0) ^ getpid() ^ device, d_states[device]);
+//         checkCuda(cudaDeviceSynchronize());
+
+//         int offset = device * height;
+//         rayTracer_kernel<<<gridSize, blockSize>>>(d_states[device], max_depth, image_width, height, center, pixel00_loc, pixel_delta_u, pixel_delta_v, samples_per_pixel, defocusAngle, defocusDisk_u, defocusDisk_v, d_image[device], d_world[device], offset);
+//         checkCuda(cudaDeviceSynchronize());
+//     }
+
+//     // Copy results back to the host and combine
+//     for (int device = 0; device < 2; ++device) {
+//         cudaSetDevice(device);
+//         checkCuda(cudaMemcpy(colorBuffer + (device * image_width * height), d_image[device], image_width * height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+//         cudaFree(d_image[device]);
+//         cudaFree(d_states[device]);
+//         cudaFree(d_world[device]);
+//         cudaFree(d_spheres[device]);
+//         cudaFree(d_material_ground[device]);
+//         cudaFree(d_material_center[device]);
+//         cudaFree(d_material_left[device]);
+//         cudaFree(d_material_bubble[device]);
+//         cudaFree(d_material_right[device]);
+//     }
+// }
