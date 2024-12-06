@@ -1710,6 +1710,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hi
     h_hittables_list.push_back(bvhItem2);
 
 
+
     // complete the scene
     size_t number_of_hittables = h_hittables_list.size();
     printf("size: %d\n", (int)number_of_hittables);
