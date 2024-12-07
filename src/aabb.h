@@ -1,5 +1,12 @@
 #pragma once
 
+__device__ __host__
+inline void deviceSwap(float &a, float &b) {
+    float temp = a;
+    a = b;
+    b = temp;
+}
+
 class AaBb {
     public:
         interval x, y, z;
@@ -31,6 +38,8 @@ class AaBb {
             if (n == 2) return z;
             return x;
         }
+
+        // this is faster
         __device__ __host__
         bool hit(const ray& r, interval ray_t) const {
             const glm::vec3& ray_orig = r.origin;
@@ -57,6 +66,41 @@ class AaBb {
 
             return true;
         }
+        // __device__ __host__
+        // bool hit(const ray& r, interval ray_t) const {
+        //     auto r_origin = r.origin;
+        //     auto r_dir = r.direction;
+        //     for (int a = 0; a < 3; a++) {
+        //         auto invD = 1.0f / r_dir[a];
+        //         auto orig = r_origin[a];
+        //         float t0 = (axis(a).min - orig) * invD;
+        //         float t1 = (axis(a).max - orig) * invD;
+        //         if (invD < 0)
+        //             deviceSwap(t0, t1);
+        //         if (fminf(t1, ray_t.max) <= fmaxf(t0, ray_t.min))
+        //             return false;
+        //     }
+        //     return true;
+        // }
+        // bool hit(const ray& r, interval ray_t) const {
+        //     for (int a = 0; a < 3; a++) {
+        //         auto t0 = fmin((axis(a).min - r.origin[a]) / r.direction[a],
+        //                        (axis(a).max - r.origin[a]) / r.direction[a]);
+        //         auto t1 = fmax((axis(a).min - r.origin[a]) / r.direction[a],
+        //                        (axis(a).max - r.origin[a]) / r.direction[a]);
+        //         ray_t.min = fmax(t0, ray_t.min);
+        //         ray_t.max = fmin(t1, ray_t.max);
+        //         if (ray_t.max <= ray_t.min)
+        //             return false;
+        //     }
+        //     return true;
+        // }
+        __device__ __host__
+        const interval& axis(int n) const {
+        if (n == 1) return y;
+        if (n == 2) return z;
+        return x;
+    }
         __device__ __host__
         int longest_axis() const {
             // Returns the index of the longest axis of the bounding box.
