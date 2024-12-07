@@ -120,6 +120,18 @@ struct alignas(16) BVHNode {
     
 };
 
+struct NodeSoA {
+    AaBb* bbox;
+    int* left_child_index;     // Index of left child in the BVH array (-1 if it's a leaf)
+    int* right_child_index;    // Index of right child in the BVH array (-1 if it's a leaf)
+    int* rope_index;
+    bool* is_leaf;             // Is this node a leaf?
+    size_t* start;
+    size_t* end;
+    int* object_index;         // Index of the object (used if it's a leaf)
+    
+};
+
 
 struct alignas(16) StackNode {
             size_t start, end;
@@ -222,6 +234,7 @@ struct hittableList_data {
 
 struct bvhNode_data {
     hittable* objects;
+    NodeSoA nodeSoA;
     BVHNode* nodes;
     size_t objects_size;
     AaBb bbox;

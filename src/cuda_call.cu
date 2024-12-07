@@ -482,6 +482,53 @@ hittable createBVH(HybridMemoryManager& memoryManager, hittable* object) {
     return hittable::make_bvhNode(nodes, d_object, 1);
 }
 
+NodeSoA setNodesAsSoA(HybridMemoryManager& memoryManager, hittable* object){
+
+
+
+    int size = 2 * object->bvhNode.objects_size -1;
+    auto& bbox = object->bvhNode.nodeSoA.bbox;
+    bbox = memoryManager.allocateDevice<AaBb>(size);
+    auto& left_child_index = object->bvhNode.nodeSoA.left_child_index;
+    left_child_index = memoryManager.allocateDevice<int>(size);
+    auto& right_child_index = object->bvhNode.nodeSoA.right_child_index;
+    right_child_index = memoryManager.allocateDevice<int>(size);
+    auto& rope_index = object->bvhNode.nodeSoA.rope_index;
+    rope_index = memoryManager.allocateDevice<int>(size);
+    auto& is_leaf = object->bvhNode.nodeSoA.is_leaf;
+    is_leaf = memoryManager.allocateDevice<bool>(size);
+    auto& start = object->bvhNode.nodeSoA.start;
+    start = memoryManager.allocateDevice<size_t>(size);
+    auto& end = object->bvhNode.nodeSoA.end;
+    end = memoryManager.allocateDevice<size_t>(size);
+    auto& object_index = object->bvhNode.nodeSoA.object_index;
+    object_index = memoryManager.allocateDevice<int>(size);
+    
+
+    for (int i = 0; i < size; i++) {
+        
+        memoryManager.copyToDevice(bbox + i, &object->bvhNode.nodes[i].bbox);
+        memoryManager.copyToDevice(left_child_index + i, &object->bvhNode.nodes[i].left_child_index);
+        memoryManager.copyToDevice(right_child_index + i, &object->bvhNode.nodes[i].right_child_index);
+        memoryManager.copyToDevice(rope_index + i, &object->bvhNode.nodes[i].rope_index);
+        memoryManager.copyToDevice(is_leaf + i, &object->bvhNode.nodes[i].is_leaf);
+        memoryManager.copyToDevice(start + i, &object->bvhNode.nodes[i].start);
+        memoryManager.copyToDevice(end + i, &object->bvhNode.nodes[i].end);
+        memoryManager.copyToDevice(object_index + i, &object->bvhNode.nodes[i].object_index);
+    }
+
+    NodeSoA node;
+    node.bbox               = bbox;
+    node.end                = end;
+    node.is_leaf            = is_leaf;
+    node.left_child_index   = left_child_index;
+    node.right_child_index  = right_child_index;
+    node.rope_index         = rope_index;
+    node.start              = start;
+
+    return node;
+}
+
 
 
 __device__
@@ -1269,6 +1316,8 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     auto ghostMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 1.2f, smoke));
     bvh1 = createBVH(memoryManager, ghostMonkey);
     h_hittables_list.push_back(bvh1);
+    // auto nodeSoA = setNodesAsSoA(memoryManager, &bvh1);
+    
 
     // golden monkey
     createModelFromFile(builder, "images/monkey.obj");
@@ -1424,6 +1473,7 @@ void cornell_box(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_h
     
     h_hittables_list.push_back(bvh1);
     h_hittables_list.push_back(bvh2);
+
     
     size_t number_of_hittables = h_hittables_list.size();
 
