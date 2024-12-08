@@ -1298,7 +1298,7 @@ void triangles(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hit
 void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 60.0f;
-    cam.lookfrom = glm::vec3( -2.0f, 3.0f,  10.0f);
+    cam.lookfrom = glm::vec3( -1.0f, 2.0f,  11.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.1f;
@@ -1350,7 +1350,7 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     bvh1 = createBVHSoA(memoryManager, rotated);    // last, convert to bvh the rotation/translation
     h_hittables_list.push_back(bvh1);
     
-    auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
+    
 
     //ghosted monkey
     createModelFromFile(builder, "images/monkey.obj");
@@ -1359,10 +1359,9 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     // tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/Metal024_4K-JPG/Metal024_4K-JPG_Color.jpg");
     auto yellow = createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 2.0, .2));
     auto monkey = createModel(memoryManager, builder, offset, scale, yellow);
-
     auto dark = createTexture(memoryManager, Type::SOLID, glm::vec3(0.0f, 0.0f, 0.1f));
     auto smoke = createMaterial(memoryManager, Type::ISOTROPIC, dark);
-    auto ghostMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 1.2f, smoke));
+    auto ghostMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 1.0f, smoke));
     bvh1 = createBVHSoA(memoryManager, ghostMonkey);
     
     h_hittables_list.push_back(bvh1);
@@ -1376,17 +1375,26 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     bvh1 = createBVHSoA(memoryManager, goldenMonkey);
     h_hittables_list.push_back(bvh1);
 
-    // // shiny monkey
+    // // shiny blue monkey
     createModelFromFile(builder, "images/monkey.obj");
+    auto glass3 = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.2f);
     offset = glm::vec3(-2.5, 2.0, 7.0);
     scale = glm::vec3(1.0);
-    monkey = createModel(memoryManager, builder, offset, scale, {}, glass);
+    monkey = createModel(memoryManager, builder, offset, scale, {}, glass3);
+    h_hittables_list.push_back(createBVHSoA(memoryManager, monkey));
     auto blue_tex = createTexture(memoryManager, Type::SOLID, glm::vec3(0.2, 0.4, 0.9));
     auto blue_mat = createMaterial(memoryManager, Type::ISOTROPIC, blue_tex);
     auto shinyMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 4.0, blue_mat));
     bvh1 = createBVHSoA(memoryManager, shinyMonkey);
     h_hittables_list.push_back(bvh1);
 
+    //* Shiny red sphere
+    auto red_tex = createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 0.0, 0.0));
+    auto red_mat = createMaterial(memoryManager, Type::ISOTROPIC, red_tex);
+    auto boundary = memoryManager.allocateHost<hittable>(hittable::make_sphere(glm::vec3(-1.0, .75, 4.5), 0.75, createMaterial(memoryManager, Type::DIELECTRIC, NULL, glm::vec3(0), 0, 1.3)));
+    h_hittables_list.push_back(*boundary);
+    auto redObj = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(boundary, 12.0, red_mat));
+    h_hittables_list.push_back(*redObj);
 
     // ground
     tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
@@ -1394,11 +1402,13 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
     h_hittables_list.push_back(hittable_obj);
 
+    // metal sphere
     auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
     hittable_obj = hittable::make_sphere(glm::vec3(1.0f, 1.0f, 0.0f), 1.0f, silver);
     h_hittables_list.push_back(hittable_obj);
 
-    
+    // glass sphere on top of brick
+    auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
     hittable_obj = hittable::make_sphere(glm::vec3(-2.5f, 3.0, -2.0), 1.0, glass);
     h_hittables_list.push_back(hittable_obj);
 

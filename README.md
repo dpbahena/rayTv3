@@ -116,6 +116,15 @@ I started with Chapter 13 defocus Blur
 
 
 
+# bvhSoA and #pragma unroll  Branch: NW-Bvh-as-SoA
+##  RTX4090:   2137.6 sec or 00:35:37      10000 X 40 SAMPLES/depth
+##  RTX4090:   48.8 secs                       200 x 50 samples
+![Screenshot of the project](output_samples/NWfinalscene.png)
+
+
+# Loading Models opt: 12 :   Used models from Blender
+## RTX4090  205.1 secs  or 00:03:21   200 x 50 samples/depth
+![Screenshot of the project](output_samples/loadingModels.png)
 
 
 
