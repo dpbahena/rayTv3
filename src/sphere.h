@@ -634,6 +634,7 @@ bool hitBvhTraverse_stacklessSoA(const ray& r, interval ray_t, hit_record& rec, 
     auto current_Obi   = node->object_index;
 
     bool hit_anything = false;
+    int tmpIdx;
     // hit_record temp_rec;
     
     while (current_Obi != nullptr) {
@@ -650,7 +651,7 @@ bool hitBvhTraverse_stacklessSoA(const ray& r, interval ray_t, hit_record& rec, 
                 // Move to the next node via the rope
                 if (*current_rpi != -1/*  && current->rope_index != (current - nodes) */) {
                     // current = nodes + current->rope_index;
-                    int tmpIdx = *current_rpi;
+                    tmpIdx = *current_rpi;
                     current_bbox  = node->bbox + tmpIdx;
                     current_lci   = node->left_child_index + tmpIdx;
                     current_rci   = node->right_child_index + tmpIdx;
@@ -674,30 +675,30 @@ bool hitBvhTraverse_stacklessSoA(const ray& r, interval ray_t, hit_record& rec, 
             } else {
                 // Move to the left child
                 // current = nodes + current->left_child_index;
-                int tmpLci = *current_lci;
-                current_bbox  = node->bbox + tmpLci;
-                current_lci   = node->left_child_index + tmpLci;
-                current_rci   = node->right_child_index + tmpLci;
-                current_rpi   = node->rope_index + tmpLci;
-                current_isL   = node->is_leaf + tmpLci;
-                current_start = node->start + tmpLci;
-                current_end   = node->end + tmpLci;
-                current_Obi   = node->object_index + tmpLci;
+                tmpIdx = *current_lci;
+                current_bbox  = node->bbox + tmpIdx;
+                current_lci   = node->left_child_index + tmpIdx;
+                current_rci   = node->right_child_index + tmpIdx;
+                current_rpi   = node->rope_index + tmpIdx;
+                current_isL   = node->is_leaf + tmpIdx;
+                current_start = node->start + tmpIdx;
+                current_end   = node->end + tmpIdx;
+                current_Obi   = node->object_index + tmpIdx;
 
             }
         } else {
             // No intersection; follow the rope
             if (*current_rpi != -1 /* && current->rope_index != (current - nodes) */) {
                 // current = nodes + current->rope_index;
-                int tmpRpi = *current_rpi;
-                current_bbox  = node->bbox + tmpRpi;
-                current_lci   = node->left_child_index + tmpRpi;
-                current_rci   = node->right_child_index + tmpRpi;
-                current_rpi   = node->rope_index + tmpRpi;
-                current_isL   = node->is_leaf + tmpRpi;
-                current_start = node->start + tmpRpi;
-                current_end   = node->end + tmpRpi;
-                current_Obi   = node->object_index + tmpRpi;
+                tmpIdx = *current_rpi;
+                current_bbox  = node->bbox + tmpIdx;
+                current_lci   = node->left_child_index + tmpIdx;
+                current_rci   = node->right_child_index + tmpIdx;
+                current_rpi   = node->rope_index + tmpIdx;
+                current_isL   = node->is_leaf + tmpIdx;
+                current_start = node->start + tmpIdx;
+                current_end   = node->end + tmpIdx;
+                current_Obi   = node->object_index + tmpIdx;
 
 
             } else {
