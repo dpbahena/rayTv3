@@ -70,7 +70,7 @@ bool hittableList_data::hit(const ray& r, interval ray_t, hit_record& rec, float
     bool hit_anything = false;
     auto closest_so_far = ray_t.max;
     
-    
+        #pragma unroll
         for (int i = 0; i < objects_size; i++){
         if (objects[i].type == Type::SPHERE) {
             if (objects[i].sphere.hit(r, interval(ray_t.min, closest_so_far), temp_rec)){
@@ -325,6 +325,7 @@ void build_bvh_kernelSoA(NodeSoA* nodeSoA, hittable* objects, size_t objects_siz
 
         // Compute the bounding box for the current node
         AaBb bbox = AaBb::empty();
+        #pragma unroll
         for (size_t i = current.start; i < current.end; ++i) {
             if(objects[i].type == Type::SPHERE) {
                 bbox = AaBb(bbox, (objects + i)->sphere.bounding_box());
@@ -718,6 +719,79 @@ bool hitBvhTraverse_stacklessSoA(const ray& r, interval ray_t, hit_record& rec, 
     return hit_anything;
 }
 
+__device__ __host__
+inline void updateNode(NodeSoA* __restrict__ node, int index, 
+                                  AaBb*& current_bbox, int*& current_lci,
+                                  int*& current_rci, int*& current_rpi,
+                                  bool*& current_isL, size_t*& current_start,
+                                  size_t*& current_end, int*& current_Obi) {
+    current_bbox  = node->bbox + index;
+    current_lci   = node->left_child_index + index;
+    current_rci   = node->right_child_index + index;
+    current_rpi   = node->rope_index + index;
+    current_isL   = node->is_leaf + index;
+    current_start = node->start + index;
+    current_end   = node->end + index;
+    current_Obi   = node->object_index + index;
+}
+
+
+
+__device__ __host__ __noinline__
+bool hitBvhTraverse_stacklessSoA2(const ray& r, interval ray_t, hit_record& rec, NodeSoA* __restrict__ node, const hittable* __restrict__ objects, float randNumber) {
+    // Initialize pointers to the current node attributes
+    auto current_bbox  = node->bbox;
+    auto current_lci   = node->left_child_index;
+    auto current_rci   = node->right_child_index;
+    auto current_rpi   = node->rope_index;
+    auto current_isL   = node->is_leaf;
+    auto current_start = node->start;
+    auto current_end   = node->end;
+    auto current_Obi   = node->object_index;
+
+    bool hit_anything = false;
+
+    while (current_Obi != nullptr) {
+        if (current_bbox->hit(r, ray_t)) { // Check for ray intersection with the bounding box
+            if (*current_isL) { // If the current node is a leaf
+                const int start = *current_start;
+                const int end = *current_end;
+
+                // Iterate over objects in the leaf node
+                #pragma unroll
+                for (int i = start; i < end; ++i) {
+                    const hittable* obj = objects + i;
+                    if (getHitFunctions()[(int)obj->type](obj, r, ray_t, rec, randNumber)) {
+                        hit_anything = true;
+                        ray_t.max = rec.t; // Update the ray's maximum t value
+                    }
+                }
+
+                // Follow the rope to the next node if available
+                if (*current_rpi != -1) {
+                    updateNode(node, *current_rpi, current_bbox, current_lci, current_rci,
+                               current_rpi, current_isL, current_start, current_end, current_Obi);
+                } else {
+                    break; // End traversal if no rope exists
+                }
+            } else { // If the current node is not a leaf, move to the left child
+                updateNode(node, *current_lci, current_bbox, current_lci, current_rci,
+                           current_rpi, current_isL, current_start, current_end, current_Obi);
+            }
+        } else { // If no intersection, follow the rope if available
+            if (*current_rpi != -1) {
+                updateNode(node, *current_rpi, current_bbox, current_lci, current_rci,
+                           current_rpi, current_isL, current_start, current_end, current_Obi);
+            } else {
+                break; // End traversal if no rope exists
+            }
+        }
+    }
+
+    return hit_anything;
+}
+
+
 
 // __device__ __host__
 // bool hitBvhTraverse_stackless(const ray& r, interval ray_t, hit_record& rec, 
@@ -874,7 +948,7 @@ bool bvhNode_data::hit(const ray& r, interval ray_t, hit_record& rec, float rand
 
     // return hitBvhTraverse_stackless(r, ray_t, rec, nodes, objects, randNumber);
     // return hitBvhTraverse_stack(r, ray_t, rec, nodes, objects, randNumber);
-    return hitBvhTraverse_stacklessSoA(r, ray_t, rec, nodeSoA, objects, randNumber);
+    return hitBvhTraverse_stacklessSoA2(r, ray_t, rec, nodeSoA, objects, randNumber);
 }
 
 

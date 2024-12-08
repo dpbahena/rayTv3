@@ -792,6 +792,7 @@ inline glm::vec3 ray_color(curandStatePhilox4_32_10_t& rngState, int depth, cons
     glm::vec3 final_color     = glm::vec3(0.0f, 0.0f, 0.0f);
     
     // Loop through the ray bounces up to the specified depth
+    #pragma unroll
     for (int k = 0; k < depth; k++){
         hit_record rec;
         
@@ -907,6 +908,7 @@ __global__ void rayTracer_kernel_shared(
     // Accumulate color
     glm::vec3 color(0.0f);
     int sample_base = thread_in_pixel * samples_per_thread;
+    #pragma unroll
     for (int s = 0; s < samples_per_thread; ++s) {
         int sample_index = sample_base + s;
 
