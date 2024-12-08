@@ -9,7 +9,6 @@
             "type": "cuda-gdb",
             "request": "launch",
             "program": "${workspaceFolder}/build/rayTracer",
-            "args": [5,2],
             "cwd": "${workspaceFolder}",
             
         },

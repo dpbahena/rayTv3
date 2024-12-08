@@ -45,5 +45,5 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     # $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>
     # $<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=65>
     # $<$<COMPILE_LANGUAGE:CUDA>:-rdc=true>
-    # $<$<COMPILE_LANGUAGE:CUDA>:-G -g>
+    $<$<COMPILE_LANGUAGE:CUDA>:-G -g>
 )

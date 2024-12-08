@@ -38,7 +38,7 @@ int main(int arg, char** argv) {
     } else {  // default valules
         cam.samples_per_pixel = 5;
         cam.max_depth = 3;
-        cam.scene = 12;
+        cam.scene = 1;
         cam.ends = false; // true ends program after first run
         printf("Using default values:  ./rayTracer 100 40 1 \n");
         printf("Usage:  ./raytracer <# samples per pixel: 5-500> <max depth: 5-100>  <scene: 1-10\n");

@@ -120,7 +120,7 @@ struct alignas(16) BVHNode {
     
 };
 
-struct NodeSoA {
+struct alignas(16) NodeSoA {
     AaBb* bbox;
     int* left_child_index;     // Index of left child in the BVH array (-1 if it's a leaf)
     int* right_child_index;    // Index of right child in the BVH array (-1 if it's a leaf)
@@ -234,7 +234,7 @@ struct hittableList_data {
 
 struct bvhNode_data {
     hittable* objects;
-    NodeSoA nodeSoA;
+    NodeSoA* nodeSoA;
     BVHNode* nodes;
     size_t objects_size;
     AaBb bbox;
@@ -399,6 +399,18 @@ struct hittable {
         hittable obj;
         obj.type = Type::BVH;
         obj.bvhNode.nodes = nodes;
+        obj.bvhNode.objects = objects;
+        obj.bvhNode.objects_size = objects_size;
+        
+        obj.bvhNode.build_bvh();
+
+        return obj;
+    }
+
+    static hittable make_bvhNode(NodeSoA* nodeSoA, hittable* objects, size_t objects_size){
+        hittable obj;
+        obj.type = Type::BVH;
+        obj.bvhNode.nodeSoA = nodeSoA;
         obj.bvhNode.objects = objects;
         obj.bvhNode.objects_size = objects_size;
         

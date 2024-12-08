@@ -482,51 +482,88 @@ hittable createBVH(HybridMemoryManager& memoryManager, hittable* object) {
     return hittable::make_bvhNode(nodes, d_object, 1);
 }
 
-NodeSoA setNodesAsSoA(HybridMemoryManager& memoryManager, hittable* object){
+hittable createBVHSoA(HybridMemoryManager& memoryManager, std::vector<hittable> group) {
+    auto d_group = memoryManager.allocateDevice<hittable>(group.size());
+    memoryManager.copyToDevice(d_group, group.data(), group.size());
+    int number_of_nodes = (2 * group.size() - 1);
+    auto h_nodeSoA = memoryManager.allocateHost<NodeSoA>();
+    // allocate individual arrays of the structure
+    h_nodeSoA->bbox = memoryManager.allocateDevice<AaBb>(number_of_nodes);
+    h_nodeSoA->left_child_index = memoryManager.allocateDevice<int>(number_of_nodes);
+    h_nodeSoA->right_child_index = memoryManager.allocateDevice<int>(number_of_nodes);
+    h_nodeSoA->rope_index = memoryManager.allocateDevice<int>(number_of_nodes);
+    h_nodeSoA->is_leaf = memoryManager.allocateDevice<bool>(number_of_nodes);
+    h_nodeSoA->start = memoryManager.allocateDevice<size_t>(number_of_nodes);
+    h_nodeSoA->end = memoryManager.allocateDevice<size_t>(number_of_nodes);
+    h_nodeSoA->object_index = memoryManager.allocateDevice<int>(number_of_nodes);
+
+    // auto d_nodeSoA = memoryManager.allocateDevice<NodeSoA>();
+    // memoryManager.copyToDevice(d_nodeSoA, h_nodeSoA);
+    
+    return hittable::make_bvhNode(h_nodeSoA, d_group, group.size());
+}
 
 
+
+
+void setNodesAsSoA(HybridMemoryManager& memoryManager, hittable* object){
+
+    // allocate host memory
+    object->bvhNode.nodeSoA = memoryManager.allocateHost<NodeSoA>();
+
+
+    auto nodeSoA = memoryManager.allocateHost<NodeSoA>();
 
     int size = 2 * object->bvhNode.objects_size -1;
-    auto& bbox = object->bvhNode.nodeSoA.bbox;
+    // int size = object->bvhNode.objects_size;
+    // int size = 10;
+    auto& bbox = nodeSoA->bbox;
+    
     bbox = memoryManager.allocateDevice<AaBb>(size);
-    auto& left_child_index = object->bvhNode.nodeSoA.left_child_index;
+    auto& left_child_index = nodeSoA->left_child_index;
     left_child_index = memoryManager.allocateDevice<int>(size);
-    auto& right_child_index = object->bvhNode.nodeSoA.right_child_index;
+    auto& right_child_index = nodeSoA->right_child_index;
     right_child_index = memoryManager.allocateDevice<int>(size);
-    auto& rope_index = object->bvhNode.nodeSoA.rope_index;
+    auto& rope_index = nodeSoA->rope_index;
     rope_index = memoryManager.allocateDevice<int>(size);
-    auto& is_leaf = object->bvhNode.nodeSoA.is_leaf;
+    auto& is_leaf = nodeSoA->is_leaf;
     is_leaf = memoryManager.allocateDevice<bool>(size);
-    auto& start = object->bvhNode.nodeSoA.start;
+    auto& start = nodeSoA->start;
     start = memoryManager.allocateDevice<size_t>(size);
-    auto& end = object->bvhNode.nodeSoA.end;
+    auto& end = nodeSoA->end;
     end = memoryManager.allocateDevice<size_t>(size);
-    auto& object_index = object->bvhNode.nodeSoA.object_index;
+    auto& object_index = nodeSoA->object_index;
     object_index = memoryManager.allocateDevice<int>(size);
     
 
     for (int i = 0; i < size; i++) {
         
-        memoryManager.copyToDevice(bbox + i, &object->bvhNode.nodes[i].bbox);
-        memoryManager.copyToDevice(left_child_index + i, &object->bvhNode.nodes[i].left_child_index);
-        memoryManager.copyToDevice(right_child_index + i, &object->bvhNode.nodes[i].right_child_index);
-        memoryManager.copyToDevice(rope_index + i, &object->bvhNode.nodes[i].rope_index);
-        memoryManager.copyToDevice(is_leaf + i, &object->bvhNode.nodes[i].is_leaf);
-        memoryManager.copyToDevice(start + i, &object->bvhNode.nodes[i].start);
-        memoryManager.copyToDevice(end + i, &object->bvhNode.nodes[i].end);
-        memoryManager.copyToDevice(object_index + i, &object->bvhNode.nodes[i].object_index);
+        bbox[i] = object->bvhNode.nodes[i].bbox;
+        left_child_index[i] = object->bvhNode.nodes[i].left_child_index;
+        right_child_index[i] = object->bvhNode.nodes[i].right_child_index;
+        rope_index[i] = object->bvhNode.nodes[i].rope_index;
+        is_leaf[i] = object->bvhNode.nodes[i].is_leaf;
+        start[i] = object->bvhNode.nodes[i].start;
+        end[i] = object->bvhNode.nodes[i].end;
+        object_index[i] = object->bvhNode.nodes[i].object_index;
     }
 
-    NodeSoA node;
-    node.bbox               = bbox;
-    node.end                = end;
-    node.is_leaf            = is_leaf;
-    node.left_child_index   = left_child_index;
-    node.right_child_index  = right_child_index;
-    node.rope_index         = rope_index;
-    node.start              = start;
+    object->bvhNode.nodeSoA = nodeSoA;
 
-    return node;
+    // memoryManager.copyToDevice(object->bvhNode.nodeSoA, nodeSoA);
+
+    // auto node = memoryManager.allocateHost<NodeSoA>();
+
+    // node->bbox               = bbox;
+    // node->end                = end;
+    // node->is_leaf            = is_leaf;
+    // node->left_child_index   = left_child_index;
+    // node->right_child_index  = right_child_index;
+    // node->rope_index         = rope_index;
+    // node->start              = start;
+
+    
+    
 }
 
 
@@ -934,7 +971,7 @@ __global__ void addToColorBuffer(float* data, uint32_t* image, int width, int he
 void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hittable_list, hittable* &d_world){
 
     cam.vfov = 20.0f;
-    cam.lookfrom = glm::vec3(13.0f, 2.0f,  3.0f);
+    cam.lookfrom = glm::vec3(1.0f, 20.0f,  0.0f);
     cam.lookat   = glm::vec3( 0.0f, 0.0f,  0.0f);
     cam.vup      = glm::vec3( 0.0f, 1.0f,  0.0f);
     cam.defocus_angle = 0.6f;
@@ -944,10 +981,10 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, hittable*
 
     std::vector<hittable> h_hittables_list, small_spheres;
     
-    auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
-    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
-    h_hittables_list.push_back(hittable_obj);
+    // auto tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
+    // auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
+    // auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
+    // h_hittables_list.push_back(hittable_obj);
 
     // Create random spheres 
     for (int a = -11; a < 11; a++) {
@@ -983,22 +1020,22 @@ void bouncing_spheres(Camera& cam, HybridMemoryManager& memoryManager, hittable*
     }
 
 
-    // Three secundary spheres
-    auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
-    hittable_obj = hittable::make_sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, glass);
-    h_hittables_list.push_back(hittable_obj);
+    // // Three secundary spheres
+    // auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
+    // hittable_obj = hittable::make_sphere(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, glass);
+    // h_hittables_list.push_back(hittable_obj);
 
-    auto a_color = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.4f, 0.2f, 0.1f), {},{},{},{}));
-    hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, a_color);
-    h_hittables_list.push_back(hittable_obj);
+    // auto a_color = createMaterial(memoryManager, Type::LAMBERTIAN, createTexture(memoryManager, Type::SOLID, glm::vec3(0.4f, 0.2f, 0.1f), {},{},{},{}));
+    // hittable_obj = hittable::make_sphere(glm::vec3(-4.0f, 1.0f, 0.0f), 1.0f, a_color);
+    // h_hittables_list.push_back(hittable_obj);
 
-    auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
-    hittable_obj = hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, silver);
-    h_hittables_list.push_back(hittable_obj);
+    // auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
+    // hittable_obj = hittable::make_sphere(glm::vec3(4.0f, 1.0f, 0.0f), 1.0f, silver);
+    // h_hittables_list.push_back(hittable_obj);
  
 
     // convert this group to BVH
-    auto bvhItem = createBVH(memoryManager, small_spheres);
+    auto bvhItem = createBVHSoA(memoryManager, small_spheres);
     h_hittables_list.push_back(bvhItem);
 
 
@@ -1265,7 +1302,7 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     glm::vec3 offset, scale;
     hittable* obj1, bvh1;
     Builder builder;
-    texture* tex;
+    // texture* tex;
 
 
     createModelFromFile(builder, "images/woodFloor.obj");
@@ -1273,95 +1310,97 @@ void loadingModels(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     scale = glm::vec3(7.0);
     obj1 = createModel(memoryManager, builder, offset, scale);
     bvh1 = createBVH(memoryManager, obj1);
+    // h_hittables_list.push_back(bvh1);
+    // setNodesAsSoA(memoryManager, &bvh1);
     h_hittables_list.push_back(bvh1);
-    
-    createModelFromFile(builder, "images/brick94Cube.obj");
-    offset = glm::vec3(-2.5, 1.0, -2.0);
-    scale = glm::vec3(1.0);
-    obj1 = createModel(memoryManager, builder, offset, scale);
-    bvh1 = createBVH(memoryManager, obj1);
-    h_hittables_list.push_back(bvh1);
-
-    createModelFromFile(builder, "images/brick97Cube.obj");
-    offset = glm::vec3(-3.0, 1.0, 3.0);
-    scale = glm::vec3(1.0);
-    obj1 = createModel(memoryManager, builder, offset, scale);
-    bvh1 = createBVH(memoryManager, obj1);
-    h_hittables_list.push_back(bvh1);
-
-
-    createModelFromFile(builder, "images/cube.obj");
-    offset = glm::vec3(4.0, 1.0, 5.0);
-    // offset = glm::vec3(0.0);
-    scale = glm::vec3(0.5);
-    // auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/WoodFloor043_4K-JPG/WoodFloor043_4K-JPG_Color.jpg");
-    obj1 = createModel(memoryManager, builder, offset, scale);
-    auto rotated = memoryManager.allocateHost<hittable>(hittable::make_rotateY(obj1, 45));  // apply rotation first
-    auto translate = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(0, 3, 0))); // then tranlation.
-    bvh1 = createBVH(memoryManager, rotated);    // last, convert to bvh the rotation/translation
-    h_hittables_list.push_back(bvh1);
-    
-    auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
-
-    //ghosted monkey
-    createModelFromFile(builder, "images/monkey.obj");
-    offset = glm::vec3(0.0, 2.0, 7.0);
-    scale = glm::vec3(1.0);
-    // tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/Metal024_4K-JPG/Metal024_4K-JPG_Color.jpg");
-    auto yellow = createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 2.0, .2));
-    auto monkey = createModel(memoryManager, builder, offset, scale, yellow);
-
-    auto dark = createTexture(memoryManager, Type::SOLID, glm::vec3(0.0f, 0.0f, 0.1f));
-    auto smoke = createMaterial(memoryManager, Type::ISOTROPIC, dark);
-    auto ghostMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 1.2f, smoke));
-    bvh1 = createBVH(memoryManager, ghostMonkey);
-    h_hittables_list.push_back(bvh1);
-    // auto nodeSoA = setNodesAsSoA(memoryManager, &bvh1);
-    
-
-    // golden monkey
-    createModelFromFile(builder, "images/monkey.obj");
-    offset = glm::vec3(2.5, 2.0, 7.0);
-    scale = glm::vec3(1.0);
-    auto goldenMetal = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(1.0, 0.8, 0.1), 0.3);
-    auto goldenMonkey = createModel(memoryManager, builder, offset, scale, {}, goldenMetal);
-    bvh1 = createBVH(memoryManager, goldenMonkey);
-    h_hittables_list.push_back(bvh1);
-
-    // shiny monkey
-    createModelFromFile(builder, "images/monkey.obj");
-    offset = glm::vec3(-2.5, 2.0, 7.0);
-    scale = glm::vec3(1.0);
-    monkey = createModel(memoryManager, builder, offset, scale, {}, glass);
-    auto blue_tex = createTexture(memoryManager, Type::SOLID, glm::vec3(0.2, 0.4, 0.9));
-    auto blue_mat = createMaterial(memoryManager, Type::ISOTROPIC, blue_tex);
-    auto shinyMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 4.0, blue_mat));
-    bvh1 = createBVH(memoryManager, shinyMonkey);
-    h_hittables_list.push_back(bvh1);
-
-
-    // // ground
-    tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
-    auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
-    auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
-    h_hittables_list.push_back(hittable_obj);
-
-    auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
-    hittable_obj = hittable::make_sphere(glm::vec3(1.0f, 1.0f, 0.0f), 1.0f, silver);
-    h_hittables_list.push_back(hittable_obj);
 
     
-    hittable_obj = hittable::make_sphere(glm::vec3(-2.5f, 3.0, -2.0), 1.0, glass);
-    h_hittables_list.push_back(hittable_obj);
+    // createModelFromFile(builder, "images/brick94Cube.obj");
+    // offset = glm::vec3(-2.5, 1.0, -2.0);
+    // scale = glm::vec3(1.0);
+    // obj1 = createModel(memoryManager, builder, offset, scale);
+    // bvh1 = createBVH(memoryManager, obj1);
+    // h_hittables_list.push_back(bvh1);
 
-    auto glass2 = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.05f);
+    // createModelFromFile(builder, "images/brick97Cube.obj");
+    // offset = glm::vec3(-3.0, 1.0, 3.0);
+    // scale = glm::vec3(1.0);
+    // obj1 = createModel(memoryManager, builder, offset, scale);
+    // bvh1 = createBVH(memoryManager, obj1);
+    // h_hittables_list.push_back(bvh1);
+
+
+    // createModelFromFile(builder, "images/cube.obj");
+    // offset = glm::vec3(4.0, 1.0, 5.0);
+    // // offset = glm::vec3(0.0);
+    // scale = glm::vec3(0.5);
+    // // auto tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/WoodFloor043_4K-JPG/WoodFloor043_4K-JPG_Color.jpg");
+    // obj1 = createModel(memoryManager, builder, offset, scale);
+    // auto rotated = memoryManager.allocateHost<hittable>(hittable::make_rotateY(obj1, 45));  // apply rotation first
+    // auto translate = memoryManager.allocateHost<hittable>(hittable::make_translate(rotated, glm::vec3(0, 3, 0))); // then tranlation.
+    // bvh1 = createBVH(memoryManager, rotated);    // last, convert to bvh the rotation/translation
+    // h_hittables_list.push_back(bvh1);
     
-    auto a = glm::vec3(-8, 1, 5);  // imaginary rectangle corner to opposite corner
-    auto b = glm::vec3(8, 6, -5);
-    auto bubbles = createSparsedSpheres(memoryManager, a, b, glass2, 30 , 0.02);
-    // auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(0, 3, -30)));
-    bvh1 = createBVH(memoryManager, bubbles);
-    h_hittables_list.push_back(bvh1);
+    // auto glass = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.5f);
+
+    // //ghosted monkey
+    // createModelFromFile(builder, "images/monkey.obj");
+    // offset = glm::vec3(0.0, 2.0, 7.0);
+    // scale = glm::vec3(1.0);
+    // // tex = createTexture(memoryManager, Type::IMAGE, {}, {}, "texture/Metal024_4K-JPG/Metal024_4K-JPG_Color.jpg");
+    // auto yellow = createTexture(memoryManager, Type::SOLID, glm::vec3(1.0, 2.0, .2));
+    // auto monkey = createModel(memoryManager, builder, offset, scale, yellow);
+
+    // auto dark = createTexture(memoryManager, Type::SOLID, glm::vec3(0.0f, 0.0f, 0.1f));
+    // auto smoke = createMaterial(memoryManager, Type::ISOTROPIC, dark);
+    // auto ghostMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 1.2f, smoke));
+    // bvh1 = createBVH(memoryManager, ghostMonkey);
+    
+    // h_hittables_list.push_back(bvh1);
+
+    // // golden monkey
+    // createModelFromFile(builder, "images/monkey.obj");
+    // offset = glm::vec3(2.5, 2.0, 7.0);
+    // scale = glm::vec3(1.0);
+    // auto goldenMetal = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(1.0, 0.8, 0.1), 0.3);
+    // auto goldenMonkey = createModel(memoryManager, builder, offset, scale, {}, goldenMetal);
+    // bvh1 = createBVH(memoryManager, goldenMonkey);
+    // h_hittables_list.push_back(bvh1);
+
+    // // shiny monkey
+    // createModelFromFile(builder, "images/monkey.obj");
+    // offset = glm::vec3(-2.5, 2.0, 7.0);
+    // scale = glm::vec3(1.0);
+    // monkey = createModel(memoryManager, builder, offset, scale, {}, glass);
+    // auto blue_tex = createTexture(memoryManager, Type::SOLID, glm::vec3(0.2, 0.4, 0.9));
+    // auto blue_mat = createMaterial(memoryManager, Type::ISOTROPIC, blue_tex);
+    // auto shinyMonkey = memoryManager.allocateHost<hittable>(hittable::make_constantMedium(monkey, 4.0, blue_mat));
+    // bvh1 = createBVH(memoryManager, shinyMonkey);
+    // h_hittables_list.push_back(bvh1);
+
+
+    // // // ground
+    // tex = createTexture(memoryManager, Type::CHECKER, glm::vec3(0.2f, 0.3f, 0.1f), glm::vec3(0.9f, 0.9f, 0.9f),{}, {}, 0.32f);
+    // auto ground = createMaterial(memoryManager, Type::LAMBERTIAN, tex);
+    // auto hittable_obj = hittable::make_sphere(glm::vec3(0.0,-1000.0, 0.0), 1000, ground);
+    // h_hittables_list.push_back(hittable_obj);
+
+    // auto silver = createMaterial(memoryManager, Type::METAL, {}, glm::vec3(0.7f, 0.6f, 0.5f), 0.0, {});
+    // hittable_obj = hittable::make_sphere(glm::vec3(1.0f, 1.0f, 0.0f), 1.0f, silver);
+    // h_hittables_list.push_back(hittable_obj);
+
+    
+    // hittable_obj = hittable::make_sphere(glm::vec3(-2.5f, 3.0, -2.0), 1.0, glass);
+    // h_hittables_list.push_back(hittable_obj);
+
+    // auto glass2 = createMaterial(memoryManager, Type::DIELECTRIC, {}, {}, {}, 1.05f);
+    
+    // auto a = glm::vec3(-8, 1, 5);  // imaginary rectangle corner to opposite corner
+    // auto b = glm::vec3(8, 6, -5);
+    // auto bubbles = createSparsedSpheres(memoryManager, a, b, glass2, 30 , 0.02);
+    // // auto translated = memoryManager.allocateHost<hittable>(hittable::make_translate(conglomerate, glm::vec3(0, 3, -30)));
+    // bvh1 = createBVH(memoryManager, bubbles);
+    // h_hittables_list.push_back(bvh1);
     
     size_t number_of_hittables = h_hittables_list.size();
 
