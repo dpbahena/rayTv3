@@ -815,19 +815,37 @@ inline glm::vec3 ray_color(curandStatePhilox4_32_10_t& rngState, int depth, cons
         glm::vec3 attenuation;
         bool did_scatter = false;
         //* Scatter based on material type
-        if (rec.mat->type == Type::METAL){
-            did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, rngState);
-        } else if (rec.mat->type == Type::LAMBERTIAN){
-            did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, rngState);
-        } else if (rec.mat->type == Type::DIELECTRIC){
-            did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, rngState);    
-        } else if (rec.mat->type == Type::ISOTROPIC){
-            did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, rngState);    
+        switch(rec.mat->type){
+            case Type::METAL:
+                did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, rngState);
+                break;
+            case Type::LAMBERTIAN:
+                did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, rngState);
+                break;
+            case Type::DIELECTRIC:
+                did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, rngState);        
+                break;
+            case Type::ISOTROPIC:
+                did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, rngState);        
+                break;
+            default:
+                return final_color;
+                break;
         }
+
+        // if (rec.mat->type == Type::METAL){
+        //     did_scatter = metal_scatter(cur_ray, rec, attenuation, scattered, rec.mat->metal, rngState);
+        // } else if (rec.mat->type == Type::LAMBERTIAN){
+        //     did_scatter = lambertian_scatter(cur_ray, rec, attenuation, scattered, rec.mat->lambertian, rngState);
+        // } else if (rec.mat->type == Type::DIELECTRIC){
+        //     did_scatter = dielectric_scatter(cur_ray, rec, attenuation, scattered, rec.mat->dielectric, rngState);    
+        // } else if (rec.mat->type == Type::ISOTROPIC){
+        //     did_scatter = isotropic_scatter(cur_ray, rec, attenuation, scattered, rec.mat->isotropic, rngState);    
+        // }
         //* If scattering did not occur, return the accumulated color
-        if(!did_scatter) {
-            return final_color;
-        }
+        // if(!did_scatter) {
+        //     return final_color;
+        // }
         
         //* Update the current ray and attenuation for the next bounce
         cur_ray = scattered;
