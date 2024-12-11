@@ -1,4 +1,4 @@
-#include "cuda_call.h"
+#include "CUDAHandler.h"
 #include "hittable.h"
 #include "sphere.h"
 #include "mem_manager.h"
@@ -8,6 +8,7 @@
 #include <vector>
 #include <random>
 #include <chrono>
+#include <cuda_gl_interop.h>
 
 #define MAX_STACK_SIZE 20
 
@@ -1851,7 +1852,18 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hi
 
 }
 
-void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
+CUDAHandler::CUDAHandler(GLuint textureID) : cudaResource(NULL) 
+{
+    cudaGraphicsGLRegisterImage(&cudaResource, textureID, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsSurfaceLoadStore);
+}
+
+CUDAHandler::~CUDAHandler()
+{
+    
+}
+
+// void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
+void CUDAHandler::updateRaytracer(Camera &cam)
 {
 
 
@@ -1965,7 +1977,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
     printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
 
-    checkCuda(cudaMemcpy(colorBuffer, d_buffer, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    // checkCuda(cudaMemcpy(colorBuffer, d_buffer, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
     
     //*...
     //* Memory manager will take care of cleaning memory allocations at exit

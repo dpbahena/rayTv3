@@ -11,19 +11,30 @@ project(${PROJECT_NAME} VERSION 0.1.0 LANGUAGES C CXX CUDA)
 # Set the CUDA architecture
 set(CMAKE_CUDA_ARCHITECTURES 86)
 
+
+# Find OpenGL and GLUT packages
+find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
+
+# Find the CUDA Toolkit
+find_package(CUDAToolkit REQUIRED)
+
 # Find SDL2 package
-find_package(SDL2 REQUIRED)
-include_directories(${SDL2_INCLUDE_DIRS})
+# find_package(SDL2 REQUIRED)
+# include_directories(${SDL2_INCLUDE_DIRS})
 
 # Collect all source files in the src directory
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.cu")
-file(GLOB_RECURSE HEADERS "src/*.hpp" )
+file(GLOB_RECURSE HEADERS "src/*.h" "src/*.hpp" )
 
 # Add the main executable and specify all source files
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
-# Link SDL2 library
-target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+# # Link SDL2 library
+# target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+
+# Link OpenGL, GLUT, and CUDA libraries
+target_link_libraries(${PROJECT_NAME} OpenGL::GL GLUT::GLUT ${CUDAToolkit_LIBRARIES})
 
 # Specify properties for CUDA compilation
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -33,6 +44,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ${CMAKE_SOURCE_DIR}/src
+    ${CUDAToolkit_INCLUDE_DIRS}     # Modern CUDA include directory
     ${CMAKE_SOURCE_DIR}/libraries/stb
     ${CMAKE_SOURCE_DIR}/libraries/tinyobject
 )
