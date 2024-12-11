@@ -1859,7 +1859,7 @@ CUDAHandler::CUDAHandler(GLuint textureID) : cudaResource(NULL)
 
 CUDAHandler::~CUDAHandler()
 {
-    
+    cudaGraphicsUnregisterResource(cudaResource);
 }
 
 // void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
@@ -1879,6 +1879,20 @@ void CUDAHandler::updateRaytracer(Camera &cam)
         checkCuda(cudaDeviceSetLimit(cudaLimitStackSize, newSize));
          printf("New Stack Size: %d bytes\n", (int)newSize);
     }
+
+    //* Map the resource for CUDA
+    cudaArray_t array;
+    cudaGraphicsMapResources(1, &cudaResource, 0);
+    cudaGraphicsSubResourceGetMappedArray(&array, cudaResource, 0, 0);
+
+    //* Create a CUDA surface object
+    cudaResourceDesc resDesc = {};
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = array;
+
+    cudaSurfaceObject_t surface = 0;
+    cudaCreateSurfaceObject(&surface, &resDesc);
+    
     HybridMemoryManager memoryManager;
    
     hittable*   d_hittables_list    = memoryManager.deferDeviceAllocation<hittable>();
