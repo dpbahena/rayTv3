@@ -8,7 +8,7 @@
 #include <vector>
 #include <random>
 #include <chrono>
-#include <cuda_gl_interop.h>
+// #include <cuda_gl_interop.h>
 
 #define MAX_STACK_SIZE 20
 
@@ -746,6 +746,11 @@ inline glm::vec3 random_in_unit_sphere(curandStatePhilox4_32_10_t* rngState) {
     }
 }
 
+__device__ inline float clamp(float value, float minVal, float maxVal) {
+    return fmaxf(minVal, fminf(value, maxVal));
+}
+
+
 __device__
 inline glm::vec3 random_in_unit_disk(curandStatePhilox4_32_10_t* rngState){
         
@@ -885,8 +890,8 @@ unsigned long long seed = static_cast<unsigned long long>(
 
 
 __global__ void rayTracer_kernel_shared(
+    cudaSurfaceObject_t surface,
     Camera* cam,
-    float* image,
     hittable* world,
     unsigned long long seed)
 {
@@ -959,14 +964,36 @@ __global__ void rayTracer_kernel_shared(
 
     __syncthreads();
 
-    // Write back to global memory
-    if (thread_in_pixel == 0) {
-        int pixel_index = pixel_y * cam->image_width + pixel_x;
-        int image_base_index = pixel_index * 3;
+    // // Write back to global memory
+    // if (thread_in_pixel == 0) {
+    //     int pixel_index = pixel_y * cam->image_width + pixel_x;
+    //     int image_base_index = pixel_index * 3;
 
-        image[image_base_index + 0] += shared_colors[shared_mem_idx + 0];
-        image[image_base_index + 1] += shared_colors[shared_mem_idx + 1];
-        image[image_base_index + 2] += shared_colors[shared_mem_idx + 2];
+    //     image[image_base_index + 0] += shared_colors[shared_mem_idx + 0];
+    //     image[image_base_index + 1] += shared_colors[shared_mem_idx + 1];
+    //     image[image_base_index + 2] += shared_colors[shared_mem_idx + 2];
+    // }
+
+    // Write back to surface memory
+    if (thread_in_pixel == 0) {
+        glm::vec3 final_color = glm::vec3(
+            shared_colors[shared_mem_idx + 0],
+            shared_colors[shared_mem_idx + 1],
+            shared_colors[shared_mem_idx + 2]
+        ) / static_cast<float>(cam->samples_per_pixel);
+
+        // Apply gamma correction (if needed)
+        final_color = glm::sqrt(final_color);
+
+        // Convert to RGBA
+        uchar4 rgba;
+        rgba.x = static_cast<unsigned char>(clamp(final_color.r * 255.99f, 0.0f, 255.0f));
+        rgba.y = static_cast<unsigned char>(clamp(final_color.g * 255.99f, 0.0f, 255.0f));
+        rgba.z = static_cast<unsigned char>(clamp(final_color.b * 255.99f, 0.0f, 255.0f));
+        rgba.w = 255; // Fully opaque
+
+        // Write to the surface
+        surf2Dwrite(rgba, surface, pixel_x * sizeof(uchar4), pixel_y);
     }
 }
 
@@ -1852,7 +1879,7 @@ void finalScene(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d_hi
 
 }
 
-CUDAHandler::CUDAHandler(GLuint textureID) : cudaResource(NULL) 
+CUDAHandler::CUDAHandler(GLuint textureID, Camera& cam) : cam(cam), cudaResource(NULL) 
 {
     cudaGraphicsGLRegisterImage(&cudaResource, textureID, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsSurfaceLoadStore);
 }
@@ -1863,7 +1890,7 @@ CUDAHandler::~CUDAHandler()
 }
 
 // void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
-void CUDAHandler::updateRaytracer(Camera &cam)
+void CUDAHandler::updateRaytracer()
 {
 
 
@@ -1972,24 +1999,27 @@ void CUDAHandler::updateRaytracer(Camera &cam)
     // Calculate shared memory size
     size_t shared_mem_size = pixels_per_block * 3 * sizeof(float);
 
-    
 
     // Launch the kernel
-    rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_cam, d_image, d_world, seed);
-    checkCuda(cudaGetLastError());
-    // checkCuda(cudaDeviceSynchronize());
-
-    // Set up block and grid sizes
-    dim3 blockSize1(16, 16);
-    dim3 gridSize1((cam.image_width + blockSize.x - 1) / blockSize.x, (cam.image_height + blockSize.y - 1) / blockSize.y);
-
-    // Launch the kernel
-    addToColorBuffer<<<gridSize1, blockSize1>>>(d_image, d_buffer, cam.image_width, cam.image_height, cam.pixel_sample_scale);
+    rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(surface, d_cam, d_world, seed);
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
+
+    // // Set up block and grid sizes
+    // dim3 blockSize1(16, 16);
+    // dim3 gridSize1((cam.image_width + blockSize.x - 1) / blockSize.x, (cam.image_height + blockSize.y - 1) / blockSize.y);
+
+    // // Launch the kernel
+    // addToColorBuffer<<<gridSize1, blockSize1>>>(d_image, d_buffer, cam.image_width, cam.image_height, cam.pixel_sample_scale);
+    // checkCuda(cudaGetLastError());
+    // checkCuda(cudaDeviceSynchronize());
+
     stop = clock();
     double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
     printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
+
+    cudaDestroySurfaceObject(surface);
+    cudaGraphicsUnmapResources(1, &cudaResource);
 
     // checkCuda(cudaMemcpy(colorBuffer, d_buffer, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
     

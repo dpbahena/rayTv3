@@ -1,5 +1,4 @@
-// #include "window.hpp"
-// #include "renderer.hpp"
+
 #include "camera.h"
 #include "CUDAHandler.h"
 #include "GLManager.h"
@@ -14,7 +13,7 @@ CUDAHandler* cudaHandler;
 
 
 void display() {
-    // cudaHandler
+    cudaHandler->updateRaytracer();
     glManager->render();
 }
 
@@ -64,68 +63,13 @@ int main(int argc, char** argv) {
     cam.aspect_ratio = glManager->getExtent().width / static_cast<float>(glManager->getExtent().height);
     cam.image_width = glManager->getExtent().width;
 
-    cudaHandler = new CUDAHandler(glManager->getTextureID());
+    cudaHandler = new CUDAHandler(glManager->getTextureID(), cam);
          
     printf("Raytrace with %d samples with %d depth\n", cam.samples_per_pixel, cam.max_depth);
 
-    // bool rendered = false;
-    // bool ends = false;
 
-    while(win.windowIsOpen() && !ends) {
+    glutDisplayFunc(display);
+    glutIdleFunc(display);
 
-        if(!rendered) {
-            gpuOperations.cudaCall(cam, myRender.colorBuffer);
-            myRender.render();
-            rendered = true;
-        }
-        ends = cam.ends;
-        
-
-        
-        /* Check for keyboard input */
-        SDL_Event event;   // check for keyboard input
-        SDL_PollEvent(&event);
-
-        switch (event.type)
-        {
-            case SDL_QUIT:
-                win.closeWindow();
-                break;
-            case SDL_KEYDOWN:
-                switch (event.key.keysym.sym) {
-                    case SDLK_ESCAPE:
-                        win.closeWindow();
-                        break;
-                    case SDLK_SPACE: // redraw display
-                        cam.scene = (cam.scene % 12) + 1;  //* Cycle between 1, 2, 3, etc or n
-                        rendered = false;
-                    default:
-                        break;
-                }
-            default:
-                break;
-        }
-
-
-    }
-
-}
-
-
-void displayCallback() {
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Bind texture
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    // Draw a quad with the texture
-    glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
-    glTexCoord2f(1.0f, 0.0f); glVertex2f( 1.0f, -1.0f);
-    glTexCoord2f(1.0f, 1.0f); glVertex2f( 1.0f,  1.0f);
-    glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f,  1.0f);
-    glEnd();
-
-    // Swap buffers for display
-    glutSwapBuffers();
+    
 }
