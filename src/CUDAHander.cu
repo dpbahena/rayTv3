@@ -993,7 +993,9 @@ __global__ void rayTracer_kernel_shared(
         rgba.w = 255; // Fully opaque
 
         // Write to the surface
-        surf2Dwrite(rgba, surface, pixel_x * sizeof(uchar4), pixel_y);
+        int flipped_y = cam->image_height - 1 - pixel_y;
+        // surf2Dwrite(rgba, surface, pixel_x * sizeof(uchar4), pixel_y);
+        surf2Dwrite(rgba, surface, pixel_x * sizeof(uchar4), flipped_y);
     }
 }
 
@@ -1979,8 +1981,6 @@ void CUDAHandler::updateRaytracer()
         break;
     }
     Camera*     d_cam       = memoryManager.allocateDevice<Camera>();
-    float*   d_image     = memoryManager.allocateDevice<float>(cam.image_width * cam.image_height * sizeof(float));    // for display buffer
-    uint32_t* d_buffer     = memoryManager.allocateDevice<uint32_t>(cam.image_width * cam.image_height * sizeof(uint32_t));    // for display buffer
     
     memoryManager.copyToDevice(d_cam, &cam);
     
@@ -1988,8 +1988,8 @@ void CUDAHandler::updateRaytracer()
     start = clock();
 
      // Define threads per pixel and pixels per block
-    const int threads_per_pixel = 16; //8 16;  // Adjust as needed
-    const int pixels_per_block =  4;//8;    // Adjust as needed
+    const int threads_per_pixel = 16;   // Adjust as needed
+    const int pixels_per_block =  4;    // Adjust as needed
 
     // Set up block and grid sizes
     dim3 blockSize(threads_per_pixel, pixels_per_block);
@@ -2005,15 +2005,6 @@ void CUDAHandler::updateRaytracer()
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
 
-    // // Set up block and grid sizes
-    // dim3 blockSize1(16, 16);
-    // dim3 gridSize1((cam.image_width + blockSize.x - 1) / blockSize.x, (cam.image_height + blockSize.y - 1) / blockSize.y);
-
-    // // Launch the kernel
-    // addToColorBuffer<<<gridSize1, blockSize1>>>(d_image, d_buffer, cam.image_width, cam.image_height, cam.pixel_sample_scale);
-    // checkCuda(cudaGetLastError());
-    // checkCuda(cudaDeviceSynchronize());
-
     stop = clock();
     double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
     printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
@@ -2021,8 +2012,7 @@ void CUDAHandler::updateRaytracer()
     cudaDestroySurfaceObject(surface);
     cudaGraphicsUnmapResources(1, &cudaResource);
 
-    // checkCuda(cudaMemcpy(colorBuffer, d_buffer, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
-    
+  
     //*...
     //* Memory manager will take care of cleaning memory allocations at exit
 }
