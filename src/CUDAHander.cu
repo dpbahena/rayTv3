@@ -1,4 +1,5 @@
 #include "CUDAHandler.h"
+#include "helpers.cuh"
 #include "hittable.h"
 #include "sphere.h"
 #include "mem_manager.h"
@@ -1984,8 +1985,12 @@ void CUDAHandler::updateRaytracer()
     
     memoryManager.copyToDevice(d_cam, &cam);
     
-    clock_t start, stop;
-    start = clock();
+    // clock_t start, stop;
+    // start = clock();
+    Timer timer;
+
+    timer.start();
+
 
      // Define threads per pixel and pixels per block
     const int threads_per_pixel = 16;   // Adjust as needed
@@ -2005,9 +2010,10 @@ void CUDAHandler::updateRaytracer()
     checkCuda(cudaGetLastError());
     checkCuda(cudaDeviceSynchronize());
 
-    stop = clock();
-    double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
-    printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
+    // stop = clock();
+    timer.stop("raytracing");
+    // double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
+    // printf("Took %f seconds with %d samples per pixel and %d max depth\n", timer_seconds, cam.samples_per_pixel, cam.max_depth);
 
     cudaDestroySurfaceObject(surface);
     cudaGraphicsUnmapResources(1, &cudaResource);
