@@ -50,7 +50,7 @@ int main(int arg, char** argv) {
     cam.aspect_ratio = win.getExtent().width / static_cast<float>(win.getExtent().height);
     cam.image_width = win.getExtent().width;
          
-    printf("Raytrace with %d samples with %d depth\n", cam.samples_per_pixel, cam.max_depth);
+    // printf("Raytrace with %d samples with %d depth\n", cam.samples_per_pixel, cam.max_depth);
 
     bool rendered = false;
     bool ends = false;

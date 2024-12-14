@@ -1720,7 +1720,7 @@ void cornell_smoke(Camera& cam, HybridMemoryManager& memoryManager, hittable* &d
     
    
     size_t number_of_hittables = h_hittables_list.size();
-    printf("size: %d\n", (int)number_of_hittables);
+    // printf("size: %d\n", (int)number_of_hittables);
     
     memoryManager.allocateDeferred(d_hittable_list, number_of_hittables);
     memoryManager.copyToDevice(d_hittable_list, h_hittables_list.data(), number_of_hittables);
