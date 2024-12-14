@@ -34,7 +34,7 @@
 
     Window& window;
     
-    float* zBuffer = nullptr;
+    // float* zBuffer = nullptr;
     Extent2D extent;
     Extent2D offset;
 
@@ -69,7 +69,7 @@
     Renderer::~Renderer()
     {
         delete[] colorBuffer;
-        delete[] zBuffer;
+        // delete[] zBuffer;
         
     }
 
@@ -104,13 +104,13 @@
             throw std::runtime_error("Failed to allocate buffer memory");
         }
 
-        // Allocate memory for Z-buffer
-        allocation = windowSize * sizeof(float);
-        zBuffer = new float[allocation];
+        // // Allocate memory for Z-buffer
+        // allocation = windowSize * sizeof(float);
+        // zBuffer = new float[allocation];
 
-        if (zBuffer == nullptr) {
-            throw std::runtime_error("Failed to allocate Z-buffer memory");
-        }
+        // if (zBuffer == nullptr) {
+        //     throw std::runtime_error("Failed to allocate Z-buffer memory");
+        // }
     }
 
     void Renderer::initBuffers()
@@ -119,8 +119,8 @@
         memset(colorBuffer, 0xFF000000, windowSize * sizeof(uint32_t));
 
         // Init zbuffer to max Float
-        std::vector<float> host_zBuffer(windowSize, FLT_MAX);
-        memcpy(zBuffer, host_zBuffer.data(), windowSize * sizeof(float));
+        // std::vector<float> host_zBuffer(windowSize, FLT_MAX);
+        // memcpy(zBuffer, host_zBuffer.data(), windowSize * sizeof(float));
 
 
     }
