@@ -902,7 +902,7 @@ __global__ void rayTracer_kernel_shared(
     if (pixel_x >= cam->image_width || pixel_y >= N)
         return;
 
-    int global_pixel_y = pixel_y + lower;
+    // int global_pixel_y = pixel_y + lower;
     // Shared memory index
     extern __shared__ float shared_colors[];
     int shared_mem_idx = pixel_in_block * 3;
@@ -922,7 +922,7 @@ __global__ void rayTracer_kernel_shared(
         samples_per_thread++;
 
     // Unique sequence for RNG (now correctly used)
-    unsigned long long sequence = ((unsigned long long)global_pixel_y * gridDim.x + pixel_x) * blockDim.x + thread_in_pixel;
+    unsigned long long sequence = ((unsigned long long)(pixel_y + lower) * gridDim.x + pixel_x) * blockDim.x + thread_in_pixel;
     // Total random numbers per sample (adjust based on actual usage)
     const int N_per_sample = 256; // estimate or calculate precisely
 
@@ -948,7 +948,7 @@ __global__ void rayTracer_kernel_shared(
             cam->defocus_disk_u,
             cam->defocus_disk_v,
             pixel_x,
-            global_pixel_y);
+            pixel_y + lower);
 
         // Compute color
         color += ray_color(rngState, cam->max_depth, cam->background, r, world);
@@ -1953,13 +1953,13 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 
     
       // Define threads per pixel and pixels per block
-    const int threads_per_pixel = 16; //8 16;  // Adjust as needed
-    const int pixels_per_block =  4;//8;    // Adjust as needed
+    const int threads_per_pixel = 24; //16; //8 16;  // Adjust as needed
+    const int pixels_per_block =  8; //4;//8;    // Adjust as needed
 
     // Set up block and grid sizes
     dim3 blockSize(threads_per_pixel, pixels_per_block);
-    dim3 gridSize(cam.image_width,
-                  (cam.image_height + pixels_per_block - 1) / pixels_per_block);
+    // dim3 gridSize(cam.image_width,
+    //               (cam.image_height + pixels_per_block - 1) / pixels_per_block);
      
 
     // Calculate shared memory size
@@ -1968,7 +1968,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
 
     // Set up block and grid sizes to copy to buffer
     dim3 blockSize1(16, 16);
-    dim3 gridSize1((cam.image_width + blockSize.x - 1) / blockSize.x, (cam.image_height + blockSize.y - 1) / blockSize.y);
+    // dim3 gridSize1((cam.image_width + blockSize.x - 1) / blockSize.x, (cam.image_height + blockSize.y - 1) / blockSize.y);
     
     clock_t start, stop;
     
@@ -1991,11 +1991,10 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
         const int upper = std::min(lower + chunk_size, cam.image_height);
         //* Since the tail stream range may not be 'chunk_size', we need to calculate a separate 'range' value;
         const int range = upper - lower;
-
-        // dim3 gridSize_chunk(cam.image_width, (range + pixels_per_block - 1) / pixels_per_block);
-        rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size, streams[stream]>>>(d_cam, d_image + (lower * cam.image_width * 3), range, d_world, seed, lower);
-        // dim3 gridSize1_chunk((cam.image_width + blockSize.x - 1) / blockSize.x, (range + blockSize.y - 1) / blockSize.y);
-        addToColorBuffer<<<gridSize1, blockSize1, 0, streams[stream]>>>(d_image + (lower * cam.image_width * 3), d_buffer + (lower * cam.image_width), cam.image_width, range, cam.pixel_sample_scale);
+        dim3 gridSize_chunk(cam.image_width, (range + pixels_per_block - 1) / pixels_per_block);
+        rayTracer_kernel_shared<<<gridSize_chunk, blockSize, shared_mem_size, streams[stream]>>>(d_cam, d_image + (lower * cam.image_width * 3), range, d_world, seed, lower);
+        dim3 gridSize1_chunk((cam.image_width + blockSize1.x - 1) / blockSize1.x,(range + blockSize1.y - 1) / blockSize1.y);
+        addToColorBuffer<<<gridSize1_chunk, blockSize1, 0, streams[stream]>>>(d_image + (lower * cam.image_width * 3), d_buffer + (lower * cam.image_width), cam.image_width, range, cam.pixel_sample_scale);
         cudaMemcpyAsync(h_buffer + (lower * cam.image_width), d_buffer + (lower * cam.image_width), sizeof(uint32_t) * cam.image_width * range, cudaMemcpyDeviceToHost, streams[stream]);
         
     }
@@ -2013,19 +2012,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     }
     check_last_error();
 
-    // stop = clock();
-
-    // Launch the kernel
-    // rayTracer_kernel_shared<<<gridSize, blockSize, shared_mem_size>>>(d_cam, d_image, d_world, seed);
-    // checkCuda(cudaGetLastError());
-    // checkCuda(cudaDeviceSynchronize());
-
-    
-
-    // Launch the kernel
-    // addToColorBuffer<<<gridSize1, blockSize1>>>(d_image, d_buffer, cam.image_width, cam.image_height, cam.pixel_sample_scale);
-    // checkCuda(cudaGetLastError());
-    // checkCuda(cudaDeviceSynchronize());
+  
     stop = clock();
 
     memcpy(colorBuffer, h_buffer, sizeof(uint32_t) * cam.image_width * cam.image_height);
@@ -2033,7 +2020,7 @@ void RayTracer::cudaCall(Camera &cam, uint32_t *colorBuffer)
     printf("Took %f seconds with %d samples per pixel, %d max depth, and %d streams\n", timer_seconds, cam.samples_per_pixel, cam.max_depth, cam.streams);
 
     cudaFreeHost(h_buffer);
-    // checkCuda(cudaMemcpy(colorBuffer, d_buffer, cam.image_width * cam.image_height * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+   
     
     //*...
     //* Memory manager will take care of cleaning memory allocations at exit
