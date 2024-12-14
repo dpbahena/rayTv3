@@ -30,6 +30,7 @@ class Camera {
         float defocus_angle = 0;  // Variation angle of rays through each pixel
         float focus_dist = 10;    // Distance from camera lookfrom point to plane of perfect focus
         bool ends = false;
+        int streams = 1;
         int scene = 1;
 
         Camera();
